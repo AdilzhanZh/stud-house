@@ -1,9 +1,19 @@
-# Student House — Backend (кезең 1: схема + Auth/RBAC)
+# Student House — Backend (кезең 1-3: схема + Auth/RBAC + өтініш + рапорт/дауыс)
 
 Қорқыт Ата атындағы Қызылорда университетінің жатақхана басқару жүйесі.
-Бұл кезеңде тек негізгі дерекқор схемасы мен авторизация/аутентификация
-(JWT + RBAC) жасалды. Өтініш/рапорт/келісімшарт/төлем логикасы келесі
-кезеңдерде қосылады.
+
+- **Кезең 1**: негізгі дерекқор схемасы (users/dormitories/rooms/benefits)
+  мен авторизация/аутентификация (JWT + RBAC).
+- **Кезең 2**: «студент өтініш береді → менеджер қарайды» ағыны —
+  `applications`, `application_status_history`, `application_documents`,
+  `notifications`.
+- **Кезең 3** (осы қосымша): «менеджер approved өтініштерден рапорт
+  құрастырады → комиссия дауыс береді → рапорт мақұлданады/қабылданбайды»
+  ағыны — `report_templates`, `reports`, `report_applications`,
+  `committee_votes`.
+
+Келісімшарт, төлем, "кері байланыс күту уақыты" логикасы, нақты
+.docx/PDF генерациясы, email/SMTP интеграциясы — 4-ші кезеңде.
 
 ## Стек
 
@@ -25,6 +35,7 @@ internal/domain/         — доменнің struct-тары (User, Room, Benef
 internal/repository/     — репозиторий интерфейстері + Postgres іске асыруы
   └── postgres/
 internal/service/        — бизнес-логика (validation, RBAC ережелері, auth)
+  └── notifier/            — in-app хабарлама stub-ы (Notify)
 internal/http/           — HTTP қабаты
   ├── handler/            — gin handler-лері + DTO-лар
   ├── middleware/          — JWT auth, RBAC (RequireRole)
@@ -55,6 +66,14 @@ migrations/              — golang-migrate SQL миграциялары
 | `benefits`, `benefit_fields`, `benefit_required_documents` | льгота түрлері мен олардың өрістері/құжаттары |
 | `student_benefits` | студентке льгота тағайындалғаны (минимал жазба — толық өтініш логикасы емес) |
 | `refresh_tokens` | refresh token хэштері, logout/revoke үшін |
+| `applications` | жатақханаға өтініштер, `status` enum (`pending/manager_review/needs_correction/approved/rejected`); студентке — бір белсенді өтініш деген partial unique index |
+| `application_status_history` | әр статус ауысуының аудит логы (`from_status`/`to_status`/`comment`/`changed_by`) |
+| `application_documents` | студент жүктеген құжаттар (тек `file_url`, файл сақтау инфрақұрылымы жоқ) |
+| `notifications` | in-app хабарламалар (`is_read`, `related_application_id`) |
+| `report_templates` | менеджер жүктеген рапорт шаблоны (`name`, `file_url`) |
+| `reports` | рапорттар, `status` enum (`pending_committee/approved/rejected`), `previous_report_id` — қайта жіберілген рапорттың тізбегі |
+| `report_applications` | рапортқа кірген өтініштер (көп-көпке) |
+| `committee_votes` | комиссия мүшесінің дауысы (`decision` nullable, `reason`, `voted_at`) |
 
 Chairperson бөлек рөл емес — `committee_member` рөлінің үстіне қосымша
 `is_chairperson` флагы (DB CHECK constraint осыны бекітеді).
@@ -69,6 +88,72 @@ Chairperson бөлек рөл емес — `committee_member` рөлінің ү�
   жаңа шектеумен салыстырады; біреуі де сәйкес келмесе — `409 Conflict`.
   Керісінше, `POST /rooms/{roomId}/residents` жаңа тұрғынды бөлменің
   қолданыстағы шектеуімен және бос орынымен тексереді.
+
+### Application (өтініш) статус машинасы
+
+```
+pending → (manager_review) → approved | rejected | needs_correction
+needs_correction → pending (студент PATCH /applications/{id} арқылы қайта жібергенде)
+```
+
+- **Бөлек "claim" endpoint жоқ**: `PATCH /applications/{id}/decision`
+  application жолын (`SELECT ... FOR UPDATE`) құлыптап, `pending →
+  manager_review → соңғы статус` ауысуын бір транзакцияда жасайды. Екі
+  менеджер бір өтінішке қатар шешім қабылдамақ болса — екіншісі жолдың
+  құлпы ашылғанша күтеді де, статус енді `pending` болмағандықтан
+  `409 Conflict` алады.
+- **Бір студент — бір белсенді өтініш**: `pending`/`manager_review`/
+  `needs_correction` статусындағы өтінішкезінде екінші өтініш жасауға
+  болмайды (DB-де partial unique index + сервис деңгейінде тексеріс).
+  Сонымен қатар, студент қазірдің өзінде бір бөлмеде тұрса (`room_residents`
+  жазбасы бар) — жаңа өтініш жасай алмайды.
+- **approve** — `room_id` міндетті, 1-ші кезеңдегі `RoomService.AddResident`
+  қайта шақырылады (capacity + restriction валидациясы), сол сәтте
+  `assigned_room_id` толтырылып, `room_residents`-ке жазба қосылады.
+- **reject** / **request_correction** — `comment` міндетті.
+- Әр ауысу `application_status_history`-ге жазылады, студентке
+  `notifier.Notify()` арқылы in-app хабарлама жіберіледі.
+
+### Рапорт/комиссия дауысы (кезең 3)
+
+```
+pending_committee → approved (барлық дауыс 'approved' болса, барлығы дауыс бергеннен кейін)
+pending_committee → rejected (кем дегенде бір дауыс 'rejected' болса, барлығы дауыс бергеннен кейін)
+rejected → (revise) → жаңа reports жазбасы, previous_report_id = ескі report.id
+```
+
+- **Дауыс саны ережесі — unanimous**: `approved` болу үшін комиссияның
+  **барлық** мүшесі 'approved' деп дауыс беруі керек. Қорытынды тек
+  барлық мүше дауыс бергеннен кейін шығарылады (жартылай дауыспен ертерек
+  шешім қабылданбайды); сол сәтте кем дегенде біреуі 'rejected' болса —
+  `report.status='rejected'`. Бұл — спекте "TODO" деп белгіленген жердегі
+  нақтыланған ереже (пайдаланушымен келісілген).
+- **POST /reports** — `application_ids`-тың әрқайсысы `status='approved'`
+  болуын және басқа `pending_committee` рапортта жоқтығын
+  `SELECT ... FOR UPDATE` арқылы құлыптап тексереді (`applications`
+  кестесінің жолдарын құлыптау — партиал unique index/CHECK бұл екі
+  ережені DB деңгейінде толық өрнектей алмайды, себебі басқа кестенің
+  мәніне тәуелді). Committee_votes-қа сол сәттегі барлық
+  `committee_member` үшін `decision=NULL` жол жасалады, әрқайсысына
+  notification жіберіледі.
+- **PATCH /reports/{id}/vote** — тек `pending_committee` рапортта, тек
+  өз дауысын. Дауыс құлыпталған рапорт жолымен (`WithVoteLock`) бір
+  транзакцияда есептеледі — екі мүше қатар дауыс берсе, екіншісі
+  біріншісі аяқталғанша күтеді.
+- **POST /reports/{id}/revise** — тек `status='rejected'` рапортта.
+  Ескі рапорттағы, жаңа тізімде жоқ өтініштер `applications.status='rejected'`
+  болып қойылады (`application_status_history`-ге "Комиссия
+  мақұлдамағаннан кейін менеджер алып тастады" деп жазылады). Жаңа
+  рапорт **сол шаблонмен**, таза (`decision=NULL`) дауыспен құрылады.
+- **GET /reports/{id}** — кез келген аутентификацияланған пайдаланушыға
+  оқуға қолжетімді, тек `committee_member` дауыс бере алады.
+- **GET /reports/{id}/export** — толық document generation (докх/PDF)
+  бұл кезеңде жоқ; endpoint тек JSON түрінде шаблон `file_url`-ін және
+  рапорттағы студенттер тізімін (аты-жөні, email, телефон, бөлме) қайтарады.
+- Report notification-дары үшін `notifications.type` enum-ына жаңа
+  `'report_review'` мәні қосылды (жеке миграция арқылы — ескі
+  `application_status_changed`/`document_requested` бір өтінішке
+  байланысты, ал рапорт бүкіл топқа қатысты).
 
 ## Auth және RBAC
 
@@ -85,6 +170,47 @@ Chairperson бөлек рөл емес — `committee_member` рөлінің ү�
 - Оқу (`GET`) endpoint-тері — кез келген аутентификацияланған пайдаланушы
 - Студент өз профилін (`/students/{id}/profile`) тек өзі немесе
   admin/manager өзгерте алады
+
+### Application/Notification endpoint-тері (кезең 2)
+
+**Student:**
+| Метод | Маршрут | Сипаттама |
+|---|---|---|
+| POST | `/api/v1/applications` | жаңа өтініш жасау |
+| GET | `/api/v1/applications/my` | өз өтініштерім |
+| PATCH | `/api/v1/applications/{id}` | тек `needs_correction`-де, тек өзінікін өзгерту → `pending`-ге қайтады |
+| POST | `/api/v1/applications/{id}/documents` | құжат қосу (тек `file_url` қабылданады) |
+| GET | `/api/v1/notifications` | өз хабарламаларым |
+| PATCH | `/api/v1/notifications/{id}/read` | оқылды деп белгілеу |
+
+**Manager (admin да істей алады):**
+| Метод | Маршрут | Сипаттама |
+|---|---|---|
+| GET | `/api/v1/applications?status=pending` | кезекті сүзгімен көру |
+| GET | `/api/v1/applications/{id}` | толық ақпарат (өтініш + құжаттар + тарих) |
+| PATCH | `/api/v1/applications/{id}/decision` | `{action: approve\|reject\|request_correction, room_id?, comment?}` |
+
+### Report/Committee endpoint-тері (кезең 3)
+
+**Manager (admin да істей алады):**
+| Метод | Маршрут | Сипаттама |
+|---|---|---|
+| POST | `/api/v1/report-templates` | шаблон жүктеу (`name`, `file_url`) |
+| GET | `/api/v1/report-templates` | шаблондар тізімі |
+| POST | `/api/v1/reports` | `{template_id, application_ids}` — жаңа рапорт, комиссияға жіберіледі |
+| GET | `/api/v1/reports?status=pending_committee` | рапорттар тізімі сүзгімен |
+| POST | `/api/v1/reports/{id}/revise` | `{application_ids}` — тек `rejected` рапортта, жаңа рапорт жасайды |
+| GET | `/api/v1/reports/{id}/export` | шаблон `file_url` + студенттер тізімі (JSON) |
+
+**Committee (кез келген комиссия мүшесі, соның ішінде chairperson):**
+| Метод | Маршрут | Сипаттама |
+|---|---|---|
+| PATCH | `/api/v1/reports/{id}/vote` | `{decision: approved\|rejected, reason?}` |
+
+**Кез келген аутентификацияланған пайдаланушы:**
+| Метод | Маршрут | Сипаттама |
+|---|---|---|
+| GET | `/api/v1/reports/{id}` | рапорт + студенттер + әр мүшенің дауысы |
 
 Толық маршрут тізімі — `internal/http/router.go`.
 
@@ -144,7 +270,14 @@ bcrypt хэші.)
 
 ## Кейінгі кезеңдерге қалдырылғандар
 
-Өтініш (application), рапорт, келісімшарт, хабарлама, төлем логикасы —
-осы кезеңде жоқ. `student_benefits` кестесі тек room restriction
-валидациясы үшін минимал "студентте льгота бар" жазбасын сақтайды —
-бұл льгота алу процесінің (approval workflow) толық емес нұсқасы.
+Келісімшарт жіберу, төлем QR, "кері байланыс күту уақыты" логикасы — 4-ші
+кезеңде. Нақты .docx/PDF генерациясы (шаблон placeholder-ларын студент
+деректерімен ауыстыру) жасалмады — `GET /reports/{id}/export` тек JSON
+қайтарады. Нақты email/SMTP интеграциясы жоқ (`internal/service/notifier`
+тек DB-ге жазып, логқа шығарады). Файл сақтау инфрақұрылымы (S3/MinIO/disk)
+орнатылмаған — `application_documents`/`report_templates` тек
+frontend-тен келген `file_url`-ды қабылдайды. `student_benefits` кестесі
+тек room restriction валидациясы үшін минимал "студентте льгота бар"
+жазбасын сақтайды — бұл льгота алу процесінің (approval workflow) толық
+емес нұсқасы. Chairperson-ге ерекше салмақты дауыс құқығы жоқ — ол
+`committee_member` ретінде тең дауыс береді.

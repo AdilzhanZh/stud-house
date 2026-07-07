@@ -9,11 +9,14 @@ import (
 )
 
 type Handlers struct {
-	Auth      *handler.AuthHandler
-	User      *handler.UserHandler
-	Dormitory *handler.DormitoryHandler
-	Room      *handler.RoomHandler
-	Benefit   *handler.BenefitHandler
+	Auth         *handler.AuthHandler
+	User         *handler.UserHandler
+	Dormitory    *handler.DormitoryHandler
+	Room         *handler.RoomHandler
+	Benefit      *handler.BenefitHandler
+	Application  *handler.ApplicationHandler
+	Notification *handler.NotificationHandler
+	Report       *handler.ReportHandler
 }
 
 func NewRouter(jwtSecret string, h Handlers) *gin.Engine {
@@ -21,6 +24,8 @@ func NewRouter(jwtSecret string, h Handlers) *gin.Engine {
 
 	admin := middleware.RequireRole(domain.RoleAdmin)
 	adminOrManager := middleware.RequireRole(domain.RoleAdmin, domain.RoleManager)
+	studentOnly := middleware.RequireRole(domain.RoleStudent)
+	committeeOnly := middleware.RequireRole(domain.RoleCommitteeMember)
 	auth := middleware.RequireAuth(jwtSecret)
 
 	api := r.Group("/api/v1")
@@ -65,6 +70,31 @@ func NewRouter(jwtSecret string, h Handlers) *gin.Engine {
 			protected.PUT("/students/:id/profile", h.User.UpsertStudentProfile)
 			protected.GET("/students/:id/profile", h.User.GetStudentProfile)
 
+			// Any authenticated user: their own in-app notifications.
+			protected.GET("/notifications", h.Notification.ListMine)
+			protected.PATCH("/notifications/:id/read", h.Notification.MarkRead)
+
+			// Any authenticated user: read a report (only committee_member can vote).
+			protected.GET("/reports/:id", h.Report.GetDetail)
+
+			// Committee-only: chairperson qualifies automatically (a flag on
+			// top of committee_member, not a separate role).
+			committeeGroup := protected.Group("")
+			committeeGroup.Use(committeeOnly)
+			{
+				committeeGroup.PATCH("/reports/:id/vote", h.Report.Vote)
+			}
+
+			// Student-only: submitting and managing their own application.
+			studentGroup := protected.Group("")
+			studentGroup.Use(studentOnly)
+			{
+				studentGroup.POST("/applications", h.Application.Create)
+				studentGroup.GET("/applications/my", h.Application.ListMine)
+				studentGroup.PATCH("/applications/:id", h.Application.Resubmit)
+				studentGroup.POST("/applications/:id/documents", h.Application.AddDocument)
+			}
+
 			// Admin+Manager: dormitory/room/benefit management.
 			mgmt := protected.Group("")
 			mgmt.Use(adminOrManager)
@@ -92,6 +122,18 @@ func NewRouter(jwtSecret string, h Handlers) *gin.Engine {
 
 				mgmt.POST("/students/:id/benefits", h.Benefit.AssignBenefit)
 				mgmt.DELETE("/students/:id/benefits/:benefitId", h.Benefit.RevokeBenefit)
+
+				mgmt.GET("/applications", h.Application.List)
+				mgmt.GET("/applications/:id", h.Application.GetDetail)
+				mgmt.PATCH("/applications/:id/decision", h.Application.Decide)
+
+				mgmt.POST("/report-templates", h.Report.CreateTemplate)
+				mgmt.GET("/report-templates", h.Report.ListTemplates)
+
+				mgmt.POST("/reports", h.Report.Create)
+				mgmt.GET("/reports", h.Report.List)
+				mgmt.POST("/reports/:id/revise", h.Report.Revise)
+				mgmt.GET("/reports/:id/export", h.Report.Export)
 			}
 		}
 	}

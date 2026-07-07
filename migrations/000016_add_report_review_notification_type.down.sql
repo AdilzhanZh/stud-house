@@ -1,0 +1,5 @@
+-- PostgreSQL has no ALTER TYPE ... DROP VALUE. Reverting this would require
+-- recreating notification_type without 'report_review' and rewriting the
+-- notifications.type column, which risks failing if any row already uses
+-- the value. Left as a no-op; roll back further migrations first if a full
+-- revert is ever required.

@@ -9,6 +9,7 @@ import (
 	"student-house/internal/http/handler"
 	"student-house/internal/repository/postgres"
 	"student-house/internal/service"
+	"student-house/internal/service/notifier"
 )
 
 func main() {
@@ -37,19 +38,31 @@ func main() {
 	benefitRepo := postgres.NewBenefitRepo(pool)
 	studentBenefitRepo := postgres.NewStudentBenefitRepo(pool)
 	refreshTokenRepo := postgres.NewRefreshTokenRepo(pool)
+	applicationRepo := postgres.NewApplicationRepo(pool)
+	applicationDocumentRepo := postgres.NewApplicationDocumentRepo(pool)
+	notificationRepo := postgres.NewNotificationRepo(pool)
+	reportTemplateRepo := postgres.NewReportTemplateRepo(pool)
+	reportRepo := postgres.NewReportRepo(pool)
 
 	authService := service.NewAuthService(userRepo, refreshTokenRepo, cfg.JWTSecret, cfg.AccessTokenTTL, cfg.RefreshTokenTTL)
 	userService := service.NewUserService(userRepo, studentProfileRepo)
 	dormitoryService := service.NewDormitoryService(dormitoryRepo)
 	roomService := service.NewRoomService(roomRepo, dormitoryRepo, userRepo, studentProfileRepo, studentBenefitRepo)
 	benefitService := service.NewBenefitService(benefitRepo, userRepo, studentBenefitRepo)
+	notifierService := notifier.New(notificationRepo)
+	applicationService := service.NewApplicationService(applicationRepo, applicationDocumentRepo, dormitoryRepo, roomRepo, roomService, notifierService)
+	notificationService := service.NewNotificationService(notificationRepo)
+	reportService := service.NewReportService(reportTemplateRepo, reportRepo, applicationRepo, userRepo, notifierService)
 
 	handlers := apihttp.Handlers{
-		Auth:      handler.NewAuthHandler(authService),
-		User:      handler.NewUserHandler(userService),
-		Dormitory: handler.NewDormitoryHandler(dormitoryService),
-		Room:      handler.NewRoomHandler(roomService),
-		Benefit:   handler.NewBenefitHandler(benefitService),
+		Auth:         handler.NewAuthHandler(authService),
+		User:         handler.NewUserHandler(userService),
+		Dormitory:    handler.NewDormitoryHandler(dormitoryService),
+		Room:         handler.NewRoomHandler(roomService),
+		Benefit:      handler.NewBenefitHandler(benefitService),
+		Application:  handler.NewApplicationHandler(applicationService),
+		Notification: handler.NewNotificationHandler(notificationService),
+		Report:       handler.NewReportHandler(reportService),
 	}
 
 	router := apihttp.NewRouter(cfg.JWTSecret, handlers)

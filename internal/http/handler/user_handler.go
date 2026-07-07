@@ -1,0 +1,174 @@
+package handler
+
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+
+	"student-house/internal/domain"
+	"student-house/internal/http/middleware"
+	"student-house/internal/service"
+	"student-house/pkg/apperror"
+	"student-house/pkg/response"
+)
+
+type UserHandler struct {
+	users *service.UserService
+}
+
+func NewUserHandler(users *service.UserService) *UserHandler {
+	return &UserHandler{users: users}
+}
+
+type createUserRequest struct {
+	FullName string      `json:"full_name" binding:"required"`
+	Email    string      `json:"email" binding:"required,email"`
+	Phone    string      `json:"phone"`
+	Password string      `json:"password" binding:"required"`
+	Role     domain.Role `json:"role" binding:"required"`
+}
+
+// CreateUser is admin-only: registers a user with any role (including admin).
+func (h *UserHandler) CreateUser(c *gin.Context) {
+	var req createUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.BadRequest(err.Error()))
+		return
+	}
+	user, err := h.users.CreateUser(c.Request.Context(), req.FullName, req.Email, req.Phone, req.Password, req.Role)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.Created(c, userDTO(user))
+}
+
+type updateRoleRequest struct {
+	Role domain.Role `json:"role" binding:"required"`
+}
+
+// UpdateRole is admin-only.
+func (h *UserHandler) UpdateRole(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, apperror.BadRequest("invalid user id"))
+		return
+	}
+	var req updateRoleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.BadRequest(err.Error()))
+		return
+	}
+	if err := h.users.UpdateRole(c.Request.Context(), id, req.Role); err != nil {
+		response.Error(c, err)
+		return
+	}
+	user, err := h.users.GetByID(c.Request.Context(), id)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, userDTO(user))
+}
+
+type setChairpersonRequest struct {
+	IsChairperson bool `json:"is_chairperson"`
+}
+
+// SetChairperson is admin-only.
+func (h *UserHandler) SetChairperson(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, apperror.BadRequest("invalid user id"))
+		return
+	}
+	var req setChairpersonRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.BadRequest(err.Error()))
+		return
+	}
+	if err := h.users.SetChairperson(c.Request.Context(), id, req.IsChairperson); err != nil {
+		response.Error(c, err)
+		return
+	}
+	user, err := h.users.GetByID(c.Request.Context(), id)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, userDTO(user))
+}
+
+// ListCommitteeMembers returns every user with role=committee_member, for the
+// chairperson-assignment picker. Admin and manager may both view it.
+func (h *UserHandler) ListCommitteeMembers(c *gin.Context) {
+	users, err := h.users.ListCommitteeMembers(c.Request.Context())
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, usersDTO(users))
+}
+
+type upsertStudentProfileRequest struct {
+	Gender *domain.Gender `json:"gender"`
+	Course *int16         `json:"course"`
+}
+
+// UpsertStudentProfile is allowed for admin/manager (any student) or the
+// student themselves (their own profile only).
+func (h *UserHandler) UpsertStudentProfile(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, apperror.BadRequest("invalid user id"))
+		return
+	}
+	if !canAccessStudentResource(c, id) {
+		response.Error(c, apperror.Forbidden("you can only manage your own profile"))
+		return
+	}
+
+	var req upsertStudentProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.BadRequest(err.Error()))
+		return
+	}
+	if err := h.users.UpsertStudentProfile(c.Request.Context(), id, req.Gender, req.Course); err != nil {
+		response.Error(c, err)
+		return
+	}
+	profile, err := h.users.GetStudentProfile(c.Request.Context(), id)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, studentProfileDTO(profile))
+}
+
+func (h *UserHandler) GetStudentProfile(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, apperror.BadRequest("invalid user id"))
+		return
+	}
+	if !canAccessStudentResource(c, id) {
+		response.Error(c, apperror.Forbidden("you can only view your own profile"))
+		return
+	}
+	profile, err := h.users.GetStudentProfile(c.Request.Context(), id)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, studentProfileDTO(profile))
+}
+
+// canAccessStudentResource allows admins and managers unconditionally, and a
+// student only when accessing their own resource.
+func canAccessStudentResource(c *gin.Context, targetID uuid.UUID) bool {
+	role, _ := middleware.Role(c)
+	if role == domain.RoleAdmin || role == domain.RoleManager {
+		return true
+	}
+	userID, ok := middleware.UserID(c)
+	return ok && userID == targetID
+}

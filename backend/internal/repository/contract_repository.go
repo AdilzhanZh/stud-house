@@ -42,6 +42,9 @@ type ContractRepository interface {
 	MarkReminderSent(ctx context.Context, id uuid.UUID) error
 	// List optionally filters by status (nil = all).
 	List(ctx context.Context, status *domain.ContractStatus) ([]*domain.Contract, error)
+	// ListByStudent joins through applications.student_id, since contracts
+	// carry no student_id of their own (kezeng 3 frontend: GET /contracts/my).
+	ListByStudent(ctx context.Context, studentID uuid.UUID) ([]*domain.Contract, error)
 	GetDormitoryPrice(ctx context.Context, dormitoryID uuid.UUID) (*float64, error)
 
 	WithLock(ctx context.Context, id uuid.UUID, fn func(ctx context.Context, contract *domain.Contract, tx ContractTx) error) error

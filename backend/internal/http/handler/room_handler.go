@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -172,6 +173,41 @@ func (h *RoomHandler) ListActiveResidents(c *gin.Context) {
 		return
 	}
 	response.OK(c, roomResidentsDTO(residents))
+}
+
+type residenceResponse struct {
+	RoomID      uuid.UUID `json:"room_id"`
+	DormitoryID uuid.UUID `json:"dormitory_id"`
+	RoomNumber  string    `json:"room_number"`
+	Capacity    int       `json:"capacity"`
+	MovedInAt   time.Time `json:"moved_in_at"`
+}
+
+// GetMyResidence is available to the owning student or admin/manager
+// (reuses canAccessStudentResource from user_handler.go): the current active
+// room + its dormitory, or 404 if the student has none.
+func (h *RoomHandler) GetMyResidence(c *gin.Context) {
+	studentID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, apperror.BadRequest("invalid student id"))
+		return
+	}
+	if !canAccessStudentResource(c, studentID) {
+		response.Error(c, apperror.Forbidden("you can only view your own residence"))
+		return
+	}
+	resident, room, err := h.rooms.GetActiveResidence(c.Request.Context(), studentID)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, residenceResponse{
+		RoomID:      room.ID,
+		DormitoryID: room.DormitoryID,
+		RoomNumber:  room.RoomNumber,
+		Capacity:    room.Capacity,
+		MovedInAt:   resident.MovedInAt,
+	})
 }
 
 func (h *RoomHandler) MoveOutResident(c *gin.Context) {

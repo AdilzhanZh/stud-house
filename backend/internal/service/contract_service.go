@@ -245,6 +245,12 @@ func (s *ContractService) List(ctx context.Context, status *domain.ContractStatu
 	return s.contracts.List(ctx, status)
 }
 
+// ListMine is student-only: every contract tied to one of the caller's own
+// applications (frontend kezeng 3: /contracts/my).
+func (s *ContractService) ListMine(ctx context.Context, studentID uuid.UUID) ([]*domain.Contract, error) {
+	return s.contracts.ListByStudent(ctx, studentID)
+}
+
 // ManagerDecision is the only way a contract past its deadline can actually
 // be resolved: void rejects the application and frees the room (same
 // effect phase 4 wrongly applied automatically); extend gives the student a

@@ -59,6 +59,22 @@ func (h *PaymentHandler) GetByContract(c *gin.Context) {
 	response.OK(c, paymentDTO(payment))
 }
 
+// ListMine is student-only: every payment tied to one of the caller's own
+// contracts.
+func (h *PaymentHandler) ListMine(c *gin.Context) {
+	studentID, _ := middleware.UserID(c)
+	list, err := h.payments.ListMine(c.Request.Context(), studentID)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	out := make([]paymentResponse, 0, len(list))
+	for _, p := range list {
+		out = append(out, paymentDTO(p))
+	}
+	response.OK(c, out)
+}
+
 type submitPaymentRequest struct {
 	ReceiptFileURL string `json:"receipt_file_url" binding:"required"`
 }

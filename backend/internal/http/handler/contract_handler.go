@@ -37,6 +37,22 @@ func (h *ContractHandler) canAccessApplication(c *gin.Context, applicationID uui
 	return ok && app.StudentID == userID
 }
 
+// ListMine is student-only: every contract tied to one of the caller's own
+// applications.
+func (h *ContractHandler) ListMine(c *gin.Context) {
+	studentID, _ := middleware.UserID(c)
+	list, err := h.contracts.ListMine(c.Request.Context(), studentID)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	out := make([]contractResponse, 0, len(list))
+	for _, ct := range list {
+		out = append(out, contractDTO(ct))
+	}
+	response.OK(c, out)
+}
+
 // GetByApplication is available to the owning student or admin/manager.
 func (h *ContractHandler) GetByApplication(c *gin.Context) {
 	appID, err := uuid.Parse(c.Param("id"))

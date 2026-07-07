@@ -218,6 +218,14 @@ exit_requests: pending → approved (moved_out_at=now()) | rejected
 - **PATCH /payments/{id}/confirm** — `confirm` кезінде
   `applications.status='settled'` етіп қояды (жаңа enum мәні,
   `application_status_history`-ге "Төлем расталды" деп жазылады).
+  **Ескерту (фронтенд-3 сұрауы бойынша тексерілді)**: `reject`
+  әрекетінде себеп/comment өрісі жоқ — `Payment` доменінде
+  (`internal/domain/payment.go`) тек `Status`/`ConfirmedBy`/`ConfirmedAt`
+  бар. Студентке көрсетілетін жалғыз түсініктеме —
+  `notifier`-мен жіберілетін тұрақты мәтін ("Сіздің төлеміңіз
+  расталмады, чекті қайта жүктеңіз."), ол `PaymentService.
+  notifyStudentPaymentDecision`-де хардкодталған. Фронтенд осы мәтінді
+  қайталайды (backend-тен қайта сұрамай), себебі ол әрдайым бірдей.
 - **POST /exit-requests** — студенттің өз белсенді `room_residents`
   жазбасы бойынша (`moved_out_at IS NULL`) автоматты табылады, бір
   мезгілде бір ғана `pending` шығу өтініші бола алады (partial unique
@@ -305,6 +313,7 @@ exit_requests: pending → approved (moved_out_at=now()) | rejected
 |---|---|---|
 | POST | `/api/v1/applications` | жаңа өтініш жасау |
 | GET | `/api/v1/applications/my` | өз өтініштерім |
+| GET | `/api/v1/applications/{id}` | толық ақпарат (өтініш + құжаттар + тарих) — меншік құқығы тексеріледі, тек өз өтінішін көре алады (кезең 2, фронтенд-2 тарапынан сұралған түзету: бастапқыда бұл маршрут тек admin/manager үшін ашық болатын) |
 | PATCH | `/api/v1/applications/{id}` | тек `needs_correction`-де, тек өзінікін өзгерту → `pending`-ге қайтады |
 | POST | `/api/v1/applications/{id}/documents` | құжат қосу (тек `file_url` қабылданады) |
 | GET | `/api/v1/notifications` | өз хабарламаларым |
@@ -314,7 +323,7 @@ exit_requests: pending → approved (moved_out_at=now()) | rejected
 | Метод | Маршрут | Сипаттама |
 |---|---|---|
 | GET | `/api/v1/applications?status=pending` | кезекті сүзгімен көру |
-| GET | `/api/v1/applications/{id}` | толық ақпарат (өтініш + құжаттар + тарих) |
+| GET | `/api/v1/applications/{id}` | толық ақпарат — жоғарыдағымен бір ғана endpoint, admin/manager кез келген өтінішті көре алады |
 | PATCH | `/api/v1/applications/{id}/decision` | `{action: approve\|reject\|request_correction, room_id?, comment?}` |
 
 ### Report/Committee endpoint-тері (кезең 3)
@@ -344,7 +353,9 @@ exit_requests: pending → approved (moved_out_at=now()) | rejected
 **Student:**
 | Метод | Маршрут | Сипаттама |
 |---|---|---|
+| GET | `/api/v1/contracts/my` | өз келісімшарттарым (фронтенд-3 сұрауы бойынша қосылған — бастапқыда болмаған, `ContractRepository.ListByStudent` — `applications.student_id` арқылы JOIN) |
 | PATCH | `/api/v1/contracts/{id}/respond` | `{action: accept\|decline}` |
+| GET | `/api/v1/payments/my` | өз төлемдерім (фронтенд-3 сұрауы бойынша қосылған, сол сияқты JOIN арқылы `contracts`→`applications`) |
 | POST | `/api/v1/payments/{id}/submit` | `{receipt_file_url}` |
 | POST | `/api/v1/exit-requests` | `{reason?}` — өз белсенді бөлмесі бойынша |
 | GET | `/api/v1/exit-requests/my` | өз шығу өтініштерім |
@@ -384,6 +395,22 @@ exit_requests: pending → approved (moved_out_at=now()) | rejected
 | Метод | Маршрут | Сипаттама |
 |---|---|---|
 | GET | `/api/v1/transfer-requests/{id}` | бір ауыстыру өтінішінің толық ақпараты |
+
+### Residence endpoint-і (фронтенд-3 сұрауы бойынша қосылған)
+
+`GET /api/v1/students/{id}/residence` — иесі не admin/manager
+(`canAccessStudentResource`, `user_handler.go`-дағы бармен бірдей). Жауабы:
+`{room_id, dormitory_id, room_number, capacity, moved_in_at}`, белсенді
+`room_residents` жазбасы жоқ болса — `404`.
+
+Бұл endpoint қосылғанға дейін студенттің қазіргі бөлмесін табатын **ешбір
+жол болмаған**: `applications.assigned_room_id` өрісі базадан оқылады, бірақ
+кодтың ешбір жерінде жазылмайды (әрдайым `null`); нақты орналасу тек
+`room_residents` кестесінде, ал оны оқитын `RoomRepository.
+GetActiveResidentByStudent` тек ішкі сервистерде (`exit_request_service.go`,
+`transfer_request_service.go`) қолданылған, HTTP-қа шығарылмаған. Жаңа
+`RoomService.GetActiveResidence` осы репозиторий әдісін қайта пайдаланып,
+`RoomHandler.GetMyResidence`-ке қосады.
 
 Толық маршрут тізімі — `internal/http/router.go`.
 

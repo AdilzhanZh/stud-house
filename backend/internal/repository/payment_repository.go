@@ -22,6 +22,10 @@ type PaymentRepository interface {
 	Create(ctx context.Context, p *domain.Payment) error
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Payment, error)
 	GetByContractID(ctx context.Context, contractID uuid.UUID) (*domain.Payment, error)
+	// ListByStudent joins through contracts->applications.student_id, since
+	// payments carry no student_id of their own (kezeng 3 frontend: GET
+	// /payments/my).
+	ListByStudent(ctx context.Context, studentID uuid.UUID) ([]*domain.Payment, error)
 
 	WithLock(ctx context.Context, id uuid.UUID, fn func(ctx context.Context, payment *domain.Payment, tx PaymentTx) error) error
 }

@@ -4,6 +4,14 @@ import { DashboardLayout } from './layouts/DashboardLayout'
 import { LoginPage } from './features/auth/LoginPage'
 import { RegisterPage } from './features/auth/RegisterPage'
 import { ProfilePage } from './features/profile/ProfilePage'
+import { DormitoriesPage } from './features/dormitories/DormitoriesPage'
+import { NewApplicationPage } from './features/applications/NewApplicationPage'
+import { MyApplicationsPage } from './features/applications/MyApplicationsPage'
+import { ApplicationDetailPage } from './features/applications/ApplicationDetailPage'
+import { NotificationsPage } from './features/notifications/NotificationsPage'
+import { ContractsPage } from './features/contracts/ContractsPage'
+import { PaymentPage } from './features/payments/PaymentPage'
+import { MyResidencePage } from './features/residence/MyResidencePage'
 import { ProtectedRoute } from './routes/ProtectedRoute'
 import { useAuthBootstrap } from './features/auth/useAuthBootstrap'
 
@@ -28,6 +36,14 @@ function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<DashboardLayout />}>
           <Route path="/dashboard/profile" element={<ProfilePage />} />
+          <Route path="/dormitories" element={<DormitoriesPage />} />
+          <Route path="/applications/new" element={<NewApplicationPage />} />
+          <Route path="/applications/my" element={<MyApplicationsPage />} />
+          <Route path="/applications/:id" element={<ApplicationDetailPage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
+          <Route path="/contracts/my" element={<ContractsPage />} />
+          <Route path="/contracts/:id/payment" element={<PaymentPage />} />
+          <Route path="/my-residence" element={<MyResidencePage />} />
         </Route>
       </Route>
 

@@ -126,7 +126,21 @@ func (h *ApplicationHandler) List(c *gin.Context) {
 	response.OK(c, applicationsDTO(list))
 }
 
-// GetDetail is manager/admin-only: full application + documents + history.
+// canAccessApplication allows admin/manager unconditionally, and a student
+// only for their own application (mirrors ContractHandler's helper of the
+// same name for the same ownership rule).
+func canAccessApplication(c *gin.Context, app *domain.Application) bool {
+	role, _ := middleware.Role(c)
+	if role == domain.RoleAdmin || role == domain.RoleManager {
+		return true
+	}
+	userID, ok := middleware.UserID(c)
+	return ok && app.StudentID == userID
+}
+
+// GetDetail is available to the owning student or admin/manager: full
+// application + documents + history (a student views their own application's
+// status timeline and uploaded documents; a manager reviews any of them).
 func (h *ApplicationHandler) GetDetail(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -136,6 +150,10 @@ func (h *ApplicationHandler) GetDetail(c *gin.Context) {
 	app, err := h.applications.GetByID(c.Request.Context(), id)
 	if err != nil {
 		response.Error(c, err)
+		return
+	}
+	if !canAccessApplication(c, app) {
+		response.Error(c, apperror.Forbidden("you cannot view this application"))
 		return
 	}
 	documents, err := h.applications.ListDocuments(c.Request.Context(), id)

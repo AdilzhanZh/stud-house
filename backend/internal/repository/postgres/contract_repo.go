@@ -119,6 +119,30 @@ func (r *ContractRepo) List(ctx context.Context, status *domain.ContractStatus) 
 	return out, rows.Err()
 }
 
+func (r *ContractRepo) ListByStudent(ctx context.Context, studentID uuid.UUID) ([]*domain.Contract, error) {
+	const q = `
+		SELECT c.id, c.application_id, c.file_url, c.status, c.sent_at, c.responded_at, c.response_deadline, c.reminder_sent_at, c.created_at
+		FROM contracts c
+		JOIN applications a ON a.id = c.application_id
+		WHERE a.student_id = $1
+		ORDER BY c.created_at DESC`
+	rows, err := r.db.Query(ctx, q, studentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []*domain.Contract
+	for rows.Next() {
+		c, err := scanContractFields(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
 func (r *ContractRepo) GetDormitoryPrice(ctx context.Context, dormitoryID uuid.UUID) (*float64, error) {
 	var price *float64
 	err := r.db.QueryRow(ctx, `SELECT price_per_semester FROM dormitories WHERE id = $1`, dormitoryID).Scan(&price)

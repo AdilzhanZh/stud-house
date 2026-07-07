@@ -73,6 +73,7 @@ func NewRouter(jwtSecret string, h Handlers) *gin.Engine {
 			// Self-or-admin/manager: ownership is checked inside the handler.
 			protected.PUT("/students/:id/profile", h.User.UpsertStudentProfile)
 			protected.GET("/students/:id/profile", h.User.GetStudentProfile)
+			protected.GET("/students/:id/residence", h.Room.GetMyResidence)
 
 			// Any authenticated user: their own in-app notifications.
 			protected.GET("/notifications", h.Notification.ListMine)
@@ -83,6 +84,7 @@ func NewRouter(jwtSecret string, h Handlers) *gin.Engine {
 
 			// Any authenticated user: ownership (student) or admin/manager is
 			// checked inside the handler.
+			protected.GET("/applications/:id", h.Application.GetDetail)
 			protected.GET("/applications/:id/contract", h.Contract.GetByApplication)
 			protected.GET("/contracts/:id/payment", h.Payment.GetByContract)
 			protected.GET("/exit-requests/:id", h.ExitRequest.Get)
@@ -105,7 +107,9 @@ func NewRouter(jwtSecret string, h Handlers) *gin.Engine {
 				studentGroup.PATCH("/applications/:id", h.Application.Resubmit)
 				studentGroup.POST("/applications/:id/documents", h.Application.AddDocument)
 
+				studentGroup.GET("/contracts/my", h.Contract.ListMine)
 				studentGroup.PATCH("/contracts/:id/respond", h.Contract.Respond)
+				studentGroup.GET("/payments/my", h.Payment.ListMine)
 				studentGroup.POST("/payments/:id/submit", h.Payment.Submit)
 				studentGroup.POST("/exit-requests", h.ExitRequest.Create)
 				studentGroup.GET("/exit-requests/my", h.ExitRequest.ListMine)
@@ -142,7 +146,6 @@ func NewRouter(jwtSecret string, h Handlers) *gin.Engine {
 				mgmt.DELETE("/students/:id/benefits/:benefitId", h.Benefit.RevokeBenefit)
 
 				mgmt.GET("/applications", h.Application.List)
-				mgmt.GET("/applications/:id", h.Application.GetDetail)
 				mgmt.PATCH("/applications/:id/decision", h.Application.Decide)
 
 				mgmt.POST("/report-templates", h.Report.CreateTemplate)

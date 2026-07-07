@@ -40,6 +40,31 @@ func (r *PaymentRepo) GetByContractID(ctx context.Context, contractID uuid.UUID)
 	return scanPaymentRow(row)
 }
 
+func (r *PaymentRepo) ListByStudent(ctx context.Context, studentID uuid.UUID) ([]*domain.Payment, error) {
+	const q = `
+		SELECT p.id, p.contract_id, p.amount, p.currency, p.receipt_file_url, p.status, p.submitted_at, p.confirmed_by, p.confirmed_at, p.created_at
+		FROM payments p
+		JOIN contracts c ON c.id = p.contract_id
+		JOIN applications a ON a.id = c.application_id
+		WHERE a.student_id = $1
+		ORDER BY p.created_at DESC`
+	rows, err := r.db.Query(ctx, q, studentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []*domain.Payment
+	for rows.Next() {
+		p, err := scanPaymentFields(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
 func (r *PaymentRepo) WithLock(ctx context.Context, id uuid.UUID, fn func(ctx context.Context, payment *domain.Payment, tx repository.PaymentTx) error) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {

@@ -59,6 +59,12 @@ func (s *PaymentService) GetByContractID(ctx context.Context, contractID uuid.UU
 	return p, nil
 }
 
+// ListMine is student-only: every payment tied to one of the caller's own
+// contracts (frontend kezeng 3: /payments/my).
+func (s *PaymentService) ListMine(ctx context.Context, studentID uuid.UUID) ([]*domain.Payment, error) {
+	return s.payments.ListByStudent(ctx, studentID)
+}
+
 // Submit lets the owning student attach a receipt while the contract is
 // accepted; it may be called again after a rejection to resubmit.
 func (s *PaymentService) Submit(ctx context.Context, actorStudentID, paymentID uuid.UUID, receiptFileURL string) (*domain.Payment, error) {

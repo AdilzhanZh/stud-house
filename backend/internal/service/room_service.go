@@ -71,6 +71,25 @@ func (s *RoomService) GetByID(ctx context.Context, id uuid.UUID) (*domain.Room, 
 	return room, nil
 }
 
+// GetActiveResidence is student-facing (frontend kezeng 3: "Менің
+// орналасуым"): there was previously no way for a student to discover which
+// room they currently live in (Application.AssignedRoomID is scanned from
+// the DB but never written anywhere in this codebase).
+func (s *RoomService) GetActiveResidence(ctx context.Context, studentID uuid.UUID) (*domain.RoomResident, *domain.Room, error) {
+	resident, err := s.rooms.GetActiveResidentByStudent(ctx, studentID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, nil, apperror.NotFound("no active room assignment")
+		}
+		return nil, nil, err
+	}
+	room, err := s.rooms.GetByID(ctx, resident.RoomID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return resident, room, nil
+}
+
 func (s *RoomService) ListByDormitory(ctx context.Context, dormitoryID uuid.UUID) ([]*domain.Room, error) {
 	return s.rooms.ListByDormitory(ctx, dormitoryID)
 }

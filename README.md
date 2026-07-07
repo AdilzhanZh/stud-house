@@ -1,4 +1,4 @@
-# Student House — Backend (кезең 1-3: схема + Auth/RBAC + өтініш + рапорт/дауыс)
+# Student House — Backend (кезең 1-5: толық негізгі процесс)
 
 Қорқыт Ата атындағы Қызылорда университетінің жатақхана басқару жүйесі.
 
@@ -7,13 +7,23 @@
 - **Кезең 2**: «студент өтініш береді → менеджер қарайды» ағыны —
   `applications`, `application_status_history`, `application_documents`,
   `notifications`.
-- **Кезең 3** (осы қосымша): «менеджер approved өтініштерден рапорт
-  құрастырады → комиссия дауыс береді → рапорт мақұлданады/қабылданбайды»
-  ағыны — `report_templates`, `reports`, `report_applications`,
-  `committee_votes`.
+- **Кезең 3**: «менеджер approved өтініштерден рапорт құрастырады →
+  комиссия дауыс береді → рапорт мақұлданады/қабылданбайды» ағыны —
+  `report_templates`, `reports`, `report_applications`, `committee_votes`.
+- **Кезең 4**: рапорт approved болғаннан кейінгі процесс — келісімшарт →
+  төлем → нақты орналастыру → шығу (exit) — `contracts`, `payments`,
+  `exit_requests`.
+- **Кезең 5** (осы қосымша): (A) 4-ші кезеңдегі "мерзімі өткен
+  келісімшарт → автоматты rejected" логикасы дұрысталды (енді тек
+  менеджердің рұқсатымен); (B) бөлме/жатақхана ауыстыру процесі
+  (`transfer_requests`); (C) response deadline жақындағанда менеджерге
+  ескерту.
 
-Келісімшарт, төлем, "кері байланыс күту уақыты" логикасы, нақты
-.docx/PDF генерациясы, email/SMTP интеграциясы — 4-ші кезеңде.
+"Кері байланыс күту уақыты" логикасы (жалпы SLA/eskalation ережелері,
+5-ші кезеңдегі нақты deadline-ескертуден бөлек) осы кезеңге кірмейді.
+Нақты .docx/PDF генерациясы, төлем шлюзі (payment gateway), email/SMS
+интеграциясы — жобаның осы кезеңдерінде де толық жасалмайды (төменде
+түсіндірілген).
 
 ## Стек
 
@@ -74,6 +84,16 @@ migrations/              — golang-migrate SQL миграциялары
 | `reports` | рапорттар, `status` enum (`pending_committee/approved/rejected`), `previous_report_id` — қайта жіберілген рапорттың тізбегі |
 | `report_applications` | рапортқа кірген өтініштер (көп-көпке) |
 | `committee_votes` | комиссия мүшесінің дауысы (`decision` nullable, `reason`, `voted_at`) |
+| `contracts` | келісімшарттар, `application_id` UNIQUE, `status` enum (`sent/awaiting_manager_decision/accepted/declined/expired`), `response_deadline`, `reminder_sent_at` |
+| `payments` | төлемдер, `contract_id` UNIQUE, `amount`/`currency`, `status` enum (`pending/submitted/confirmed/rejected`) |
+| `exit_requests` | жатақханадан шығу өтініштері, `room_resident_id` арқылы белсенді тұруға сілтейді |
+| `transfer_requests` | бөлме/жатақхана ауыстыру өтініштері (settled студент үшін), `status` enum (`pending/approved/rejected`) |
+
+`dormitories`-ке 4-ші кезеңде `price_per_semester` (NUMERIC, nullable)
+өрісі қосылды (жаңа миграция арқылы — 1-ші кезеңдегі Go struct/repository
+өзгертілмеді, бұл өріс тек жаңа `ContractRepository.GetDormitoryPrice`
+арқылы тікелей SQL-мен оқылады). `applications.status` enum-ына жаңа
+`'settled'` мәні қосылды (төлем расталғаннан кейін).
 
 Chairperson бөлек рөл емес — `committee_member` рөлінің үстіне қосымша
 `is_chairperson` флагы (DB CHECK constraint осыны бекітеді).
@@ -155,6 +175,113 @@ rejected → (revise) → жаңа reports жазбасы, previous_report_id = 
   `application_status_changed`/`document_requested` бір өтінішке
   байланысты, ал рапорт бүкіл топқа қатысты).
 
+### Келісімшарт → төлем → орналастыру → шығу (кезең 4)
+
+```
+report.status='approved' → contracts автоматты құрылады (status='sent')
+sent → accepted (payment жасалады, status='pending') | declined (application → rejected)
+sent → awaiting_manager_decision (мерзім өткенде, background job/қолмен — ӘЛІ application-ды өзгертпейді)
+awaiting_manager_decision → expired (manager action=void → application → rejected)
+awaiting_manager_decision → sent (manager action=extend, new_deadline)
+payment: pending → submitted → confirmed (application → 'settled') | rejected (қайта submit ете алады)
+exit_requests: pending → approved (moved_out_at=now()) | rejected
+```
+
+- **⚠️ Маңызды түзету (2-ші кезеңмен қайшылық)**: 2-ші кезеңде
+  `PATCH /applications/{id}/decision` (action=approve) ІШІНДЕ
+  `RoomService.AddResident` шақырылып, `room_residents`-ке жазба
+  ҚАЗІРДІҢ ӨЗІНДЕ approve сәтінде қосылады. Сондықтан 4-ші кезеңде
+  `PATCH /payments/{id}/confirm` **жаңа** `room_residents` жазбасын
+  ҚОСПАЙДЫ (unique constraint бұзылар еді) — тек
+  `applications.status='settled'` етіп қояды. Керісінше, келісімшарт
+  `declined`/`expired` болса немесе (болашақта) төлем түпкілікті
+  қабылданбаса, сол студенттің белсенді `room_residents` жазбасы
+  автоматты жабылады (`moved_out_at=now()`), орны босайды.
+- **Auto-contract hook**: "рапорт approved болған сәтте автоматты
+  келісімшарт жасау" логикасы 3-ші кезеңдегі `ReportService.Vote()`
+  ішіне шағын, міндетті емес hook ретінде қосылды
+  (`ReportService.SetOnApproved`, `main.go`-да
+  `contractService.OnReportApproved`-ке байланған). Contract жасау
+  `application_id` бойынша idempotent (`CreateIfNotExists`) — сол
+  студент басқа рапортта қайта пайда болса, қайталанбайды.
+- **Contract.file_url** нақты .docx/PDF generation орнына рапорттың
+  байланысты шаблонының (`report_templates.file_url`) көшірмесі
+  ретінде толтырылады.
+- **PATCH /contracts/{id}/respond** — тек `status='sent'` және
+  `now() < response_deadline` болғанда. `accept` — `payments` жазбасын
+  автоматты жасайды, сомасы `dormitories.price_per_semester`-ден
+  алынады (орнатылмаса — `400`). `decline` — `applications.status
+  ='rejected'` + бөлмені босату.
+- **POST /payments/{id}/submit** — `contract.status='accepted'`
+  болғанда ғана, қайта-қайта шақыруға болады (мысалы алдыңғы чек
+  `rejected` болса).
+- **PATCH /payments/{id}/confirm** — `confirm` кезінде
+  `applications.status='settled'` етіп қояды (жаңа enum мәні,
+  `application_status_history`-ге "Төлем расталды" деп жазылады).
+- **POST /exit-requests** — студенттің өз белсенді `room_residents`
+  жазбасы бойынша (`moved_out_at IS NULL`) автоматты табылады, бір
+  мезгілде бір ғана `pending` шығу өтініші бола алады (partial unique
+  index). `approve` — `RoomService`/`RoomRepository.MoveOutResident`
+  қайта пайдаланылып, бөлме босатылады.
+
+### ⚠️ Мерзімі өткен келісімшарт логикасы дұрысталды (кезең 5, түзету A)
+
+4-ші кезеңде response_deadline өтсе, контракт автоматты `expired` болып,
+өтініш те автоматты `rejected` болатын. **Бұл қате болатын** — спекте
+бұл тек менеджердің рұқсатымен болу керек делінген. Түзетілген нұсқа:
+
+- `ContractService.FlagOverdueContracts` (ескі `ExpireOverdue`-дың
+  орнына) — `response_deadline` өткен `sent` контракттарды тек
+  `awaiting_manager_decision`-ге ауыстырады. **Ешбір application/
+  room_residents өзгермейді.**
+- Менеджер оларды `GET /api/v1/contracts?status=awaiting_manager_decision`
+  арқылы көреді.
+- `PATCH /api/v1/contracts/{id}/manager-decision`:
+  - `action=void` → `status='expired'`, `applications.status='rejected'`
+    (`application_status_history`-ге "Мерзімде жауап бермегендіктен
+    менеджер өтінішті жойды" деп жазылады), студенттің белсенді
+    `room_residents` жазбасы жабылады (`moved_out_at=now()`).
+  - `action=extend`, `new_deadline` міндетті → `status='sent'`-ке
+    қайта оралады, `response_deadline` жаңарады, `reminder_sent_at`
+    тазаланады (жаңа мерзімге жаңа ескерту циклі).
+
+### Response deadline ескертуі (кезең 5, түзету C)
+
+`ContractService.RemindApproachingDeadline` — `response_deadline`-ге
+дейін `CONTRACT_REMINDER_HOURS_BEFORE_DEADLINE` (default 24) сағат
+қалған, әлі `status='sent'` контракттар бойынша барлық admin/manager
+пайдаланушыларға notification жібереді. Бір контрактқа тек бір рет
+жіберіледі (`contracts.reminder_sent_at`).
+
+Флаг қою (A) мен ескерту (C) екеуі де сол бір фондық
+`time.Ticker`/`POST /admin/contracts/expire-check` шақыруында бірге
+орындалады (`ContractHandler.ExpireCheck` екеуін де шақырып,
+`{flagged_count, reminded_count}` қайтарады).
+
+### Жатақхана/бөлме ауыстыру (кезең 5, қосымша B)
+
+- **POST /transfer-requests** — тек **settled** студент (`room_residents`-те
+  `moved_out_at IS NULL` жазбасы бар) және оның шешілмеген
+  (`pending`/`needs_correction`) application-ы жоқ болса ғана. Бір
+  студентте бір мезгілде тек бір `pending` transfer_request бола алады
+  (partial unique index). `requested_dormitory_id`/`requested_room_id`
+  — студенттің таңдауы бойынша ерікті кеңестер ғана, түпкілікті
+  шешімді менеджер қабылдайды.
+- **PATCH /transfer-requests/{id}/decision** — `action=approve`,
+  `room_id` міндетті:
+  1. студенттің қазіргі белсенді `room_residents` жазбасы жабылады
+     (`RoomRepository.MoveOutResident`);
+  2. жаңа бөлмеге 1-ші кезеңдегі `RoomService.AddResident` арқылы
+     қосылады (capacity/restriction валидациясы қайта пайдаланылады);
+  3. екеуі де сәтті болғанда ғана `transfer_requests.status='approved'`
+     болады — жаңа бөлме валидациядан өтпесе, өтініш `pending` күйінде
+     қалады (ескі бөлме жабылып қойса да, `pending` — менеджер басқа
+     бөлме таңдап қайта көре алады деген белгі).
+  Ескі бөлме мен жаңа бөлме — **бір транзакцияда емес** (2 бөлек
+  repository шақыруы), алдыңғы кезеңдерде де кездескен сол баламалы
+  trade-off.
+  `action=reject`, `comment` міндетті.
+
 ## Auth және RBAC
 
 - `POST /api/v1/auth/register` — тек student үшін self-registration
@@ -212,6 +339,52 @@ rejected → (revise) → жаңа reports жазбасы, previous_report_id = 
 |---|---|---|
 | GET | `/api/v1/reports/{id}` | рапорт + студенттер + әр мүшенің дауысы |
 
+### Contract/Payment/Exit-request endpoint-тері (кезең 4)
+
+**Student:**
+| Метод | Маршрут | Сипаттама |
+|---|---|---|
+| PATCH | `/api/v1/contracts/{id}/respond` | `{action: accept\|decline}` |
+| POST | `/api/v1/payments/{id}/submit` | `{receipt_file_url}` |
+| POST | `/api/v1/exit-requests` | `{reason?}` — өз белсенді бөлмесі бойынша |
+| GET | `/api/v1/exit-requests/my` | өз шығу өтініштерім |
+
+**Manager (admin да істей алады):**
+| Метод | Маршрут | Сипаттама |
+|---|---|---|
+| PATCH | `/api/v1/payments/{id}/confirm` | `{action: confirm\|reject}` |
+| POST | `/api/v1/admin/contracts/expire-check` | overdue флаг қою + deadline ескертулерін қолмен іске қосу |
+| GET | `/api/v1/contracts?status=awaiting_manager_decision` | манагер шешімін күтетін келісімшарттар (кезең 5) |
+| PATCH | `/api/v1/contracts/{id}/manager-decision` | `{action: void\|extend, new_deadline?}` (кезең 5) |
+| GET | `/api/v1/exit-requests?status=pending` | шығу өтініштері тізімі сүзгімен |
+| PATCH | `/api/v1/exit-requests/{id}/decision` | `{action: approve\|reject, comment?}` |
+
+**Кез келген аутентификацияланған пайдаланушы (иесі немесе admin/manager):**
+| Метод | Маршрут | Сипаттама |
+|---|---|---|
+| GET | `/api/v1/applications/{id}/contract` | сол өтініштің келісімшарты |
+| GET | `/api/v1/contracts/{id}/payment` | сол келісімшарттың төлемі |
+| GET | `/api/v1/exit-requests/{id}` | бір шығу өтінішінің толық ақпараты |
+
+### Room transfer endpoint-тері (кезең 5)
+
+**Student:**
+| Метод | Маршрут | Сипаттама |
+|---|---|---|
+| POST | `/api/v1/transfer-requests` | `{requested_dormitory_id?, requested_room_id?, reason?}` |
+| GET | `/api/v1/transfer-requests/my` | өз ауыстыру өтініштерім |
+
+**Manager (admin да істей алады):**
+| Метод | Маршрут | Сипаттама |
+|---|---|---|
+| GET | `/api/v1/transfer-requests?status=pending` | ауыстыру өтініштері тізімі сүзгімен |
+| PATCH | `/api/v1/transfer-requests/{id}/decision` | `{action: approve\|reject, room_id?, comment?}` |
+
+**Кез келген аутентификацияланған пайдаланушы (иесі немесе admin/manager):**
+| Метод | Маршрут | Сипаттама |
+|---|---|---|
+| GET | `/api/v1/transfer-requests/{id}` | бір ауыстыру өтінішінің толық ақпараты |
+
 Толық маршрут тізімі — `internal/http/router.go`.
 
 ## Іске қосу
@@ -230,6 +403,9 @@ cp .env.example .env
 | `JWT_SECRET` | JWT қол қою құпиясы | — (міндетті) |
 | `ACCESS_TOKEN_TTL_MINUTES` | access token өмір сүру мерзімі | `15` |
 | `REFRESH_TOKEN_TTL_DAYS` | refresh token өмір сүру мерзімі | `30` |
+| `CONTRACT_RESPONSE_DEADLINE_DAYS` | келісімшартқа жауап беру мерзімі (күн) | `7` |
+| `CONTRACT_EXPIRY_CHECK_INTERVAL_MINUTES` | фондық "overdue флаг қою + ескерту" тексерісінің жиілігі | `60` |
+| `CONTRACT_REMINDER_HOURS_BEFORE_DEADLINE` | deadline-ге дейін неше сағат қалғанда менеджерге ескерту жіберу | `24` |
 
 ### 2. Миграцияларды қолдану
 
@@ -268,16 +444,51 @@ VALUES ('Admin', 'admin@example.com', '', '<bcrypt-hash>', 'admin');
 (`password_hash` — `pkg/hasher.HashPassword` арқылы алдын ала есептелген
 bcrypt хэші.)
 
+### 5. Фондық тапсырма (overdue флаг қою + deadline ескерту)
+
+Бөлек cron/worker процесі қажет емес — `go run ./cmd/api` іске қосылған
+сәтте `startContractExpiryChecker` (`cmd/api/main.go`) сервермен бірге
+`time.Ticker`-мен (`CONTRACT_EXPIRY_CHECK_INTERVAL_MINUTES`, default
+60 минут) фонда жұмыс істей бастайды және әр тик сайын екеуін де
+шақырады: `ContractService.FlagOverdueContracts` (мерзімі өткен `sent`
+контракттарды `awaiting_manager_decision`-ге ауыстырады — **application-ды
+өзгертпейді**) және `ContractService.RemindApproachingDeadline`
+(`CONTRACT_REMINDER_HOURS_BEFORE_DEADLINE` ішінде қалған контракттар
+бойынша менеджерлерге ескерту). Сервер тоқтағанда бірге тоқтайды.
+
+Cron/systemd timer сияқты сыртқы жоспарлаушы қолданатын ортада (мысалы
+контейнерді минутына бір рет қайта іске қоспай, бөлек тексеру керек
+болса) дәл сол екі әдісті бір рет орындайтын
+`POST /api/v1/admin/contracts/expire-check` (admin/manager) endpoint-ін
+шақыруға болады — `{"flagged_count": N, "reminded_count": M}` қайтарады.
+Екеуі де идемпотентті, сондықтан ticker пен қолмен шақыруды бірге
+қосу қауіпсіз.
+
 ## Кейінгі кезеңдерге қалдырылғандар
 
-Келісімшарт жіберу, төлем QR, "кері байланыс күту уақыты" логикасы — 4-ші
-кезеңде. Нақты .docx/PDF генерациясы (шаблон placeholder-ларын студент
-деректерімен ауыстыру) жасалмады — `GET /reports/{id}/export` тек JSON
-қайтарады. Нақты email/SMTP интеграциясы жоқ (`internal/service/notifier`
-тек DB-ге жазып, логқа шығарады). Файл сақтау инфрақұрылымы (S3/MinIO/disk)
-орнатылмаған — `application_documents`/`report_templates` тек
-frontend-тен келген `file_url`-ды қабылдайды. `student_benefits` кестесі
-тек room restriction валидациясы үшін минимал "студентте льгота бар"
-жазбасын сақтайды — бұл льгота алу процесінің (approval workflow) толық
-емес нұсқасы. Chairperson-ге ерекше салмақты дауыс құқығы жоқ — ол
+"Кері байланыс күту уақыты" логикасы (жалпы SLA/eskalation ережелері)
+осы кезеңдердің ешқайсысында жоқ. Нақты .docx/PDF генерациясы (шаблон
+placeholder-ларын студент деректерімен ауыстыру) жасалмады —
+`GET /reports/{id}/export` тек JSON қайтарады, `contracts.file_url` —
+рапорт шаблонының көшірмесі ғана. Нақты төлем шлюзі (payment gateway)
+интеграцияланбаған — тек чек файлын (`receipt_file_url`) қабылдап,
+менеджер қолмен растайды/қабылдамайды. Нақты email/SMTP/SMS
+интеграциясы жоқ (`internal/service/notifier` тек DB-ге жазып, логқа
+шығарады). Файл сақтау инфрақұрылымы (S3/MinIO/disk) орнатылмаған —
+`application_documents`/`report_templates` тек frontend-тен келген
+`file_url`-ды қабылдайды. `student_benefits` кестесі тек room
+restriction валидациясы үшін минимал "студентте льгота бар" жазбасын
+сақтайды. Chairperson-ге ерекше салмақты дауыс құқығы жоқ — ол
 `committee_member` ретінде тең дауыс береді.
+
+Білуге тиіс шектеу: `ExitRequestService.Decide` мен
+`TransferRequestService.Decide`-та room_residents-ті жабу/қосу —
+өз статус-жаңарту транзакциясының сыртында, бөлек repository шақырулары
+(бір DB транзакциясында емес). `TransferRequestService.Decide` бұл
+тәуекелді азайту үшін нақты бөлме ауыстыруды (ескі жабу + жаңа қосу)
+transfer_request-тің ӨЗ статусын 'approved' етіп белгілеуден БҰРЫН
+орындайды — сол арқылы жаңа бөлме валидациядан өтпей қалса, өтініш
+дұрыс "pending" күйінде қалады (жалған "approved" болмайды), бірақ
+ескі бөлменің дереу жабылуы мен жаңасының қосылуы арасындағы өте тар
+сәт әлі де бір транзакция емес — алдыңғы кезеңдерде де кездескен сол
+баламалы trade-off (phase 1/2 repository интерфейстерін өзгертпеу үшін).

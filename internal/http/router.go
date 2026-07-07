@@ -9,14 +9,18 @@ import (
 )
 
 type Handlers struct {
-	Auth         *handler.AuthHandler
-	User         *handler.UserHandler
-	Dormitory    *handler.DormitoryHandler
-	Room         *handler.RoomHandler
-	Benefit      *handler.BenefitHandler
-	Application  *handler.ApplicationHandler
-	Notification *handler.NotificationHandler
-	Report       *handler.ReportHandler
+	Auth            *handler.AuthHandler
+	User            *handler.UserHandler
+	Dormitory       *handler.DormitoryHandler
+	Room            *handler.RoomHandler
+	Benefit         *handler.BenefitHandler
+	Application     *handler.ApplicationHandler
+	Notification    *handler.NotificationHandler
+	Report          *handler.ReportHandler
+	Contract        *handler.ContractHandler
+	Payment         *handler.PaymentHandler
+	ExitRequest     *handler.ExitRequestHandler
+	TransferRequest *handler.TransferRequestHandler
 }
 
 func NewRouter(jwtSecret string, h Handlers) *gin.Engine {
@@ -77,6 +81,13 @@ func NewRouter(jwtSecret string, h Handlers) *gin.Engine {
 			// Any authenticated user: read a report (only committee_member can vote).
 			protected.GET("/reports/:id", h.Report.GetDetail)
 
+			// Any authenticated user: ownership (student) or admin/manager is
+			// checked inside the handler.
+			protected.GET("/applications/:id/contract", h.Contract.GetByApplication)
+			protected.GET("/contracts/:id/payment", h.Payment.GetByContract)
+			protected.GET("/exit-requests/:id", h.ExitRequest.Get)
+			protected.GET("/transfer-requests/:id", h.TransferRequest.Get)
+
 			// Committee-only: chairperson qualifies automatically (a flag on
 			// top of committee_member, not a separate role).
 			committeeGroup := protected.Group("")
@@ -93,6 +104,13 @@ func NewRouter(jwtSecret string, h Handlers) *gin.Engine {
 				studentGroup.GET("/applications/my", h.Application.ListMine)
 				studentGroup.PATCH("/applications/:id", h.Application.Resubmit)
 				studentGroup.POST("/applications/:id/documents", h.Application.AddDocument)
+
+				studentGroup.PATCH("/contracts/:id/respond", h.Contract.Respond)
+				studentGroup.POST("/payments/:id/submit", h.Payment.Submit)
+				studentGroup.POST("/exit-requests", h.ExitRequest.Create)
+				studentGroup.GET("/exit-requests/my", h.ExitRequest.ListMine)
+				studentGroup.POST("/transfer-requests", h.TransferRequest.Create)
+				studentGroup.GET("/transfer-requests/my", h.TransferRequest.ListMine)
 			}
 
 			// Admin+Manager: dormitory/room/benefit management.
@@ -134,6 +152,17 @@ func NewRouter(jwtSecret string, h Handlers) *gin.Engine {
 				mgmt.GET("/reports", h.Report.List)
 				mgmt.POST("/reports/:id/revise", h.Report.Revise)
 				mgmt.GET("/reports/:id/export", h.Report.Export)
+
+				mgmt.PATCH("/payments/:id/confirm", h.Payment.Confirm)
+				mgmt.POST("/admin/contracts/expire-check", h.Contract.ExpireCheck)
+				mgmt.GET("/contracts", h.Contract.List)
+				mgmt.PATCH("/contracts/:id/manager-decision", h.Contract.ManagerDecision)
+
+				mgmt.GET("/exit-requests", h.ExitRequest.List)
+				mgmt.PATCH("/exit-requests/:id/decision", h.ExitRequest.Decide)
+
+				mgmt.GET("/transfer-requests", h.TransferRequest.List)
+				mgmt.PATCH("/transfer-requests/:id/decision", h.TransferRequest.Decide)
 			}
 		}
 	}

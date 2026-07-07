@@ -1,0 +1,119 @@
+package postgres
+
+import (
+	"context"
+	"errors"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"student-house/internal/domain"
+	"student-house/internal/repository"
+)
+
+const paymentColumns = `id, contract_id, amount, currency, receipt_file_url, status, submitted_at, confirmed_by, confirmed_at, created_at`
+
+type PaymentRepo struct {
+	db *pgxpool.Pool
+}
+
+func NewPaymentRepo(db *pgxpool.Pool) *PaymentRepo {
+	return &PaymentRepo{db: db}
+}
+
+func (r *PaymentRepo) Create(ctx context.Context, p *domain.Payment) error {
+	const q = `
+		INSERT INTO payments (contract_id, amount, currency, status)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, created_at`
+	return r.db.QueryRow(ctx, q, p.ContractID, p.Amount, p.Currency, string(p.Status)).Scan(&p.ID, &p.CreatedAt)
+}
+
+func (r *PaymentRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Payment, error) {
+	row := r.db.QueryRow(ctx, `SELECT `+paymentColumns+` FROM payments WHERE id = $1`, id)
+	return scanPaymentRow(row)
+}
+
+func (r *PaymentRepo) GetByContractID(ctx context.Context, contractID uuid.UUID) (*domain.Payment, error) {
+	row := r.db.QueryRow(ctx, `SELECT `+paymentColumns+` FROM payments WHERE contract_id = $1`, contractID)
+	return scanPaymentRow(row)
+}
+
+func (r *PaymentRepo) WithLock(ctx context.Context, id uuid.UUID, fn func(ctx context.Context, payment *domain.Payment, tx repository.PaymentTx) error) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	row := tx.QueryRow(ctx, `SELECT `+paymentColumns+` FROM payments WHERE id = $1 FOR UPDATE`, id)
+	payment, err := scanPaymentRow(row)
+	if err != nil {
+		return err
+	}
+
+	if err := fn(ctx, payment, &paymentTx{tx: tx}); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+type paymentTx struct {
+	tx pgx.Tx
+}
+
+func (t *paymentTx) SetSubmitted(ctx context.Context, id uuid.UUID, receiptFileURL string) error {
+	const q = `UPDATE payments SET status = 'submitted', receipt_file_url = $2, submitted_at = now() WHERE id = $1`
+	_, err := t.tx.Exec(ctx, q, id, receiptFileURL)
+	return err
+}
+
+func (t *paymentTx) SetDecision(ctx context.Context, id uuid.UUID, status domain.PaymentStatus, confirmedBy uuid.UUID) error {
+	const q = `UPDATE payments SET status = $2, confirmed_by = $3, confirmed_at = now() WHERE id = $1`
+	_, err := t.tx.Exec(ctx, q, id, string(status), confirmedBy)
+	return err
+}
+
+func (t *paymentTx) MarkApplicationSettled(ctx context.Context, applicationID uuid.UUID, changedBy uuid.UUID) error {
+	var fromStatus string
+	err := t.tx.QueryRow(ctx, `SELECT status FROM applications WHERE id = $1 FOR UPDATE`, applicationID).Scan(&fromStatus)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return repository.ErrNotFound
+		}
+		return err
+	}
+
+	if _, err := t.tx.Exec(ctx, `UPDATE applications SET status = 'settled', updated_at = now() WHERE id = $1`, applicationID); err != nil {
+		return err
+	}
+
+	const historyQ = `
+		INSERT INTO application_status_history (application_id, from_status, to_status, comment, changed_by)
+		VALUES ($1, $2, 'settled', $3, $4)`
+	_, err = t.tx.Exec(ctx, historyQ, applicationID, fromStatus, "Төлем расталды", changedBy)
+	return err
+}
+
+func scanPaymentRow(row pgx.Row) (*domain.Payment, error) {
+	return scanPaymentFields(row)
+}
+
+type paymentRowScanner interface {
+	Scan(dest ...interface{}) error
+}
+
+func scanPaymentFields(row paymentRowScanner) (*domain.Payment, error) {
+	p := &domain.Payment{}
+	var status string
+	err := row.Scan(&p.ID, &p.ContractID, &p.Amount, &p.Currency, &p.ReceiptFileURL, &status, &p.SubmittedAt, &p.ConfirmedBy, &p.ConfirmedAt, &p.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, repository.ErrNotFound
+		}
+		return nil, err
+	}
+	p.Status = domain.PaymentStatus(status)
+	return p, nil
+}

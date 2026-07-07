@@ -14,6 +14,18 @@ type Config struct {
 	JWTSecret       string
 	AccessTokenTTL  time.Duration
 	RefreshTokenTTL time.Duration
+
+	// ContractResponseDeadline is how long a student has to accept/decline a
+	// contract before it's eligible to be flagged awaiting_manager_decision
+	// (phase 5 fix: passing the deadline never auto-rejects by itself).
+	ContractResponseDeadline time.Duration
+	// ContractExpiryCheckInterval is how often the background job scans for
+	// overdue contracts and deadline reminders; the same work is also
+	// exposed as POST /admin/contracts/expire-check for cron-less environments.
+	ContractExpiryCheckInterval time.Duration
+	// ContractReminderWindow: managers get reminded about a 'sent' contract
+	// once its deadline is within this window (phase 5).
+	ContractReminderWindow time.Duration
 }
 
 func Load() (*Config, error) {
@@ -37,6 +49,24 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	cfg.RefreshTokenTTL = time.Duration(refreshDays) * 24 * time.Hour
+
+	contractDeadlineDays, err := strconv.Atoi(getEnv("CONTRACT_RESPONSE_DEADLINE_DAYS", "7"))
+	if err != nil {
+		return nil, err
+	}
+	cfg.ContractResponseDeadline = time.Duration(contractDeadlineDays) * 24 * time.Hour
+
+	expiryCheckMinutes, err := strconv.Atoi(getEnv("CONTRACT_EXPIRY_CHECK_INTERVAL_MINUTES", "60"))
+	if err != nil {
+		return nil, err
+	}
+	cfg.ContractExpiryCheckInterval = time.Duration(expiryCheckMinutes) * time.Minute
+
+	reminderHours, err := strconv.Atoi(getEnv("CONTRACT_REMINDER_HOURS_BEFORE_DEADLINE", "24"))
+	if err != nil {
+		return nil, err
+	}
+	cfg.ContractReminderWindow = time.Duration(reminderHours) * time.Hour
 
 	return cfg, nil
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/google/uuid"
 
@@ -21,6 +22,18 @@ type ReportService struct {
 	applications    repository.ApplicationRepository
 	users           repository.UserRepository
 	notifier        *notifier.Notifier
+	// onApproved is an optional phase-4 hook (contract auto-generation),
+	// wired via SetOnApproved. Vote() calls it right after a report becomes
+	// approved; nil means no-op, so existing (phase 3) behavior is
+	// unchanged when nothing sets it.
+	onApproved func(ctx context.Context, reportID uuid.UUID) error
+}
+
+// SetOnApproved registers a callback invoked once a report's vote tally
+// resolves to ReportApproved. Errors are logged, not returned to the caller
+// of Vote — the report decision itself has already committed successfully.
+func (s *ReportService) SetOnApproved(fn func(ctx context.Context, reportID uuid.UUID) error) {
+	s.onApproved = fn
 }
 
 func NewReportService(
@@ -252,6 +265,11 @@ func (s *ReportService) Vote(ctx context.Context, actorID, reportID uuid.UUID, d
 	}
 	if decided {
 		s.notifyReportDecision(ctx, updated)
+		if updated.Status == domain.ReportApproved && s.onApproved != nil {
+			if err := s.onApproved(ctx, updated.ID); err != nil {
+				log.Printf("report %s approved but onApproved hook failed: %v", updated.ID, err)
+			}
+		}
 	}
 	return updated, nil
 }

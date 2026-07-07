@@ -1,6 +1,8 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Route, Routes } from 'react-router-dom'
 import { AuthLayout } from './layouts/AuthLayout'
 import { DashboardLayout } from './layouts/DashboardLayout'
+import { AdminLayout } from './layouts/AdminLayout'
+import { CommitteeLayout } from './layouts/CommitteeLayout'
 import { LoginPage } from './features/auth/LoginPage'
 import { RegisterPage } from './features/auth/RegisterPage'
 import { ProfilePage } from './features/profile/ProfilePage'
@@ -12,7 +14,30 @@ import { NotificationsPage } from './features/notifications/NotificationsPage'
 import { ContractsPage } from './features/contracts/ContractsPage'
 import { PaymentPage } from './features/payments/PaymentPage'
 import { MyResidencePage } from './features/residence/MyResidencePage'
+import { DormitoryListPage } from './features/admin/dormitories/DormitoryListPage'
+import { DormitoryFormPage } from './features/admin/dormitories/DormitoryFormPage'
+import { DormitoryDetailPage } from './features/admin/dormitories/DormitoryDetailPage'
+import { RoomFormPage } from './features/admin/rooms/RoomFormPage'
+import { RoomResidentsView } from './features/admin/rooms/RoomResidentsView'
+import { BenefitListPage } from './features/admin/benefits/BenefitListPage'
+import { BenefitFormPage } from './features/admin/benefits/BenefitFormPage'
+import { UserListPage } from './features/admin/users/UserListPage'
+import { UserRegisterFormPage } from './features/admin/users/UserRegisterFormPage'
+import { RoleAssignPage } from './features/admin/users/RoleAssignPage'
+import { ApplicationQueuePage } from './features/admin/applications/ApplicationQueuePage'
+import { ApplicationAdminDetailPage } from './features/admin/applications/ApplicationAdminDetailPage'
+import { ReportTemplateListPage } from './features/admin/reports/ReportTemplateListPage'
+import { ReportBuilderPage } from './features/admin/reports/ReportBuilderPage'
+import { ReportListPage } from './features/admin/reports/ReportListPage'
+import { ReportDetailPage } from './features/admin/reports/ReportDetailPage'
+import { CommitteeReportListPage } from './features/admin/committee/CommitteeReportListPage'
+import { CommitteeVotePage } from './features/admin/committee/CommitteeVotePage'
+import { ContractOversightPage } from './features/admin/contracts/ContractOversightPage'
+import { PaymentReviewPage } from './features/admin/payments/PaymentReviewPage'
+import { ExitRequestListPage } from './features/admin/requests/ExitRequestListPage'
+import { TransferRequestListPage } from './features/admin/requests/TransferRequestListPage'
 import { ProtectedRoute } from './routes/ProtectedRoute'
+import { RoleBasedRedirect } from './routes/RoleBasedRedirect'
 import { useAuthBootstrap } from './features/auth/useAuthBootstrap'
 
 function App() {
@@ -47,8 +72,48 @@ function App() {
         </Route>
       </Route>
 
-      <Route path="/" element={<Navigate to="/dashboard/profile" replace />} />
-      <Route path="*" element={<Navigate to="/dashboard/profile" replace />} />
+      <Route element={<ProtectedRoute allowedRoles={['admin', 'manager']} />}>
+        <Route element={<AdminLayout />}>
+          <Route path="/admin/dormitories" element={<DormitoryListPage />} />
+          <Route path="/admin/dormitories/new" element={<DormitoryFormPage />} />
+          <Route path="/admin/dormitories/:id/edit" element={<DormitoryFormPage />} />
+          <Route path="/admin/dormitories/:id" element={<DormitoryDetailPage />} />
+          <Route path="/admin/dormitories/:dormitoryId/rooms/new" element={<RoomFormPage />} />
+          <Route path="/admin/rooms/:roomId/edit" element={<RoomFormPage />} />
+          <Route path="/admin/rooms/:roomId/residents" element={<RoomResidentsView />} />
+          <Route path="/admin/benefits" element={<BenefitListPage />} />
+          <Route path="/admin/benefits/new" element={<BenefitFormPage />} />
+          <Route path="/admin/benefits/:id/edit" element={<BenefitFormPage />} />
+          <Route path="/admin/users" element={<UserListPage />} />
+
+          <Route path="/admin/applications" element={<ApplicationQueuePage />} />
+          <Route path="/admin/applications/:id" element={<ApplicationAdminDetailPage />} />
+          <Route path="/admin/report-templates" element={<ReportTemplateListPage />} />
+          <Route path="/admin/reports" element={<ReportListPage />} />
+          <Route path="/admin/reports/new" element={<ReportBuilderPage />} />
+          <Route path="/admin/reports/:id" element={<ReportDetailPage />} />
+
+          <Route path="/admin/contracts" element={<ContractOversightPage />} />
+          <Route path="/admin/payments" element={<PaymentReviewPage />} />
+          <Route path="/admin/exit-requests" element={<ExitRequestListPage />} />
+          <Route path="/admin/transfer-requests" element={<TransferRequestListPage />} />
+
+          <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+            <Route path="/admin/users/new" element={<UserRegisterFormPage />} />
+            <Route path="/admin/users/:id/role" element={<RoleAssignPage />} />
+          </Route>
+        </Route>
+      </Route>
+
+      <Route element={<ProtectedRoute allowedRoles={['committee_member']} />}>
+        <Route element={<CommitteeLayout />}>
+          <Route path="/committee/reports" element={<CommitteeReportListPage />} />
+          <Route path="/committee/reports/:id" element={<CommitteeVotePage />} />
+        </Route>
+      </Route>
+
+      <Route path="/" element={<RoleBasedRedirect />} />
+      <Route path="*" element={<RoleBasedRedirect />} />
     </Routes>
   )
 }

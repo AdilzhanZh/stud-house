@@ -300,7 +300,15 @@ exit_requests: pending → approved (moved_out_at=now()) | rejected
 - Admin/Manager/CommitteeMember пайдаланушыларын тек **admin**
   `POST /api/v1/admin/users` арқылы тіркей алады
 - Рөл/chairperson тағайындау (`PATCH .../role`, `PATCH .../chairperson`)
-  — тек **admin** (Manager-де бұл құқық жоқ)
+  — тек **admin** (Manager-де бұл құқық жоқ). Chairperson маршруты
+  нақтырақ: `PATCH /api/v1/admin/committee-members/{id}/chairperson`
+  (`/admin/users/{id}/chairperson` емес — бар болғаны осы)
+- `GET /api/v1/admin/users?role=` — **admin немесе manager** (кезең 4
+  фронтенд-і сұрауы бойынша қосылған; бұрын тек `ListByRole`-ды қатты
+  кодталған `GET /admin/committee-members` арқылы ғана шақыруға болатын,
+  жалпы пайдаланушылар тізімін алатын endpoint мүлдем болмаған).
+  Тіркеу/рөл өзгерту әрекеттерінен айырмашылығы — бұл тек оқу, сондықтан
+  manager-ге де ашық
 - Dormitory/Room/Benefit CRUD — **admin немесе manager**
 - Оқу (`GET`) endpoint-тері — кез келген аутентификацияланған пайдаланушы
 - Студент өз профилін (`/students/{id}/profile`) тек өзі немесе
@@ -363,6 +371,7 @@ exit_requests: pending → approved (moved_out_at=now()) | rejected
 **Manager (admin да істей алады):**
 | Метод | Маршрут | Сипаттама |
 |---|---|---|
+| GET | `/api/v1/payments?status=submitted` | төлемдер тізімі сүзгімен (кезең 6 фронтенд сұрауы бойынша қосылған — бұрын мүлдем жоқ болатын, тек `/payments/my` мен `/contracts/{id}/payment` бар еді) |
 | PATCH | `/api/v1/payments/{id}/confirm` | `{action: confirm\|reject}` |
 | POST | `/api/v1/admin/contracts/expire-check` | overdue флаг қою + deadline ескертулерін қолмен іске қосу |
 | GET | `/api/v1/contracts?status=awaiting_manager_decision` | манагер шешімін күтетін келісімшарттар (кезең 5) |

@@ -97,6 +97,31 @@ func (r *UserRepo) ListByRole(ctx context.Context, role domain.Role) ([]*domain.
 	return users, rows.Err()
 }
 
+func (r *UserRepo) List(ctx context.Context, role *domain.Role) ([]*domain.User, error) {
+	const baseQ = `SELECT id, full_name, email, phone, password_hash, role, is_chairperson, created_at, updated_at FROM users`
+	var rows pgx.Rows
+	var err error
+	if role != nil {
+		rows, err = r.db.Query(ctx, baseQ+` WHERE role = $1 ORDER BY full_name`, string(*role))
+	} else {
+		rows, err = r.db.Query(ctx, baseQ+` ORDER BY full_name`)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []*domain.User
+	for rows.Next() {
+		u, err := scanUserRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}
+
 type rowScanner interface {
 	Scan(dest ...interface{}) error
 }

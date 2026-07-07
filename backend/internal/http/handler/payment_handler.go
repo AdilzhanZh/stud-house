@@ -75,6 +75,31 @@ func (h *PaymentHandler) ListMine(c *gin.Context) {
 	response.OK(c, out)
 }
 
+// List is manager/admin-only: optionally filtered by ?status=.
+func (h *PaymentHandler) List(c *gin.Context) {
+	var status *domain.PaymentStatus
+	if raw := c.Query("status"); raw != "" {
+		s := domain.PaymentStatus(raw)
+		switch s {
+		case domain.PaymentPending, domain.PaymentSubmitted, domain.PaymentConfirmed, domain.PaymentRejected:
+			status = &s
+		default:
+			response.Error(c, apperror.BadRequest("invalid status filter"))
+			return
+		}
+	}
+	list, err := h.payments.List(c.Request.Context(), status)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	out := make([]paymentResponse, 0, len(list))
+	for _, p := range list {
+		out = append(out, paymentDTO(p))
+	}
+	response.OK(c, out)
+}
+
 type submitPaymentRequest struct {
 	ReceiptFileURL string `json:"receipt_file_url" binding:"required"`
 }

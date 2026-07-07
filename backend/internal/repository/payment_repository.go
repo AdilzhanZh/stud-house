@@ -26,6 +26,9 @@ type PaymentRepository interface {
 	// payments carry no student_id of their own (kezeng 3 frontend: GET
 	// /payments/my).
 	ListByStudent(ctx context.Context, studentID uuid.UUID) ([]*domain.Payment, error)
+	// List optionally filters by status (nil = all), for the manager's
+	// payment review queue (kezeng 6 frontend: GET /payments?status=).
+	List(ctx context.Context, status *domain.PaymentStatus) ([]*domain.Payment, error)
 
 	WithLock(ctx context.Context, id uuid.UUID, fn func(ctx context.Context, payment *domain.Payment, tx PaymentTx) error) error
 }

@@ -145,6 +145,8 @@ func NewRouter(jwtSecret string, h Handlers) *gin.Engine {
 				mgmt.POST("/students/:id/benefits", h.Benefit.AssignBenefit)
 				mgmt.DELETE("/students/:id/benefits/:benefitId", h.Benefit.RevokeBenefit)
 
+				mgmt.GET("/admin/users", h.User.List)
+
 				mgmt.GET("/applications", h.Application.List)
 				mgmt.PATCH("/applications/:id/decision", h.Application.Decide)
 
@@ -156,6 +158,7 @@ func NewRouter(jwtSecret string, h Handlers) *gin.Engine {
 				mgmt.POST("/reports/:id/revise", h.Report.Revise)
 				mgmt.GET("/reports/:id/export", h.Report.Export)
 
+				mgmt.GET("/payments", h.Payment.List)
 				mgmt.PATCH("/payments/:id/confirm", h.Payment.Confirm)
 				mgmt.POST("/admin/contracts/expire-check", h.Contract.ExpireCheck)
 				mgmt.GET("/contracts", h.Contract.List)

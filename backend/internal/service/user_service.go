@@ -109,6 +109,14 @@ func (s *UserService) ListCommitteeMembers(ctx context.Context) ([]*domain.User,
 	return s.users.ListByRole(ctx, domain.RoleCommitteeMember)
 }
 
+// List is for the admin panel's user list: optionally filtered by role.
+func (s *UserService) List(ctx context.Context, role *domain.Role) ([]*domain.User, error) {
+	if role != nil && !role.Valid() {
+		return nil, apperror.BadRequest("invalid role filter")
+	}
+	return s.users.List(ctx, role)
+}
+
 func (s *UserService) UpsertStudentProfile(ctx context.Context, userID uuid.UUID, gender *domain.Gender, course *int16) error {
 	user, err := s.GetByID(ctx, userID)
 	if err != nil {

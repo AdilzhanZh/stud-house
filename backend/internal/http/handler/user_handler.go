@@ -109,6 +109,26 @@ func (h *UserHandler) ListCommitteeMembers(c *gin.Context) {
 	response.OK(c, usersDTO(users))
 }
 
+// List is admin/manager-only: the admin panel's user table, optionally
+// filtered by ?role=.
+func (h *UserHandler) List(c *gin.Context) {
+	var role *domain.Role
+	if raw := c.Query("role"); raw != "" {
+		r := domain.Role(raw)
+		if !r.Valid() {
+			response.Error(c, apperror.BadRequest("invalid role filter"))
+			return
+		}
+		role = &r
+	}
+	users, err := h.users.List(c.Request.Context(), role)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, usersDTO(users))
+}
+
 type upsertStudentProfileRequest struct {
 	Gender *domain.Gender `json:"gender"`
 	Course *int16         `json:"course"`

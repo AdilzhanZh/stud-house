@@ -21,6 +21,9 @@ type UserRepository interface {
 	UpdateRole(ctx context.Context, id uuid.UUID, role domain.Role) error
 	UpdateChairperson(ctx context.Context, id uuid.UUID, isChairperson bool) error
 	ListByRole(ctx context.Context, role domain.Role) ([]*domain.User, error)
+	// List optionally filters by role (nil = every user), for the admin
+	// panel's user list (frontend kezeng 4: GET /admin/users?role=).
+	List(ctx context.Context, role *domain.Role) ([]*domain.User, error)
 }
 
 type StudentProfileRepository interface {

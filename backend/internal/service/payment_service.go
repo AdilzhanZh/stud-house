@@ -48,6 +48,12 @@ func (s *PaymentService) GetByID(ctx context.Context, id uuid.UUID) (*domain.Pay
 	return p, nil
 }
 
+// List is manager/admin-only: the payment review queue, optionally
+// filtered by status (e.g. ?status=submitted).
+func (s *PaymentService) List(ctx context.Context, status *domain.PaymentStatus) ([]*domain.Payment, error) {
+	return s.payments.List(ctx, status)
+}
+
 func (s *PaymentService) GetByContractID(ctx context.Context, contractID uuid.UUID) (*domain.Payment, error) {
 	p, err := s.payments.GetByContractID(ctx, contractID)
 	if err != nil {

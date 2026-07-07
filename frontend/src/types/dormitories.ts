@@ -15,3 +15,9 @@ export interface DormitoryImage {
   image_url: string
   created_at: string
 }
+
+export interface DormitoryCapacity {
+  dormitory_id: string
+  total_capacity: number
+  allocated_beds: number
+}

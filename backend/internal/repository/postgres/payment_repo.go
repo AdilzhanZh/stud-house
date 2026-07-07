@@ -65,6 +65,30 @@ func (r *PaymentRepo) ListByStudent(ctx context.Context, studentID uuid.UUID) ([
 	return out, rows.Err()
 }
 
+func (r *PaymentRepo) List(ctx context.Context, status *domain.PaymentStatus) ([]*domain.Payment, error) {
+	var rows pgx.Rows
+	var err error
+	if status != nil {
+		rows, err = r.db.Query(ctx, `SELECT `+paymentColumns+` FROM payments WHERE status = $1 ORDER BY created_at DESC`, string(*status))
+	} else {
+		rows, err = r.db.Query(ctx, `SELECT `+paymentColumns+` FROM payments ORDER BY created_at DESC`)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []*domain.Payment
+	for rows.Next() {
+		p, err := scanPaymentFields(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
 func (r *PaymentRepo) WithLock(ctx context.Context, id uuid.UUID, fn func(ctx context.Context, payment *domain.Payment, tx repository.PaymentTx) error) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {

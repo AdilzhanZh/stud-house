@@ -1,7 +1,8 @@
-# Environment files (keep .env.example tracked)
+# Environment files (keep .env.example/.env.docker tracked as templates)
 .env
 .env.*
 !.env.example
+!.env.docker
 
 # Go (backend/)
 backend/bin/

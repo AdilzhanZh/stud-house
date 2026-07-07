@@ -1,0 +1,74 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - app-network
+
+  # One-shot migration job: runs `migrate up` against migrations/ and exits.
+  # backend waits for it to exit 0 before starting (condition below).
+  migrate:
+    image: migrate/migrate:v4.17.1
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend/migrations:/migrations
+    command: ["-path", "/migrations", "-database", "${DATABASE_URL}", "up"]
+    restart: "no"
+    networks:
+      - app-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      SERVER_PORT: 8080
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      ACCESS_TOKEN_TTL_MINUTES: ${ACCESS_TOKEN_TTL_MINUTES}
+      REFRESH_TOKEN_TTL_DAYS: ${REFRESH_TOKEN_TTL_DAYS}
+      CONTRACT_RESPONSE_DEADLINE_DAYS: ${CONTRACT_RESPONSE_DEADLINE_DAYS}
+      CONTRACT_EXPIRY_CHECK_INTERVAL_MINUTES: ${CONTRACT_EXPIRY_CHECK_INTERVAL_MINUTES}
+      CONTRACT_REMINDER_HOURS_BEFORE_DEADLINE: ${CONTRACT_REMINDER_HOURS_BEFORE_DEADLINE}
+    restart: unless-stopped
+    networks:
+      - app-network
+    # No `ports:` on purpose — backend is only reachable from other
+    # containers on app-network; the browser only ever talks to nginx.
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT}:80"
+    restart: unless-stopped
+    networks:
+      - app-network
+
+volumes:
+  postgres-data:
+
+networks:
+  app-network:
+    driver: bridge

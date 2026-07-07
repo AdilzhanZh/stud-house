@@ -1,0 +1,27 @@
+# Environment files (keep .env.example tracked)
+.env
+.env.*
+!.env.example
+
+# Go (backend/)
+backend/bin/
+*.exe
+*.exe~
+*.dll
+*.test
+*.out
+
+# Node (frontend/) — frontend/ has its own .gitignore too; this is a
+# defensive backstop in case something is run from the repo root.
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.log

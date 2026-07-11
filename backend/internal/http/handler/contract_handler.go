@@ -57,11 +57,11 @@ func (h *ContractHandler) ListMine(c *gin.Context) {
 func (h *ContractHandler) GetByApplication(c *gin.Context) {
 	appID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid application id"))
+		response.Error(c, apperror.BadRequest("өтініш идентификаторы дұрыс емес"))
 		return
 	}
 	if !h.canAccessApplication(c, appID) {
-		response.Error(c, apperror.Forbidden("you cannot view this application's contract"))
+		response.Error(c, apperror.Forbidden("бұл өтініштің келісімшартын көруге құқығыңыз жоқ"))
 		return
 	}
 	contract, err := h.contracts.GetByApplicationID(c.Request.Context(), appID)
@@ -81,7 +81,7 @@ type respondContractRequest struct {
 func (h *ContractHandler) Respond(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid contract id"))
+		response.Error(c, apperror.BadRequest("келісімшарт идентификаторы дұрыс емес"))
 		return
 	}
 	var req respondContractRequest
@@ -126,7 +126,7 @@ func (h *ContractHandler) List(c *gin.Context) {
 		case domain.ContractSent, domain.ContractAwaitingManagerDecision, domain.ContractAccepted, domain.ContractDeclined, domain.ContractExpired:
 			status = &s
 		default:
-			response.Error(c, apperror.BadRequest("invalid status filter"))
+			response.Error(c, apperror.BadRequest("статус фильтрі дұрыс емес"))
 			return
 		}
 	}
@@ -153,7 +153,7 @@ type contractManagerDecisionRequest struct {
 func (h *ContractHandler) ManagerDecision(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid contract id"))
+		response.Error(c, apperror.BadRequest("келісімшарт идентификаторы дұрыс емес"))
 		return
 	}
 	var req contractManagerDecisionRequest

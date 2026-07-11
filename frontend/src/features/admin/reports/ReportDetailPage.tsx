@@ -5,18 +5,9 @@ import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
 import { ReportSummaryCards } from '../../../components/ReportSummaryCards'
 import { extractErrorMessage } from '../../../api/client'
-import { exportReport, getReportDetail, reviseReport } from '../../../api/reportApi'
+import { getReportDetail, reviseReport } from '../../../api/reportApi'
+import { downloadReportPdf } from '../../../utils/reportPdf'
 import type { ReportDetail } from '../../../types/reports'
-
-function downloadJSON(filename: string, data: unknown) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
-}
 
 export function ReportDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -67,12 +58,11 @@ export function ReportDetailPage() {
   }
 
   async function handleExport() {
-    if (!id) return
+    if (!report) return
     setExportError(null)
     setIsExporting(true)
     try {
-      const detail = await exportReport(id)
-      downloadJSON(`report-${id}.json`, detail)
+      await downloadReportPdf(report)
     } catch (err) {
       setExportError(extractErrorMessage(err, 'Выгрузка сәтсіз аяқталды'))
     } finally {
@@ -81,10 +71,14 @@ export function ReportDetailPage() {
   }
 
   if (loadError) return <Alert variant="error" message={loadError} />
-  if (!report) return <p className="text-sm text-gray-500">Жүктелуде...</p>
+  if (!report) return <p className="text-sm text-sand-300/60">Жүктелуде...</p>
 
   return (
     <div className="flex flex-col gap-6">
+      <Button variant="secondary" className="self-start" onClick={() => navigate('/admin/reports')}>
+        ← Артқа
+      </Button>
+
       <ReportSummaryCards report={report} />
 
       {report.status === 'rejected' && (
@@ -93,7 +87,7 @@ export function ReportDetailPage() {
           <ul className="mb-4 flex flex-col gap-2">
             {report.students.map((s) => (
               <li key={s.application_id}>
-                <label className="flex items-center gap-2 text-sm text-gray-700">
+                <label className="flex items-center gap-2 text-sm text-sand-200">
                   <input
                     type="checkbox"
                     checked={keptIds.has(s.application_id)}

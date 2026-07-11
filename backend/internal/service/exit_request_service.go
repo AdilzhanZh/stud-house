@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"log"
 
 	"github.com/google/uuid"
 
@@ -10,6 +11,7 @@ import (
 	"student-house/internal/repository"
 	"student-house/internal/service/notifier"
 	"student-house/pkg/apperror"
+	"student-house/pkg/mailer"
 )
 
 type ExitRequestService struct {
@@ -17,6 +19,7 @@ type ExitRequestService struct {
 	rooms        repository.RoomRepository
 	users        repository.UserRepository
 	notifier     *notifier.Notifier
+	mailer       *mailer.Mailer
 }
 
 func NewExitRequestService(
@@ -24,8 +27,9 @@ func NewExitRequestService(
 	rooms repository.RoomRepository,
 	users repository.UserRepository,
 	notifier *notifier.Notifier,
+	m *mailer.Mailer,
 ) *ExitRequestService {
-	return &ExitRequestService{exitRequests: exitRequests, rooms: rooms, users: users, notifier: notifier}
+	return &ExitRequestService{exitRequests: exitRequests, rooms: rooms, users: users, notifier: notifier, mailer: m}
 }
 
 // Create is student-only: it looks up the caller's own active room stay
@@ -34,13 +38,13 @@ func (s *ExitRequestService) Create(ctx context.Context, studentID uuid.UUID, re
 	resident, err := s.rooms.GetActiveResidentByStudent(ctx, studentID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, apperror.BadRequest("you don't have an active room assignment")
+			return nil, apperror.BadRequest("сізде белсенді бөлмеге орналасу жоқ")
 		}
 		return nil, err
 	}
 
 	if _, err := s.exitRequests.GetActiveByRoomResident(ctx, resident.ID); err == nil {
-		return nil, apperror.Conflict("you already have a pending exit request")
+		return nil, apperror.Conflict("сізде қаралуда тұрған шығу өтініші бар")
 	} else if !errors.Is(err, repository.ErrNotFound) {
 		return nil, err
 	}
@@ -48,7 +52,7 @@ func (s *ExitRequestService) Create(ctx context.Context, studentID uuid.UUID, re
 	er := &domain.ExitRequest{RoomResidentID: resident.ID, StudentID: studentID, Reason: reason, Status: domain.ExitRequestPending}
 	if err := s.exitRequests.Create(ctx, er); err != nil {
 		if errors.Is(err, repository.ErrConflict) {
-			return nil, apperror.Conflict("you already have a pending exit request")
+			return nil, apperror.Conflict("сізде қаралуда тұрған шығу өтініші бар")
 		}
 		return nil, err
 	}
@@ -61,7 +65,7 @@ func (s *ExitRequestService) GetByID(ctx context.Context, id uuid.UUID) (*domain
 	e, err := s.exitRequests.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, apperror.NotFound("exit request not found")
+			return nil, apperror.NotFound("шығу өтініші табылмады")
 		}
 		return nil, err
 	}
@@ -86,7 +90,7 @@ func (s *ExitRequestService) Decide(ctx context.Context, actorID, exitRequestID 
 
 	err := s.exitRequests.WithLock(ctx, exitRequestID, func(ctx context.Context, e *domain.ExitRequest, tx repository.ExitRequestTx) error {
 		if e.Status != domain.ExitRequestPending {
-			return apperror.Conflict("exit request has already been decided")
+			return apperror.Conflict("шығу өтініші бойынша шешім бұрын қабылданды")
 		}
 		switch action {
 		case "approve":
@@ -95,11 +99,11 @@ func (s *ExitRequestService) Decide(ctx context.Context, actorID, exitRequestID 
 			return tx.SetDecision(ctx, exitRequestID, domain.ExitRequestApproved, actorID, comment)
 		case "reject":
 			if comment == nil || *comment == "" {
-				return apperror.BadRequest("comment is required to reject")
+				return apperror.BadRequest("қабылдамау үшін пікір міндетті")
 			}
 			return tx.SetDecision(ctx, exitRequestID, domain.ExitRequestRejected, actorID, comment)
 		default:
-			return apperror.BadRequest("invalid action")
+			return apperror.BadRequest("әрекет жарамсыз")
 		}
 	})
 	if err != nil {
@@ -112,7 +116,28 @@ func (s *ExitRequestService) Decide(ctx context.Context, actorID, exitRequestID 
 		}
 	}
 
-	return s.GetByID(ctx, exitRequestID)
+	updated, err := s.GetByID(ctx, exitRequestID)
+	if err != nil {
+		return nil, err
+	}
+	s.notifyStudentDecision(ctx, updated)
+	return updated, nil
+}
+
+func (s *ExitRequestService) notifyStudentDecision(ctx context.Context, e *domain.ExitRequest) {
+	title, body := "Шығу өтінішіңіз мақұлданды", "Сіздің жатақханадан шығу өтінішіңіз мақұлданды."
+	if e.Status == domain.ExitRequestRejected {
+		title, body = "Шығу өтінішіңіз қабылданбады", "Сіздің жатақханадан шығу өтінішіңіз қабылданбады."
+	}
+	_ = s.notifier.Notify(ctx, e.StudentID, domain.NotificationExitRequestUpdate, title, body, nil)
+
+	if student, err := s.users.GetByID(ctx, e.StudentID); err == nil {
+		go func(email, subject, body string) {
+			if err := s.mailer.Send(email, subject, body); err != nil {
+				log.Printf("failed to send exit-request-decision email to %s: %v", email, err)
+			}
+		}(student.Email, title, body)
+	}
 }
 
 func (s *ExitRequestService) notifyManagersNewExitRequest(ctx context.Context, e *domain.ExitRequest) {

@@ -44,6 +44,8 @@ type paymentResponse struct {
 	SubmittedAt    *time.Time `json:"submitted_at"`
 	ConfirmedBy    *uuid.UUID `json:"confirmed_by"`
 	ConfirmedAt    *time.Time `json:"confirmed_at"`
+	Deadline       time.Time  `json:"deadline"`
+	ReminderSentAt *time.Time `json:"reminder_sent_at"`
 	CreatedAt      time.Time  `json:"created_at"`
 }
 
@@ -58,6 +60,8 @@ func paymentDTO(p *domain.Payment) paymentResponse {
 		SubmittedAt:    p.SubmittedAt,
 		ConfirmedBy:    p.ConfirmedBy,
 		ConfirmedAt:    p.ConfirmedAt,
+		Deadline:       p.Deadline,
+		ReminderSentAt: p.ReminderSentAt,
 		CreatedAt:      p.CreatedAt,
 	}
 }

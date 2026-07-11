@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -13,7 +14,7 @@ import (
 	"student-house/internal/repository"
 )
 
-const applicationColumns = `id, student_id, dormitory_id, status, preferred_room_type, notes, assigned_room_id, handled_by, created_at, updated_at`
+const applicationColumns = `id, student_id, dormitory_id, status, preferred_room_type, preferred_room_id, notes, assigned_room_id, handled_by, created_at, updated_at`
 
 type ApplicationRepo struct {
 	db *pgxpool.Pool
@@ -25,10 +26,10 @@ func NewApplicationRepo(db *pgxpool.Pool) *ApplicationRepo {
 
 func (r *ApplicationRepo) Create(ctx context.Context, a *domain.Application) error {
 	const q = `
-		INSERT INTO applications (student_id, dormitory_id, status, preferred_room_type, notes)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO applications (student_id, dormitory_id, status, preferred_room_type, preferred_room_id, notes)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, created_at, updated_at`
-	err := r.db.QueryRow(ctx, q, a.StudentID, a.DormitoryID, string(a.Status), a.PreferredRoomType, a.Notes).
+	err := r.db.QueryRow(ctx, q, a.StudentID, a.DormitoryID, string(a.Status), a.PreferredRoomType, a.PreferredRoomID, a.Notes).
 		Scan(&a.ID, &a.CreatedAt, &a.UpdatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -76,6 +77,30 @@ func (r *ApplicationRepo) List(ctx context.Context, status *domain.ApplicationSt
 	}
 	defer rows.Close()
 	return scanApplicationRows(rows)
+}
+
+func (r *ApplicationRepo) ListByDormitory(ctx context.Context, dormitoryID uuid.UUID) ([]*domain.Application, error) {
+	rows, err := r.db.Query(ctx, `SELECT `+applicationColumns+` FROM applications WHERE dormitory_id = $1`, dormitoryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanApplicationRows(rows)
+}
+
+func (r *ApplicationRepo) Delete(ctx context.Context, id uuid.UUID) error {
+	tag, err := r.db.Exec(ctx, `DELETE FROM applications WHERE id = $1`, id)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+			return repository.ErrConflict
+		}
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return repository.ErrNotFound
+	}
+	return nil
 }
 
 func (r *ApplicationRepo) AddHistory(ctx context.Context, h *domain.ApplicationStatusHistory) error {
@@ -173,10 +198,31 @@ func insertApplicationHistory(ctx context.Context, db historyExecer, h *domain.A
 	return db.QueryRow(ctx, q, h.ApplicationID, fromStatus, string(h.ToStatus), h.Comment, h.ChangedBy).Scan(&h.ID, &h.CreatedAt)
 }
 
+func (r *ApplicationRepo) SetReapplyBlock(ctx context.Context, studentID uuid.UUID, blockedUntil time.Time) error {
+	const q = `
+		INSERT INTO application_reapply_blocks (student_id, blocked_until)
+		VALUES ($1, $2)
+		ON CONFLICT (student_id) DO UPDATE SET blocked_until = $2`
+	_, err := r.db.Exec(ctx, q, studentID, blockedUntil)
+	return err
+}
+
+func (r *ApplicationRepo) GetReapplyBlock(ctx context.Context, studentID uuid.UUID) (time.Time, error) {
+	var blockedUntil time.Time
+	err := r.db.QueryRow(ctx, `SELECT blocked_until FROM application_reapply_blocks WHERE student_id = $1`, studentID).Scan(&blockedUntil)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return time.Time{}, repository.ErrNotFound
+		}
+		return time.Time{}, err
+	}
+	return blockedUntil, nil
+}
+
 func scanApplicationRow(row pgx.Row) (*domain.Application, error) {
 	a := &domain.Application{}
 	var status string
-	err := row.Scan(&a.ID, &a.StudentID, &a.DormitoryID, &status, &a.PreferredRoomType, &a.Notes, &a.AssignedRoomID, &a.HandledBy, &a.CreatedAt, &a.UpdatedAt)
+	err := row.Scan(&a.ID, &a.StudentID, &a.DormitoryID, &status, &a.PreferredRoomType, &a.PreferredRoomID, &a.Notes, &a.AssignedRoomID, &a.HandledBy, &a.CreatedAt, &a.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, repository.ErrNotFound
@@ -192,7 +238,7 @@ func scanApplicationRows(rows pgx.Rows) ([]*domain.Application, error) {
 	for rows.Next() {
 		a := &domain.Application{}
 		var status string
-		if err := rows.Scan(&a.ID, &a.StudentID, &a.DormitoryID, &status, &a.PreferredRoomType, &a.Notes, &a.AssignedRoomID, &a.HandledBy, &a.CreatedAt, &a.UpdatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.StudentID, &a.DormitoryID, &status, &a.PreferredRoomType, &a.PreferredRoomID, &a.Notes, &a.AssignedRoomID, &a.HandledBy, &a.CreatedAt, &a.UpdatedAt); err != nil {
 			return nil, err
 		}
 		a.Status = domain.ApplicationStatus(status)

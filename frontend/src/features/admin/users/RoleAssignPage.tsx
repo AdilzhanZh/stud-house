@@ -1,21 +1,21 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Card } from '../../../components/Card'
-import { Select } from '../../../components/Select'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
 import { extractErrorMessage } from '../../../api/client'
-import { listUsers, setChairperson, updateUserRole } from '../../../api/adminUserApi'
-import type { Role, User } from '../../../types'
+import { listUsers, setChairperson, setCommitteeMember } from '../../../api/adminUserApi'
+import type { User } from '../../../types'
 
-const ALL_ROLES: Role[] = ['admin', 'manager', 'committee_member', 'student']
-
+// Reached only from manager rows in UserListPage — the user stays a manager
+// here, this page only toggles the committee-member/chairperson flags on top
+// of that role.
 export function RoleAssignPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
   const [user, setUser] = useState<User | null>(null)
-  const [role, setRole] = useState<Role>('student')
+  const [isCommitteeMember, setIsCommitteeMember] = useState(false)
   const [isChairperson, setIsChairperson] = useState(false)
 
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -34,7 +34,7 @@ export function RoleAssignPage() {
           return
         }
         setUser(found)
-        setRole(found.role)
+        setIsCommitteeMember(found.is_committee_member)
         setIsChairperson(found.is_chairperson)
       })
       .catch((err) => setLoadError(extractErrorMessage(err, 'Жүктеу сәтсіз аяқталды')))
@@ -46,8 +46,8 @@ export function RoleAssignPage() {
     setError(null)
     setIsSubmitting(true)
     try {
-      await updateUserRole(id, role)
-      if (role === 'committee_member') {
+      await setCommitteeMember(id, isCommitteeMember)
+      if (isCommitteeMember) {
         await setChairperson(id, isChairperson)
       }
       navigate('/admin/users')
@@ -59,35 +59,45 @@ export function RoleAssignPage() {
   }
 
   if (loadError) return <Alert variant="error" message={loadError} />
-  if (!user) return <p className="text-sm text-gray-500">Жүктелуде...</p>
+  if (!user) return <p className="text-sm text-sand-300/60">Жүктелуде...</p>
 
   return (
-    <Card title={`Рөлін тағайындау — ${user.full_name}`}>
-      <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-        {error && <Alert variant="error" message={error} />}
-        <Select label="Рөлі" value={role} onChange={(e) => setRole(e.target.value as Role)}>
-          {ALL_ROLES.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </Select>
-        <label className="flex items-center gap-2 text-sm text-gray-700">
-          <input
-            type="checkbox"
-            checked={isChairperson}
-            disabled={role !== 'committee_member'}
-            onChange={(e) => setIsChairperson(e.target.checked)}
-          />
-          Chairperson
-          {role !== 'committee_member' && (
-            <span className="text-xs text-gray-400">(тек committee_member рөлінде)</span>
-          )}
-        </label>
-        <Button type="submit" isLoading={isSubmitting} className="self-start">
-          Сақтау
-        </Button>
-      </form>
-    </Card>
+    <div className="flex flex-col gap-6">
+      <Button variant="secondary" className="self-start" onClick={() => navigate('/admin/users')}>
+        ← Артқа
+      </Button>
+
+      <Card title={`Комиссия тағайындау — ${user.full_name}`}>
+        <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+          {error && <Alert variant="error" message={error} />}
+          <label className="flex items-center gap-2 text-sm text-sand-200">
+            <input
+              type="checkbox"
+              checked={isCommitteeMember}
+              onChange={(e) => {
+                setIsCommitteeMember(e.target.checked)
+                if (!e.target.checked) setIsChairperson(false)
+              }}
+            />
+            Комиссия мүшесі
+          </label>
+          <label className="flex items-center gap-2 text-sm text-sand-200">
+            <input
+              type="checkbox"
+              checked={isChairperson}
+              disabled={!isCommitteeMember}
+              onChange={(e) => setIsChairperson(e.target.checked)}
+            />
+            Төраға
+            {!isCommitteeMember && (
+              <span className="text-xs text-sand-400">(тек комиссия мүшесіне)</span>
+            )}
+          </label>
+          <Button type="submit" isLoading={isSubmitting} className="self-start">
+            Сақтау
+          </Button>
+        </form>
+      </Card>
+    </div>
   )
 }

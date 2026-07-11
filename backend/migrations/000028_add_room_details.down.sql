@@ -1,0 +1,5 @@
+ALTER TABLE rooms
+    DROP COLUMN IF EXISTS floor,
+    DROP COLUMN IF EXISTS category,
+    DROP COLUMN IF EXISTS area_sq_m,
+    DROP COLUMN IF EXISTS equipment;

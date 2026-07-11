@@ -122,10 +122,10 @@ src/
 
 | Маршрут | Сипаттама |
 |---|---|
-| `/admin/dormitories` | Жатақханалар кестесі: атауы, мекенжайы, сыйымдылық (`X/Y`, `GET .../capacity`), "Өзгерту"/"Бөлмелерін көру" әрекеттері |
-| `/admin/dormitories/new`, `/admin/dormitories/{id}/edit` | Жатақхана формасы (name/address/total_capacity/QR URL). Суреттер бөлімі тек өзгерту режимінде көрінеді (dormitory images-тегідей — алдымен сақтау керек, содан кейін URL қосу) |
-| `/admin/dormitories/{id}` | Capacity progress bar + бөлмелер кестесі (№, сыйымдылық, тұрғын саны, шектеулер қысқаша) + "Жаңа бөлме" |
-| `/admin/dormitories/{dormitoryId}/rooms/new`, `/admin/rooms/{roomId}/edit` | Бөлме формасы: room_number, capacity, жыныс бойынша шектеу (select), курс бойынша шектеу (**checkbox тізімі 1-6**, төменде түсіндірілген) |
+| `/admin/dormitories` | Жатақханалар кестесі: атауы, мекенжайы, орын саны қатынасы (`total/allocated`), бөлме саны қатынасы (`target/created`, екеуі де `GET .../capacity`-ден), "Өзгерту"/"Бөлмелерін көру" әрекеттері |
+| `/admin/dormitories/new`, `/admin/dormitories/{id}/edit` | Жатақхана формасы — ТЗ-дегі толық өріс жиынтығы: name/address/phone/dorm_type(sectional-corridor-block)/floor_count/total_rooms_target/total_capacity/monthly_payment/yearly_payment/built_year/commissioned_year/ownership_form/4 amenity checkbox (ramps/elevators/handrails/parking)/QR URL. Суреттер бөлімі тек өзгерту режимінде көрінеді (dormitory images-тегідей — алдымен сақтау керек, содан кейін URL қосу) |
+| `/admin/dormitories/{id}` | Екі progress bar (орын саны, бөлме саны) + бөлмелер кестесі (№, қабат, сыйымдылық, түрі, ауданы, құрылғылар, тұрғын саны, шектеулер қысқаша) + "Жаңа бөлме" |
+| `/admin/dormitories/{dormitoryId}/rooms/new`, `/admin/rooms/{roomId}/edit` | Бөлме формасы: room_number, capacity, floor, category (әзірге тек "general"), area_sq_m, equipment, жыныс бойынша шектеу (select), курс бойынша шектеу (**checkbox тізімі 1-6**, төменде түсіндірілген) |
 | `/admin/rooms/{roomId}/residents` | Тұрғындар тізімі (студент аты `GET /admin/users`-тен ілінеді, moved_in_at күні) |
 | `/admin/benefits` | Льготалар тізімі + "Жаңа льгота" |
 | `/admin/benefits/new`, `/admin/benefits/{id}/edit` | name/description формасы; өзгерту режимінде — қажетті өрістер мен құжаттардың динамикалық тізімі (қосу/өшіру) |

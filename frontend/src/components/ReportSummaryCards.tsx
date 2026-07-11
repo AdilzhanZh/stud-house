@@ -17,14 +17,14 @@ export function ReportSummaryCards({ report }: { report: ReportDetail }) {
     <>
       <Card>
         <div className="flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-gray-900">{report.template.name}</h1>
+          <h1 className="font-heading text-lg text-sand-100">{report.template.name}</h1>
           <ReportStatusBadge status={report.status} />
         </div>
         <a
           href={report.template.file_url}
           target="_blank"
           rel="noreferrer"
-          className="text-sm text-indigo-600 hover:underline"
+          className="text-sm text-turquoise-400 hover:underline"
         >
           Шаблон файлы
         </a>
@@ -34,8 +34,8 @@ export function ReportSummaryCards({ report }: { report: ReportDetail }) {
         <ul className="flex flex-col gap-2">
           {report.students.map((s) => (
             <li key={s.application_id} className="text-sm">
-              <span className="font-medium text-gray-900">{s.student_full_name}</span>{' '}
-              <span className="text-gray-500">
+              <span className="font-medium text-sand-100">{s.student_full_name}</span>{' '}
+              <span className="text-sand-300/70">
                 ({s.student_email}, {s.student_phone})
               </span>
             </li>
@@ -47,8 +47,8 @@ export function ReportSummaryCards({ report }: { report: ReportDetail }) {
         <ul className="flex flex-col gap-2">
           {report.votes.map((v) => (
             <li key={v.committee_member_id} className="flex justify-between text-sm">
-              <span className="text-gray-900">{v.committee_member_name}</span>
-              <span className="text-gray-600">
+              <span className="text-sand-100">{v.committee_member_name}</span>
+              <span className="text-sand-300/70">
                 {voteLabels[v.decision ?? 'pending']}
                 {v.reason ? ` — ${v.reason}` : ''}
               </span>

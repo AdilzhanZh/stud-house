@@ -23,6 +23,7 @@ func NewBenefitHandler(benefits *service.BenefitService) *BenefitHandler {
 type createBenefitRequest struct {
 	Name        string `json:"name" binding:"required"`
 	Description string `json:"description"`
+	Priority    int    `json:"priority" binding:"required,min=1,max=10"`
 }
 
 func (h *BenefitHandler) Create(c *gin.Context) {
@@ -32,7 +33,7 @@ func (h *BenefitHandler) Create(c *gin.Context) {
 		return
 	}
 	createdBy, _ := middleware.UserID(c)
-	b, err := h.benefits.Create(c.Request.Context(), req.Name, req.Description, createdBy)
+	b, err := h.benefits.Create(c.Request.Context(), req.Name, req.Description, req.Priority, createdBy)
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -52,7 +53,7 @@ func (h *BenefitHandler) List(c *gin.Context) {
 func (h *BenefitHandler) Get(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid benefit id"))
+		response.Error(c, apperror.BadRequest("льгота идентификаторы дұрыс емес"))
 		return
 	}
 	b, err := h.benefits.GetByID(c.Request.Context(), id)
@@ -66,12 +67,13 @@ func (h *BenefitHandler) Get(c *gin.Context) {
 type updateBenefitRequest struct {
 	Name        string `json:"name" binding:"required"`
 	Description string `json:"description"`
+	Priority    int    `json:"priority" binding:"required,min=1,max=10"`
 }
 
 func (h *BenefitHandler) Update(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid benefit id"))
+		response.Error(c, apperror.BadRequest("льгота идентификаторы дұрыс емес"))
 		return
 	}
 	var req updateBenefitRequest
@@ -79,7 +81,7 @@ func (h *BenefitHandler) Update(c *gin.Context) {
 		response.Error(c, apperror.BadRequest(err.Error()))
 		return
 	}
-	b, err := h.benefits.Update(c.Request.Context(), id, req.Name, req.Description)
+	b, err := h.benefits.Update(c.Request.Context(), id, req.Name, req.Description, req.Priority)
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -90,7 +92,7 @@ func (h *BenefitHandler) Update(c *gin.Context) {
 func (h *BenefitHandler) Delete(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid benefit id"))
+		response.Error(c, apperror.BadRequest("льгота идентификаторы дұрыс емес"))
 		return
 	}
 	if err := h.benefits.Delete(c.Request.Context(), id); err != nil {
@@ -100,65 +102,14 @@ func (h *BenefitHandler) Delete(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-type addBenefitFieldRequest struct {
-	FieldName string `json:"field_name" binding:"required"`
-	FieldType string `json:"field_type" binding:"required"`
-}
-
-func (h *BenefitHandler) AddField(c *gin.Context) {
-	benefitID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid benefit id"))
-		return
-	}
-	var req addBenefitFieldRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, apperror.BadRequest(err.Error()))
-		return
-	}
-	f, err := h.benefits.AddField(c.Request.Context(), benefitID, req.FieldName, req.FieldType)
-	if err != nil {
-		response.Error(c, err)
-		return
-	}
-	response.Created(c, benefitFieldDTO(f))
-}
-
-func (h *BenefitHandler) ListFields(c *gin.Context) {
-	benefitID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid benefit id"))
-		return
-	}
-	fields, err := h.benefits.ListFields(c.Request.Context(), benefitID)
-	if err != nil {
-		response.Error(c, err)
-		return
-	}
-	response.OK(c, benefitFieldsDTO(fields))
-}
-
-func (h *BenefitHandler) DeleteField(c *gin.Context) {
-	fieldID, err := uuid.Parse(c.Param("fieldId"))
-	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid field id"))
-		return
-	}
-	if err := h.benefits.DeleteField(c.Request.Context(), fieldID); err != nil {
-		response.Error(c, err)
-		return
-	}
-	c.Status(http.StatusNoContent)
-}
-
 type addRequiredDocumentRequest struct {
-	DocumentName string `json:"document_name" binding:"required"`
+	DocumentID uuid.UUID `json:"document_id" binding:"required"`
 }
 
 func (h *BenefitHandler) AddRequiredDocument(c *gin.Context) {
 	benefitID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid benefit id"))
+		response.Error(c, apperror.BadRequest("льгота идентификаторы дұрыс емес"))
 		return
 	}
 	var req addRequiredDocumentRequest
@@ -166,7 +117,7 @@ func (h *BenefitHandler) AddRequiredDocument(c *gin.Context) {
 		response.Error(c, apperror.BadRequest(err.Error()))
 		return
 	}
-	d, err := h.benefits.AddRequiredDocument(c.Request.Context(), benefitID, req.DocumentName)
+	d, err := h.benefits.AddRequiredDocument(c.Request.Context(), benefitID, req.DocumentID)
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -177,7 +128,7 @@ func (h *BenefitHandler) AddRequiredDocument(c *gin.Context) {
 func (h *BenefitHandler) ListRequiredDocuments(c *gin.Context) {
 	benefitID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid benefit id"))
+		response.Error(c, apperror.BadRequest("льгота идентификаторы дұрыс емес"))
 		return
 	}
 	docs, err := h.benefits.ListRequiredDocuments(c.Request.Context(), benefitID)
@@ -191,7 +142,7 @@ func (h *BenefitHandler) ListRequiredDocuments(c *gin.Context) {
 func (h *BenefitHandler) DeleteRequiredDocument(c *gin.Context) {
 	docID, err := uuid.Parse(c.Param("documentId"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid document id"))
+		response.Error(c, apperror.BadRequest("құжат идентификаторы дұрыс емес"))
 		return
 	}
 	if err := h.benefits.DeleteRequiredDocument(c.Request.Context(), docID); err != nil {
@@ -210,7 +161,7 @@ type assignBenefitRequest struct {
 func (h *BenefitHandler) AssignBenefit(c *gin.Context) {
 	studentID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid student id"))
+		response.Error(c, apperror.BadRequest("студент идентификаторы дұрыс емес"))
 		return
 	}
 	var req assignBenefitRequest
@@ -227,10 +178,33 @@ func (h *BenefitHandler) AssignBenefit(c *gin.Context) {
 	response.Created(c, studentBenefitDTO(sb))
 }
 
+// AssignOwnBenefit is student-only: a student self-declares that a benefit
+// applies to them (e.g. while filling in a dormitory application), as
+// opposed to AssignBenefit which is an admin/manager assigning on a
+// student's behalf.
+func (h *BenefitHandler) AssignOwnBenefit(c *gin.Context) {
+	studentID, ok := middleware.UserID(c)
+	if !ok {
+		response.Error(c, apperror.Unauthorized("авторизация қажет"))
+		return
+	}
+	var req assignBenefitRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.BadRequest(err.Error()))
+		return
+	}
+	sb, err := h.benefits.AssignBenefit(c.Request.Context(), studentID, req.BenefitID, studentID)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.Created(c, studentBenefitDTO(sb))
+}
+
 func (h *BenefitHandler) ListStudentBenefits(c *gin.Context) {
 	studentID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid student id"))
+		response.Error(c, apperror.BadRequest("студент идентификаторы дұрыс емес"))
 		return
 	}
 	list, err := h.benefits.ListStudentBenefits(c.Request.Context(), studentID)
@@ -244,12 +218,12 @@ func (h *BenefitHandler) ListStudentBenefits(c *gin.Context) {
 func (h *BenefitHandler) RevokeBenefit(c *gin.Context) {
 	studentID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid student id"))
+		response.Error(c, apperror.BadRequest("студент идентификаторы дұрыс емес"))
 		return
 	}
 	benefitID, err := uuid.Parse(c.Param("benefitId"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid benefit id"))
+		response.Error(c, apperror.BadRequest("льгота идентификаторы дұрыс емес"))
 		return
 	}
 	if err := h.benefits.RevokeBenefit(c.Request.Context(), studentID, benefitID); err != nil {

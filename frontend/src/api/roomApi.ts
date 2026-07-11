@@ -14,6 +14,12 @@ export async function getRoom(id: string): Promise<Room> {
 export interface RoomPayload {
   room_number: string
   capacity: number
+  floor: number | null
+  category: string
+  area_sq_m: number | null
+  equipment: string | null
+  top_beds: number
+  bottom_beds: number
 }
 
 export async function createRoom(dormitoryId: string, payload: RoomPayload): Promise<Room> {
@@ -43,5 +49,12 @@ export async function updateRoomRestrictions(
 
 export async function listRoomResidents(roomId: string): Promise<RoomResident[]> {
   const { data } = await apiClient.get<{ data: RoomResident[] }>(`/rooms/${roomId}/residents`)
+  return data.data
+}
+
+export async function addResident(roomId: string, studentId: string): Promise<RoomResident> {
+  const { data } = await apiClient.post<{ data: RoomResident }>(`/rooms/${roomId}/residents`, {
+    student_id: studentId,
+  })
   return data.data
 }

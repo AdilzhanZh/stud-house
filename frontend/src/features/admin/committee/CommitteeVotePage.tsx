@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Card } from '../../../components/Card'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
@@ -11,6 +11,7 @@ import type { ReportDetail } from '../../../types/reports'
 
 export function CommitteeVotePage() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const { user } = useAuth()
 
   const [report, setReport] = useState<ReportDetail | null>(null)
@@ -59,7 +60,7 @@ export function CommitteeVotePage() {
   }
 
   if (loadError) return <Alert variant="error" message={loadError} />
-  if (!report || !user) return <p className="text-sm text-gray-500">Жүктелуде...</p>
+  if (!report || !user) return <p className="text-sm text-sand-300/60">Жүктелуде...</p>
 
   const myVote = report.votes.find((v) => v.committee_member_id === user.id)
   // Hide the vote panel once the report has left pending_committee (backend
@@ -69,6 +70,10 @@ export function CommitteeVotePage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <Button variant="secondary" className="self-start" onClick={() => navigate('/committee/reports')}>
+        ← Артқа
+      </Button>
+
       <ReportSummaryCards report={report} />
 
       {myVote?.decision && (
@@ -95,7 +100,7 @@ export function CommitteeVotePage() {
               <textarea
                 rows={3}
                 placeholder="Мақұлдамау себебі (міндетті)"
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200"
+                className="rounded-md border border-sand-100/15 bg-navy-950/60 px-3 py-2 text-sand-100 text-sm outline-none focus:border-turquoise-400 focus:ring-2 focus:ring-turquoise-400/30"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
               />

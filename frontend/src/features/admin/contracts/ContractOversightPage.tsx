@@ -89,20 +89,20 @@ export function ContractOversightPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold text-gray-900">Келісімшарт қадағалауы</h1>
-      <p className="text-sm text-gray-500">Мерзімі өтіп, менеджер шешімін күтетін келісімшарттар</p>
+      <h1 className="font-heading text-2xl text-sand-100">Келісімшарт қадағалауы</h1>
+      <p className="text-sm text-sand-300/60">Мерзімі өтіп, менеджер шешімін күтетін келісімшарттар</p>
 
       {error && <Alert variant="error" message={error} />}
-      {!error && !rows && <p className="text-sm text-gray-500">Жүктелуде...</p>}
+      {!error && !rows && <p className="text-sm text-sand-300/60">Жүктелуде...</p>}
 
       <div className="flex flex-col gap-3">
         {rows?.map((c) => (
           <Card key={c.id}>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="font-medium text-gray-900">{c.studentName}</p>
-                <p className="text-sm text-gray-500">{c.dormitoryName}</p>
-                <p className="text-sm text-orange-600">
+                <p className="font-medium text-sand-100">{c.studentName}</p>
+                <p className="text-sm text-sand-300/60">{c.dormitoryName}</p>
+                <p className="text-sm text-sand-200">
                   Мерзімі {formatTimeElapsed(c.response_deadline)}
                 </p>
               </div>
@@ -123,7 +123,7 @@ export function ContractOversightPage() {
                 {extendError && <Alert variant="error" message={extendError} />}
                 <input
                   type="datetime-local"
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200"
+                  className="rounded-md border border-sand-100/15 bg-navy-950/60 px-3 py-2 text-sand-100 text-sm outline-none focus:border-turquoise-400 focus:ring-2 focus:ring-turquoise-400/30"
                   value={newDeadline}
                   onChange={(e) => setNewDeadline(e.target.value)}
                 />
@@ -147,7 +147,7 @@ export function ContractOversightPage() {
           </Card>
         ))}
         {rows && rows.length === 0 && (
-          <p className="text-sm text-gray-500">Қаралатын келісімшарт жоқ</p>
+          <p className="text-sm text-sand-300/60">Қаралатын келісімшарт жоқ</p>
         )}
       </div>
 

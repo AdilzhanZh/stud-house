@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"student-house/internal/domain"
@@ -20,21 +21,71 @@ func NewDormitoryRepo(db *pgxpool.Pool) *DormitoryRepo {
 	return &DormitoryRepo{db: db}
 }
 
+const dormitoryColumns = `
+	id, name, address, phone, dorm_type, floor_count, total_rooms_target,
+	total_capacity, rooms_male, rooms_female, rooms_mixed,
+	monthly_payment, yearly_payment, built_year,
+	commissioned_year, ownership_form, created_by, created_at,
+	updated_at`
+
+// dormTypeToText/textToDormType convert domain.DormitoryType (a named string
+// type) to/from a plain *string at the pgx boundary — mirrors the
+// string(u.Role) convention used elsewhere in this package for enum columns;
+// pgx doesn't know how to encode/decode a pointer to a custom named type.
+func dormTypeToText(t *domain.DormitoryType) *string {
+	if t == nil {
+		return nil
+	}
+	s := string(*t)
+	return &s
+}
+
+func textToDormType(s *string) *domain.DormitoryType {
+	if s == nil {
+		return nil
+	}
+	t := domain.DormitoryType(*s)
+	return &t
+}
+
+func scanDormitory(row pgx.Row) (*domain.Dormitory, error) {
+	d := &domain.Dormitory{}
+	var dormType *string
+	err := row.Scan(
+		&d.ID, &d.Name, &d.Address, &d.Phone, &dormType, &d.FloorCount, &d.TotalRoomsTarget,
+		&d.TotalCapacity, &d.RoomsMale, &d.RoomsFemale, &d.RoomsMixed,
+		&d.MonthlyPayment, &d.YearlyPayment, &d.BuiltYear,
+		&d.CommissionedYear, &d.OwnershipForm, &d.CreatedBy, &d.CreatedAt,
+		&d.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	d.Type = textToDormType(dormType)
+	return d, nil
+}
+
 func (r *DormitoryRepo) Create(ctx context.Context, d *domain.Dormitory) error {
 	const q = `
-		INSERT INTO dormitories (name, address, total_capacity, payment_qr_code_url, created_by)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO dormitories (
+			name, address, phone, dorm_type, floor_count, total_rooms_target,
+			total_capacity, rooms_male, rooms_female, rooms_mixed,
+			monthly_payment, yearly_payment, built_year,
+			commissioned_year, ownership_form, created_by
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 		RETURNING id, created_at, updated_at`
-	return r.db.QueryRow(ctx, q, d.Name, d.Address, d.TotalCapacity, d.PaymentQRCodeURL, d.CreatedBy).
-		Scan(&d.ID, &d.CreatedAt, &d.UpdatedAt)
+	return r.db.QueryRow(ctx, q,
+		d.Name, d.Address, d.Phone, dormTypeToText(d.Type), d.FloorCount, d.TotalRoomsTarget,
+		d.TotalCapacity, d.RoomsMale, d.RoomsFemale, d.RoomsMixed,
+		d.MonthlyPayment, d.YearlyPayment, d.BuiltYear,
+		d.CommissionedYear, d.OwnershipForm, d.CreatedBy,
+	).Scan(&d.ID, &d.CreatedAt, &d.UpdatedAt)
 }
 
 func (r *DormitoryRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Dormitory, error) {
-	const q = `
-		SELECT id, name, address, total_capacity, payment_qr_code_url, created_by, created_at, updated_at
-		FROM dormitories WHERE id = $1`
-	d := &domain.Dormitory{}
-	err := r.db.QueryRow(ctx, q, id).Scan(&d.ID, &d.Name, &d.Address, &d.TotalCapacity, &d.PaymentQRCodeURL, &d.CreatedBy, &d.CreatedAt, &d.UpdatedAt)
+	q := `SELECT ` + dormitoryColumns + ` FROM dormitories WHERE id = $1`
+	d, err := scanDormitory(r.db.QueryRow(ctx, q, id))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, repository.ErrNotFound
@@ -45,9 +96,7 @@ func (r *DormitoryRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Dorm
 }
 
 func (r *DormitoryRepo) List(ctx context.Context) ([]*domain.Dormitory, error) {
-	const q = `
-		SELECT id, name, address, total_capacity, payment_qr_code_url, created_by, created_at, updated_at
-		FROM dormitories ORDER BY name`
+	q := `SELECT ` + dormitoryColumns + ` FROM dormitories ORDER BY name`
 	rows, err := r.db.Query(ctx, q)
 	if err != nil {
 		return nil, err
@@ -56,8 +105,8 @@ func (r *DormitoryRepo) List(ctx context.Context) ([]*domain.Dormitory, error) {
 
 	var out []*domain.Dormitory
 	for rows.Next() {
-		d := &domain.Dormitory{}
-		if err := rows.Scan(&d.ID, &d.Name, &d.Address, &d.TotalCapacity, &d.PaymentQRCodeURL, &d.CreatedBy, &d.CreatedAt, &d.UpdatedAt); err != nil {
+		d, err := scanDormitory(rows)
+		if err != nil {
 			return nil, err
 		}
 		out = append(out, d)
@@ -68,10 +117,20 @@ func (r *DormitoryRepo) List(ctx context.Context) ([]*domain.Dormitory, error) {
 func (r *DormitoryRepo) Update(ctx context.Context, d *domain.Dormitory) error {
 	const q = `
 		UPDATE dormitories
-		SET name = $2, address = $3, total_capacity = $4, payment_qr_code_url = $5, updated_at = now()
+		SET name = $2, address = $3, phone = $4, dorm_type = $5, floor_count = $6,
+			total_rooms_target = $7, total_capacity = $8, rooms_male = $9,
+			rooms_female = $10, rooms_mixed = $11, monthly_payment = $12,
+			yearly_payment = $13, built_year = $14, commissioned_year = $15,
+			ownership_form = $16,
+			updated_at = now()
 		WHERE id = $1
 		RETURNING updated_at`
-	err := r.db.QueryRow(ctx, q, d.ID, d.Name, d.Address, d.TotalCapacity, d.PaymentQRCodeURL).Scan(&d.UpdatedAt)
+	err := r.db.QueryRow(ctx, q,
+		d.ID, d.Name, d.Address, d.Phone, dormTypeToText(d.Type), d.FloorCount,
+		d.TotalRoomsTarget, d.TotalCapacity, d.RoomsMale, d.RoomsFemale, d.RoomsMixed,
+		d.MonthlyPayment, d.YearlyPayment,
+		d.BuiltYear, d.CommissionedYear, d.OwnershipForm,
+	).Scan(&d.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return repository.ErrNotFound
@@ -81,9 +140,17 @@ func (r *DormitoryRepo) Update(ctx context.Context, d *domain.Dormitory) error {
 	return nil
 }
 
+// Delete returns repository.ErrConflict if the dormitory is still referenced
+// by an application (applications.dormitory_id has no ON DELETE clause, so
+// Postgres rejects the delete with a foreign_key_violation). Rooms and images
+// cascade automatically.
 func (r *DormitoryRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	tag, err := r.db.Exec(ctx, `DELETE FROM dormitories WHERE id = $1`, id)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+			return repository.ErrConflict
+		}
 		return err
 	}
 	if tag.RowsAffected() == 0 {
@@ -93,16 +160,17 @@ func (r *DormitoryRepo) Delete(ctx context.Context, id uuid.UUID) error {
 }
 
 // GetCapacity returns total_capacity alongside the sum of all room capacities
-// currently provisioned in the dormitory (the "жиналған орын саны" progress figure).
+// currently provisioned in the dormitory (the "жиналған орын саны" progress
+// figure), and total_rooms_target alongside how many rooms actually exist yet.
 func (r *DormitoryRepo) GetCapacity(ctx context.Context, id uuid.UUID) (*domain.DormitoryCapacity, error) {
 	const q = `
-		SELECT d.id, d.total_capacity, COALESCE(SUM(r.capacity), 0)
+		SELECT d.id, d.total_capacity, COALESCE(SUM(r.capacity), 0), d.total_rooms_target, COUNT(r.id)
 		FROM dormitories d
 		LEFT JOIN rooms r ON r.dormitory_id = d.id
 		WHERE d.id = $1
-		GROUP BY d.id, d.total_capacity`
+		GROUP BY d.id, d.total_capacity, d.total_rooms_target`
 	c := &domain.DormitoryCapacity{}
-	err := r.db.QueryRow(ctx, q, id).Scan(&c.DormitoryID, &c.TotalCapacity, &c.AllocatedBeds)
+	err := r.db.QueryRow(ctx, q, id).Scan(&c.DormitoryID, &c.TotalCapacity, &c.AllocatedBeds, &c.TotalRoomsTarget, &c.RoomsCreated)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, repository.ErrNotFound
@@ -138,6 +206,61 @@ func (r *DormitoryRepo) ListImages(ctx context.Context, dormitoryID uuid.UUID) (
 
 func (r *DormitoryRepo) DeleteImage(ctx context.Context, imageID uuid.UUID) error {
 	tag, err := r.db.Exec(ctx, `DELETE FROM dormitory_images WHERE id = $1`, imageID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return repository.ErrNotFound
+	}
+	return nil
+}
+
+func (r *DormitoryRepo) AddRequiredDocument(ctx context.Context, d *domain.DormitoryRequiredDocument) error {
+	const q = `
+		INSERT INTO dormitory_required_documents (dormitory_id, document_id)
+		VALUES ($1, $2)
+		RETURNING id, created_at`
+	err := r.db.QueryRow(ctx, q, d.DormitoryID, d.DocumentID).Scan(&d.ID, &d.CreatedAt)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			if pgErr.Code == "23503" {
+				return repository.ErrNotFound
+			}
+			if pgErr.Code == "23505" {
+				return repository.ErrConflict
+			}
+		}
+		return err
+	}
+	return nil
+}
+
+func (r *DormitoryRepo) ListRequiredDocuments(ctx context.Context, dormitoryID uuid.UUID) ([]*domain.DormitoryRequiredDocument, error) {
+	const q = `
+		SELECT drd.id, drd.dormitory_id, drd.document_id, rd.name, drd.created_at
+		FROM dormitory_required_documents drd
+		JOIN required_documents rd ON rd.id = drd.document_id
+		WHERE drd.dormitory_id = $1 ORDER BY drd.created_at`
+	rows, err := r.db.Query(ctx, q, dormitoryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []*domain.DormitoryRequiredDocument
+	for rows.Next() {
+		d := &domain.DormitoryRequiredDocument{}
+		if err := rows.Scan(&d.ID, &d.DormitoryID, &d.DocumentID, &d.DocumentName, &d.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, d)
+	}
+	return out, rows.Err()
+}
+
+func (r *DormitoryRepo) DeleteRequiredDocument(ctx context.Context, docID uuid.UUID) error {
+	tag, err := r.db.Exec(ctx, `DELETE FROM dormitory_required_documents WHERE id = $1`, docID)
 	if err != nil {
 		return err
 	}

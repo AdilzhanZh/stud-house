@@ -53,7 +53,7 @@ func (h *ExitRequestHandler) ListMine(c *gin.Context) {
 func (h *ExitRequestHandler) Get(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid exit request id"))
+		response.Error(c, apperror.BadRequest("шығу сұранысының идентификаторы дұрыс емес"))
 		return
 	}
 	er, err := h.exitRequests.GetByID(c.Request.Context(), id)
@@ -64,7 +64,7 @@ func (h *ExitRequestHandler) Get(c *gin.Context) {
 	role, _ := middleware.Role(c)
 	userID, _ := middleware.UserID(c)
 	if role != domain.RoleAdmin && role != domain.RoleManager && er.StudentID != userID {
-		response.Error(c, apperror.Forbidden("you cannot view this exit request"))
+		response.Error(c, apperror.Forbidden("бұл шығу сұранысын көруге құқығыңыз жоқ"))
 		return
 	}
 	response.OK(c, exitRequestDTO(er))
@@ -79,7 +79,7 @@ func (h *ExitRequestHandler) List(c *gin.Context) {
 		case domain.ExitRequestPending, domain.ExitRequestApproved, domain.ExitRequestRejected:
 			status = &s
 		default:
-			response.Error(c, apperror.BadRequest("invalid status filter"))
+			response.Error(c, apperror.BadRequest("статус фильтрі дұрыс емес"))
 			return
 		}
 	}
@@ -100,7 +100,7 @@ type decideExitRequestRequest struct {
 func (h *ExitRequestHandler) Decide(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid exit request id"))
+		response.Error(c, apperror.BadRequest("шығу сұранысының идентификаторы дұрыс емес"))
 		return
 	}
 	var req decideExitRequestRequest

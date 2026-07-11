@@ -33,12 +33,12 @@ export function MyApplicationsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold text-gray-900">Менің өтініштерім</h1>
+      <h1 className="font-heading text-2xl text-sand-100">Менің өтініштерім</h1>
 
       {error && <Alert variant="error" message={error} />}
-      {!error && !applications && <p className="text-sm text-gray-500">Жүктелуде...</p>}
+      {!error && !applications && <p className="text-sm text-sand-300/60">Жүктелуде...</p>}
       {applications && applications.length === 0 && (
-        <p className="text-sm text-gray-500">Сізде әлі өтініш жоқ.</p>
+        <p className="text-sm text-sand-300/60">Сізде әлі өтініш жоқ.</p>
       )}
 
       <div className="flex flex-col gap-3">
@@ -50,10 +50,10 @@ export function MyApplicationsPage() {
           >
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="font-medium text-gray-900">
+                <p className="font-medium text-sand-100">
                   {dormitoriesById[app.dormitory_id]?.name ?? 'Жатақхана'}
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-sand-300/60">
                   {new Date(app.created_at).toLocaleDateString('kk-KZ')}
                 </p>
               </div>

@@ -28,6 +28,10 @@ export async function reviseReport(id: string, applicationIds: string[]): Promis
   return data.data
 }
 
+export async function deleteReport(id: string): Promise<void> {
+  await apiClient.delete(`/reports/${id}`)
+}
+
 // The backend's /export handler currently returns the same JSON shape as
 // GetDetail (no real document generation this phase — see
 // ReportHandler.Export in backend/internal/http/handler/report_handler.go).
@@ -38,7 +42,7 @@ export async function exportReport(id: string): Promise<ReportDetail> {
   return data.data
 }
 
-// committee_member-only.
+// Requires is_committee_member=true.
 export async function voteReport(
   id: string,
   decision: VoteDecision,

@@ -1,4 +1,9 @@
-export type PaymentStatus = 'pending' | 'submitted' | 'confirmed' | 'rejected'
+export type PaymentStatus =
+  | 'pending'
+  | 'submitted'
+  | 'awaiting_manager_decision'
+  | 'confirmed'
+  | 'rejected'
 
 export interface Payment {
   id: string
@@ -10,5 +15,7 @@ export interface Payment {
   submitted_at: string | null
   confirmed_by: string | null
   confirmed_at: string | null
+  deadline: string
+  reminder_sent_at: string | null
   created_at: string
 }

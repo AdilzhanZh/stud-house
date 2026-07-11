@@ -13,6 +13,7 @@ import (
 	"student-house/internal/repository"
 	"student-house/internal/service/notifier"
 	"student-house/pkg/apperror"
+	"student-house/pkg/mailer"
 )
 
 const contractDeclinedComment = "Студент келісімшартты қабылдамады"
@@ -25,8 +26,14 @@ type ContractService struct {
 	reportTemplates  repository.ReportTemplateRepository
 	users            repository.UserRepository
 	notifier         *notifier.Notifier
+	mailer           *mailer.Mailer
 	responseDeadline time.Duration
 	reminderWindow   time.Duration
+	// paymentDeadline is how long a manager has to confirm/reject a payment
+	// (see PaymentService.FlagOverduePayments) before it's flagged
+	// awaiting_manager_decision — set on the Payment row created here, in
+	// Respond's "accept" branch.
+	paymentDeadline time.Duration
 }
 
 func NewContractService(
@@ -36,8 +43,10 @@ func NewContractService(
 	reportTemplates repository.ReportTemplateRepository,
 	users repository.UserRepository,
 	notifier *notifier.Notifier,
+	m *mailer.Mailer,
 	responseDeadline time.Duration,
 	reminderWindow time.Duration,
+	paymentDeadline time.Duration,
 ) *ContractService {
 	return &ContractService{
 		contracts:        contracts,
@@ -46,8 +55,10 @@ func NewContractService(
 		reportTemplates:  reportTemplates,
 		users:            users,
 		notifier:         notifier,
+		mailer:           m,
 		responseDeadline: responseDeadline,
 		reminderWindow:   reminderWindow,
+		paymentDeadline:  paymentDeadline,
 	}
 }
 
@@ -101,7 +112,7 @@ func (s *ContractService) GetByID(ctx context.Context, id uuid.UUID) (*domain.Co
 	c, err := s.contracts.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, apperror.NotFound("contract not found")
+			return nil, apperror.NotFound("келісімшарт табылмады")
 		}
 		return nil, err
 	}
@@ -112,7 +123,7 @@ func (s *ContractService) GetByApplicationID(ctx context.Context, applicationID 
 	c, err := s.contracts.GetByApplicationID(ctx, applicationID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, apperror.NotFound("contract not found for this application")
+			return nil, apperror.NotFound("бұл өтініш бойынша келісімшарт табылмады")
 		}
 		return nil, err
 	}
@@ -130,17 +141,17 @@ func (s *ContractService) Respond(ctx context.Context, actorStudentID, contractI
 			return err
 		}
 		if app.StudentID != actorStudentID {
-			return apperror.Forbidden("you can only respond to your own contract")
+			return apperror.Forbidden("тек өз келісімшартыңызға жауап бере аласыз")
 		}
 		if contract.Status != domain.ContractSent {
-			return apperror.Conflict("contract has already been responded to or is no longer active")
+			return apperror.Conflict("келісімшартқа жауап бұрын берілген немесе ол енді белсенді емес")
 		}
 		if time.Now().After(contract.ResponseDeadline) {
 			// Lazily flag it rather than deciding anything ourselves — per
 			// spec, only a manager may void/extend a contract past its
 			// deadline (see ManagerDecision).
 			_ = tx.SetStatus(ctx, contractID, domain.ContractAwaitingManagerDecision, nil)
-			return apperror.Conflict("response deadline has passed; awaiting manager decision")
+			return apperror.Conflict("жауап беру мерзімі өтті, менеджердің шешімі күтілуде")
 		}
 
 		now := time.Now()
@@ -154,9 +165,15 @@ func (s *ContractService) Respond(ctx context.Context, actorStudentID, contractI
 				return err
 			}
 			if price == nil {
-				return apperror.BadRequest("dormitory price is not set; contact admin")
+				return apperror.BadRequest("жатақхана бағасы белгіленбеген, әкімшіге хабарласыңыз")
 			}
-			payment := &domain.Payment{ContractID: contractID, Amount: *price, Currency: "KZT", Status: domain.PaymentPending}
+			payment := &domain.Payment{
+				ContractID: contractID,
+				Amount:     *price,
+				Currency:   "KZT",
+				Status:     domain.PaymentPending,
+				Deadline:   time.Now().Add(s.paymentDeadline),
+			}
 			return tx.CreatePayment(ctx, payment)
 		case "decline":
 			if err := tx.SetStatus(ctx, contractID, domain.ContractDeclined, &now); err != nil {
@@ -167,7 +184,7 @@ func (s *ContractService) Respond(ctx context.Context, actorStudentID, contractI
 			}
 			return tx.FreeActiveRoomResident(ctx, actorStudentID)
 		default:
-			return apperror.BadRequest("invalid action")
+			return apperror.BadRequest("әрекет жарамсыз")
 		}
 	})
 	if err != nil {
@@ -258,7 +275,7 @@ func (s *ContractService) ListMine(ctx context.Context, studentID uuid.UUID) ([]
 func (s *ContractService) ManagerDecision(ctx context.Context, actorID, contractID uuid.UUID, action string, newDeadline *time.Time) (*domain.Contract, error) {
 	err := s.contracts.WithLock(ctx, contractID, func(ctx context.Context, contract *domain.Contract, tx repository.ContractTx) error {
 		if contract.Status != domain.ContractAwaitingManagerDecision {
-			return apperror.Conflict("contract is not awaiting a manager decision")
+			return apperror.Conflict("келісімшарт менеджердің шешімін күтіп тұрған жоқ")
 		}
 		switch action {
 		case "void":
@@ -275,14 +292,14 @@ func (s *ContractService) ManagerDecision(ctx context.Context, actorID, contract
 			return tx.FreeActiveRoomResident(ctx, app.StudentID)
 		case "extend":
 			if newDeadline == nil {
-				return apperror.BadRequest("new_deadline is required to extend")
+				return apperror.BadRequest("ұзарту үшін жаңа мерзім міндетті")
 			}
 			if !newDeadline.After(time.Now()) {
-				return apperror.BadRequest("new_deadline must be in the future")
+				return apperror.BadRequest("жаңа мерзім болашақта болуы керек")
 			}
 			return tx.Extend(ctx, contractID, *newDeadline)
 		default:
-			return apperror.BadRequest("invalid action")
+			return apperror.BadRequest("әрекет жарамсыз")
 		}
 	})
 	if err != nil {
@@ -307,4 +324,12 @@ func (s *ContractService) notifyManagerDecision(ctx context.Context, contract *d
 		title, body = "Келісімшарт жойылды", "Сіз мерзімде жауап бермегендіктен, менеджер өтінішіңізді жойды."
 	}
 	_ = s.notifier.Notify(ctx, app.StudentID, domain.NotificationContractSent, title, body, &app.ID)
+
+	if student, err := s.users.GetByID(ctx, app.StudentID); err == nil {
+		go func(email, subject, body string) {
+			if err := s.mailer.Send(email, subject, body); err != nil {
+				log.Printf("failed to send contract-decision email to %s: %v", email, err)
+			}
+		}(student.Email, title, body)
+	}
 }

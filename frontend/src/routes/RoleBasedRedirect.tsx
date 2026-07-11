@@ -7,11 +7,11 @@ import { useAuthStore } from '../store/authStore'
 // always going to /dashboard/profile.
 export function RoleBasedRedirect() {
   const role = useAuthStore((s) => s.user?.role)
-  if (role === 'admin' || role === 'manager') {
-    return <Navigate to="/admin/dormitories" replace />
+  if (role === 'manager') {
+    return <Navigate to="/admin/applications" replace />
   }
-  if (role === 'committee_member') {
-    return <Navigate to="/committee/reports" replace />
+  if (role === 'admin') {
+    return <Navigate to="/admin/dormitories" replace />
   }
   return <Navigate to="/dashboard/profile" replace />
 }

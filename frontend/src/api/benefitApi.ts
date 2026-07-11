@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Benefit, BenefitField, BenefitRequiredDocument } from '../types/benefits'
+import type { Benefit, BenefitRequiredDocument, StudentBenefit } from '../types/benefits'
 
 export async function listBenefits(): Promise<Benefit[]> {
   const { data } = await apiClient.get<{ data: Benefit[] }>('/benefits')
@@ -14,6 +14,7 @@ export async function getBenefit(id: string): Promise<Benefit> {
 export interface BenefitPayload {
   name: string
   description: string
+  priority: number
 }
 
 export async function createBenefit(payload: BenefitPayload): Promise<Benefit> {
@@ -26,25 +27,8 @@ export async function updateBenefit(id: string, payload: BenefitPayload): Promis
   return data.data
 }
 
-export async function listBenefitFields(benefitId: string): Promise<BenefitField[]> {
-  const { data } = await apiClient.get<{ data: BenefitField[] }>(`/benefits/${benefitId}/fields`)
-  return data.data
-}
-
-export async function addBenefitField(
-  benefitId: string,
-  fieldName: string,
-  fieldType: string,
-): Promise<BenefitField> {
-  const { data } = await apiClient.post<{ data: BenefitField }>(`/benefits/${benefitId}/fields`, {
-    field_name: fieldName,
-    field_type: fieldType,
-  })
-  return data.data
-}
-
-export async function deleteBenefitField(fieldId: string): Promise<void> {
-  await apiClient.delete(`/benefit-fields/${fieldId}`)
+export async function deleteBenefit(id: string): Promise<void> {
+  await apiClient.delete(`/benefits/${id}`)
 }
 
 export async function listBenefitRequiredDocuments(
@@ -58,15 +42,29 @@ export async function listBenefitRequiredDocuments(
 
 export async function addBenefitRequiredDocument(
   benefitId: string,
-  documentName: string,
+  documentId: string,
 ): Promise<BenefitRequiredDocument> {
   const { data } = await apiClient.post<{ data: BenefitRequiredDocument }>(
     `/benefits/${benefitId}/documents`,
-    { document_name: documentName },
+    { document_id: documentId },
   )
   return data.data
 }
 
 export async function deleteBenefitRequiredDocument(documentId: string): Promise<void> {
   await apiClient.delete(`/benefit-documents/${documentId}`)
+}
+
+// Student self-declares that a benefit applies to them (e.g. while
+// submitting a dormitory application) — distinct from the admin/manager
+// assigning a benefit on the student's behalf.
+export async function assignOwnBenefit(benefitId: string): Promise<void> {
+  await apiClient.post('/students/me/benefits', { benefit_id: benefitId })
+}
+
+export async function listStudentBenefits(studentId: string): Promise<StudentBenefit[]> {
+  const { data } = await apiClient.get<{ data: StudentBenefit[] }>(
+    `/students/${studentId}/benefits`,
+  )
+  return data.data
 }

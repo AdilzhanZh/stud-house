@@ -26,10 +26,42 @@ export async function updateUserRole(id: string, role: Role): Promise<User> {
   return data.data
 }
 
+// Admin elects (or removes) a manager onto the committee — only valid for
+// role=manager.
+export async function setCommitteeMember(id: string, isCommitteeMember: boolean): Promise<User> {
+  const { data } = await apiClient.patch<{ data: User }>(`/admin/users/${id}/committee-member`, {
+    is_committee_member: isCommitteeMember,
+  })
+  return data.data
+}
+
 export async function setChairperson(id: string, isChairperson: boolean): Promise<User> {
   const { data } = await apiClient.patch<{ data: User }>(
     `/admin/committee-members/${id}/chairperson`,
     { is_chairperson: isChairperson },
   )
+  return data.data
+}
+
+export async function deleteUser(id: string): Promise<void> {
+  await apiClient.delete(`/admin/users/${id}`)
+}
+
+export async function setUserPassword(id: string, newPassword: string): Promise<void> {
+  await apiClient.patch(`/admin/users/${id}/password`, { new_password: newPassword })
+}
+
+export async function listPendingStudents(): Promise<User[]> {
+  const { data } = await apiClient.get<{ data: User[] }>('/admin/students/pending')
+  return data.data
+}
+
+export async function decideStudentApproval(
+  id: string,
+  action: 'approve' | 'reject',
+): Promise<User> {
+  const { data } = await apiClient.patch<{ data: User }>(`/admin/students/${id}/approval`, {
+    action,
+  })
   return data.data
 }

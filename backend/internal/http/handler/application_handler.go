@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
@@ -20,9 +22,10 @@ func NewApplicationHandler(applications *service.ApplicationService) *Applicatio
 }
 
 type createApplicationRequest struct {
-	DormitoryID       uuid.UUID `json:"dormitory_id" binding:"required"`
-	PreferredRoomType *string   `json:"preferred_room_type"`
-	Notes             *string   `json:"notes"`
+	DormitoryID       uuid.UUID  `json:"dormitory_id" binding:"required"`
+	PreferredRoomType *string    `json:"preferred_room_type"`
+	PreferredRoomID   *uuid.UUID `json:"preferred_room_id"`
+	Notes             *string    `json:"notes"`
 }
 
 // Create is student-only: it always creates the application for the caller.
@@ -33,12 +36,28 @@ func (h *ApplicationHandler) Create(c *gin.Context) {
 		return
 	}
 	studentID, _ := middleware.UserID(c)
-	app, err := h.applications.Create(c.Request.Context(), studentID, req.DormitoryID, req.PreferredRoomType, req.Notes)
+	app, err := h.applications.Create(c.Request.Context(), studentID, req.DormitoryID, req.PreferredRoomType, req.Notes, req.PreferredRoomID)
 	if err != nil {
 		response.Error(c, err)
 		return
 	}
 	response.Created(c, applicationDTO(app))
+}
+
+// Delete is student-only: lets the caller cancel their own still-pending
+// application (see ApplicationService.CancelOwn).
+func (h *ApplicationHandler) Delete(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, apperror.BadRequest("өтініш идентификаторы дұрыс емес"))
+		return
+	}
+	studentID, _ := middleware.UserID(c)
+	if err := h.applications.CancelOwn(c.Request.Context(), studentID, id); err != nil {
+		response.Error(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
 func (h *ApplicationHandler) ListMine(c *gin.Context) {
@@ -61,7 +80,7 @@ type resubmitApplicationRequest struct {
 func (h *ApplicationHandler) Resubmit(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid application id"))
+		response.Error(c, apperror.BadRequest("өтініш идентификаторы дұрыс емес"))
 		return
 	}
 	var req resubmitApplicationRequest
@@ -79,9 +98,10 @@ func (h *ApplicationHandler) Resubmit(c *gin.Context) {
 }
 
 type addApplicationDocumentRequest struct {
-	BenefitRequiredDocumentID *uuid.UUID `json:"benefit_required_document_id"`
-	DocumentName              *string    `json:"document_name"`
-	FileURL                   string     `json:"file_url" binding:"required"`
+	BenefitRequiredDocumentID   *uuid.UUID `json:"benefit_required_document_id"`
+	DormitoryRequiredDocumentID *uuid.UUID `json:"dormitory_required_document_id"`
+	DocumentName                *string    `json:"document_name"`
+	FileURL                     string     `json:"file_url" binding:"required"`
 }
 
 // AddDocument is student-only: the frontend is assumed to have already
@@ -90,7 +110,7 @@ type addApplicationDocumentRequest struct {
 func (h *ApplicationHandler) AddDocument(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid application id"))
+		response.Error(c, apperror.BadRequest("өтініш идентификаторы дұрыс емес"))
 		return
 	}
 	var req addApplicationDocumentRequest
@@ -99,7 +119,7 @@ func (h *ApplicationHandler) AddDocument(c *gin.Context) {
 		return
 	}
 	studentID, _ := middleware.UserID(c)
-	doc, err := h.applications.AddDocument(c.Request.Context(), studentID, id, req.BenefitRequiredDocumentID, req.DocumentName, req.FileURL)
+	doc, err := h.applications.AddDocument(c.Request.Context(), studentID, id, req.BenefitRequiredDocumentID, req.DormitoryRequiredDocumentID, req.DocumentName, req.FileURL)
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -113,7 +133,7 @@ func (h *ApplicationHandler) List(c *gin.Context) {
 	if raw := c.Query("status"); raw != "" {
 		s := domain.ApplicationStatus(raw)
 		if !s.Valid() {
-			response.Error(c, apperror.BadRequest("invalid status filter"))
+			response.Error(c, apperror.BadRequest("статус фильтрі дұрыс емес"))
 			return
 		}
 		status = &s
@@ -144,7 +164,7 @@ func canAccessApplication(c *gin.Context, app *domain.Application) bool {
 func (h *ApplicationHandler) GetDetail(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid application id"))
+		response.Error(c, apperror.BadRequest("өтініш идентификаторы дұрыс емес"))
 		return
 	}
 	app, err := h.applications.GetByID(c.Request.Context(), id)
@@ -153,7 +173,7 @@ func (h *ApplicationHandler) GetDetail(c *gin.Context) {
 		return
 	}
 	if !canAccessApplication(c, app) {
-		response.Error(c, apperror.Forbidden("you cannot view this application"))
+		response.Error(c, apperror.Forbidden("бұл өтінішті көруге құқығыңыз жоқ"))
 		return
 	}
 	documents, err := h.applications.ListDocuments(c.Request.Context(), id)
@@ -183,7 +203,7 @@ type decisionRequest struct {
 func (h *ApplicationHandler) Decide(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid application id"))
+		response.Error(c, apperror.BadRequest("өтініш идентификаторы дұрыс емес"))
 		return
 	}
 	var req decisionRequest

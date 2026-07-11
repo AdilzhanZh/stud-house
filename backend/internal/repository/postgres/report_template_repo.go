@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"student-house/internal/domain"
@@ -58,4 +59,22 @@ func (r *ReportTemplateRepo) List(ctx context.Context) ([]*domain.ReportTemplate
 		out = append(out, t)
 	}
 	return out, rows.Err()
+}
+
+// Delete returns repository.ErrConflict if the template is still referenced
+// by a report (reports.template_id has no ON DELETE clause, so Postgres
+// rejects the delete with a foreign_key_violation).
+func (r *ReportTemplateRepo) Delete(ctx context.Context, id uuid.UUID) error {
+	tag, err := r.db.Exec(ctx, `DELETE FROM report_templates WHERE id = $1`, id)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+			return repository.ErrConflict
+		}
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return repository.ErrNotFound
+	}
+	return nil
 }

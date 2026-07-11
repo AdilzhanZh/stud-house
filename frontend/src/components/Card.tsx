@@ -9,10 +9,12 @@ interface CardProps {
 export function Card({ title, className = '', onClick, children }: PropsWithChildren<CardProps>) {
   return (
     <div
-      className={`w-full rounded-lg border border-gray-200 bg-white p-6 shadow-sm ${className}`}
+      className={`w-full rounded-xl border border-sand-100/10 bg-navy-900 p-6 shadow-sm ${
+        onClick ? 'cursor-pointer transition-colors hover:border-sand-100/20' : ''
+      } ${className}`}
       onClick={onClick}
     >
-      {title && <h2 className="mb-4 text-lg font-semibold text-gray-900">{title}</h2>}
+      {title && <h2 className="mb-4 font-heading text-lg text-sand-100">{title}</h2>}
       {children}
     </div>
   )

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"log"
 
 	"github.com/google/uuid"
 
@@ -10,6 +11,7 @@ import (
 	"student-house/internal/repository"
 	"student-house/internal/service/notifier"
 	"student-house/pkg/apperror"
+	"student-house/pkg/mailer"
 )
 
 type TransferRequestService struct {
@@ -19,6 +21,7 @@ type TransferRequestService struct {
 	roomService      *RoomService
 	users            repository.UserRepository
 	notifier         *notifier.Notifier
+	mailer           *mailer.Mailer
 }
 
 func NewTransferRequestService(
@@ -28,6 +31,7 @@ func NewTransferRequestService(
 	roomService *RoomService,
 	users repository.UserRepository,
 	notifier *notifier.Notifier,
+	m *mailer.Mailer,
 ) *TransferRequestService {
 	return &TransferRequestService{
 		transferRequests: transferRequests,
@@ -36,6 +40,7 @@ func NewTransferRequestService(
 		roomService:      roomService,
 		users:            users,
 		notifier:         notifier,
+		mailer:           m,
 	}
 }
 
@@ -46,19 +51,19 @@ func (s *TransferRequestService) Create(ctx context.Context, studentID uuid.UUID
 	resident, err := s.rooms.GetActiveResidentByStudent(ctx, studentID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, apperror.BadRequest("you don't have an active room assignment")
+			return nil, apperror.BadRequest("сізде белсенді бөлмеге орналасу жоқ")
 		}
 		return nil, err
 	}
 
 	if _, err := s.applications.GetActiveByStudent(ctx, studentID); err == nil {
-		return nil, apperror.Conflict("you have an unresolved application; resolve it before requesting a transfer")
+		return nil, apperror.Conflict("сізде шешілмеген өтінішіңіз бар, ауыстыру өтінішін бермес бұрын соны реттеңіз")
 	} else if !errors.Is(err, repository.ErrNotFound) {
 		return nil, err
 	}
 
 	if _, err := s.transferRequests.GetActiveByStudent(ctx, studentID); err == nil {
-		return nil, apperror.Conflict("you already have a pending transfer request")
+		return nil, apperror.Conflict("сізде қаралуда тұрған ауыстыру өтініші бар")
 	} else if !errors.Is(err, repository.ErrNotFound) {
 		return nil, err
 	}
@@ -73,7 +78,7 @@ func (s *TransferRequestService) Create(ctx context.Context, studentID uuid.UUID
 	}
 	if err := s.transferRequests.Create(ctx, tr); err != nil {
 		if errors.Is(err, repository.ErrConflict) {
-			return nil, apperror.Conflict("you already have a pending transfer request")
+			return nil, apperror.Conflict("сізде қаралуда тұрған ауыстыру өтініші бар")
 		}
 		return nil, err
 	}
@@ -86,7 +91,7 @@ func (s *TransferRequestService) GetByID(ctx context.Context, id uuid.UUID) (*do
 	t, err := s.transferRequests.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, apperror.NotFound("transfer request not found")
+			return nil, apperror.NotFound("ауыстыру өтініші табылмады")
 		}
 		return nil, err
 	}
@@ -111,14 +116,14 @@ func (s *TransferRequestService) Decide(ctx context.Context, actorID, transferRe
 
 	err := s.transferRequests.WithLock(ctx, transferRequestID, func(ctx context.Context, tr *domain.TransferRequest, tx repository.TransferRequestTx) error {
 		if tr.Status != domain.TransferRequestPending {
-			return apperror.Conflict("transfer request has already been decided")
+			return apperror.Conflict("ауыстыру өтініші бойынша шешім бұрын қабылданды")
 		}
 		studentID = tr.StudentID
 
 		switch action {
 		case "approve":
 			if roomID == nil {
-				return apperror.BadRequest("room_id is required to approve")
+				return apperror.BadRequest("мақұлдау үшін бөлме міндетті")
 			}
 			resident, err := s.rooms.GetActiveResidentByStudent(ctx, tr.StudentID)
 			if err != nil {
@@ -138,11 +143,11 @@ func (s *TransferRequestService) Decide(ctx context.Context, actorID, transferRe
 			return tx.SetDecision(ctx, transferRequestID, domain.TransferRequestApproved, actorID, comment)
 		case "reject":
 			if comment == nil || *comment == "" {
-				return apperror.BadRequest("comment is required to reject")
+				return apperror.BadRequest("қабылдамау үшін пікір міндетті")
 			}
 			return tx.SetDecision(ctx, transferRequestID, domain.TransferRequestRejected, actorID, comment)
 		default:
-			return apperror.BadRequest("invalid action")
+			return apperror.BadRequest("әрекет жарамсыз")
 		}
 	})
 	if err != nil {
@@ -176,4 +181,12 @@ func (s *TransferRequestService) notifyStudentDecision(ctx context.Context, stud
 		title, body = "Ауыстыру өтінішіңіз қабылданбады", "Сіздің бөлме ауыстыру өтінішіңіз қабылданбады."
 	}
 	_ = s.notifier.Notify(ctx, studentID, domain.NotificationTransferRequestUpdate, title, body, nil)
+
+	if student, err := s.users.GetByID(ctx, studentID); err == nil {
+		go func(email, subject, body string) {
+			if err := s.mailer.Send(email, subject, body); err != nil {
+				log.Printf("failed to send transfer-request-decision email to %s: %v", email, err)
+			}
+		}(student.Email, title, body)
+	}
 }

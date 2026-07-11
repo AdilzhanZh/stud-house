@@ -2,6 +2,7 @@ package response
 
 import (
 	"errors"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -25,5 +26,6 @@ func Error(c *gin.Context, err error) {
 		c.JSON(appErr.Status, gin.H{"error": gin.H{"code": appErr.Code, "message": appErr.Message}})
 		return
 	}
-	c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "internal_error", "message": "unexpected error"}})
+	log.Printf("unexpected error on %s %s: %v", c.Request.Method, c.Request.URL.Path, err)
+	c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "internal_error", "message": "Күтпеген қате орын алды, қайталап көріңіз"}})
 }

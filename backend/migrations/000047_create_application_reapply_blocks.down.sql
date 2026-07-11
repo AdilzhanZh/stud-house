@@ -1,0 +1,1 @@
+DROP TABLE application_reapply_blocks;

@@ -66,6 +66,9 @@ apiClient.interceptors.response.use(
 
 export function extractErrorMessage(error: unknown, fallback: string): string {
   if (axios.isAxiosError(error)) {
+    if (error.response?.status === 413) {
+      return 'Файл өлшемі тым үлкен (ең көбі 15 МБ), кішірек файл таңдаңыз'
+    }
     const message = (error.response?.data as { error?: { message?: string } } | undefined)?.error
       ?.message
     if (message) return message

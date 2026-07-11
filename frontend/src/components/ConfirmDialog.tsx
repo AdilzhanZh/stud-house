@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Button } from './Button'
 
 interface ConfirmDialogProps {
@@ -8,6 +9,7 @@ interface ConfirmDialogProps {
   cancelLabel?: string
   isLoading?: boolean
   danger?: boolean
+  children?: ReactNode
   onConfirm: () => void
   onCancel: () => void
 }
@@ -23,6 +25,7 @@ export function ConfirmDialog({
   cancelLabel = 'Бас тарту',
   isLoading = false,
   danger = false,
+  children,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -30,13 +33,14 @@ export function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-navy-950/70 px-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
     >
-      <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg">
-        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-        <p className="mt-2 text-sm text-gray-600">{message}</p>
+      <div className="w-full max-w-sm rounded-xl border border-sand-100/10 bg-navy-900 p-6 shadow-xl">
+        <h2 className="font-heading text-lg text-sand-100">{title}</h2>
+        <p className="mt-2 text-sm text-sand-300/70">{message}</p>
+        {children && <div className="mt-4">{children}</div>}
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="secondary" onClick={onCancel} disabled={isLoading}>
             {cancelLabel}

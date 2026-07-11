@@ -3,12 +3,15 @@
 // — the spec explicitly notes only pending/needs_correction/approved/rejected
 // are ever seen at rest. Included here only so the type covers whatever the
 // API could technically send, not because the UI treats it as a real state.
+// settled is set by the system once contract + payment are both done (see
+// backend internal/domain/contract.go's ApplicationSettled).
 export type ApplicationStatus =
   | 'pending'
   | 'manager_review'
   | 'needs_correction'
   | 'approved'
   | 'rejected'
+  | 'settled'
 
 export interface Application {
   id: string
@@ -16,6 +19,7 @@ export interface Application {
   dormitory_id: string
   status: ApplicationStatus
   preferred_room_type: string | null
+  preferred_room_id: string | null
   notes: string | null
   assigned_room_id: string | null
   handled_by: string | null
@@ -37,7 +41,9 @@ export interface ApplicationDocument {
   id: string
   application_id: string
   benefit_required_document_id: string | null
+  dormitory_required_document_id: string | null
   document_name: string | null
+  display_name: string
   file_url: string
   uploaded_at: string
 }

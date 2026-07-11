@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Card } from '../../../components/Card'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
+import { FloorCorridorMap } from '../../../components/FloorCorridorMap'
 import { extractErrorMessage } from '../../../api/client'
 import { getDormitory, getDormitoryCapacity } from '../../../api/dormitoryApi'
 import { listRoomResidents, listRoomsByDormitory } from '../../../api/roomApi'
@@ -18,10 +19,10 @@ function restrictionsSummary(room: Room): string {
   if (room.restrictions.gender) {
     parts.push(room.restrictions.gender === 'male' ? 'Ер' : 'Әйел')
   }
-  if (room.restrictions.courses.length > 0) {
+  if ((room.restrictions.courses ?? []).length > 0) {
     parts.push(`${room.restrictions.courses.join(',')} курс`)
   }
-  if (room.restrictions.benefit_ids.length > 0) {
+  if ((room.restrictions.benefit_ids ?? []).length > 0) {
     parts.push(`${room.restrictions.benefit_ids.length} льгота`)
   }
   return parts.length > 0 ? parts.join(', ') : 'Шектеусіз'
@@ -35,6 +36,7 @@ export function DormitoryDetailPage() {
   const [capacity, setCapacity] = useState<DormitoryCapacity | null>(null)
   const [rooms, setRooms] = useState<RoomRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [selectedFloor, setSelectedFloor] = useState<string | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -54,43 +56,117 @@ export function DormitoryDetailPage() {
   }, [id])
 
   if (error) return <Alert variant="error" message={error} />
-  if (!dormitory || !capacity || !rooms) return <p className="text-sm text-gray-500">Жүктелуде...</p>
+  if (!dormitory || !capacity || !rooms) return <p className="text-sm text-sand-300/60">Жүктелуде...</p>
 
-  const percent = capacity.total_capacity > 0
+  const floorGroups = Object.entries(
+    rooms.reduce<Record<number, RoomRow[]>>((byFloor, room) => {
+      if (room.floor == null) return byFloor
+      byFloor[room.floor] = [...(byFloor[room.floor] ?? []), room]
+      return byFloor
+    }, {}),
+  ).sort(([a], [b]) => Number(a) - Number(b))
+
+  const activeFloor = selectedFloor && floorGroups.some(([floor]) => floor === selectedFloor)
+    ? selectedFloor
+    : floorGroups[0]?.[0]
+  const activeFloorRooms = floorGroups.find(([floor]) => floor === activeFloor)?.[1] ?? []
+
+  const bedsPercent = capacity.total_capacity > 0
     ? Math.min(100, Math.round((capacity.allocated_beds / capacity.total_capacity) * 100))
+    : 0
+  const roomsPercent = capacity.total_rooms_target && capacity.total_rooms_target > 0
+    ? Math.min(100, Math.round((capacity.rooms_created / capacity.total_rooms_target) * 100))
     : 0
 
   return (
     <div className="flex flex-col gap-6">
+      <Button variant="secondary" className="self-start" onClick={() => navigate('/admin/dormitories')}>
+        ← Артқа
+      </Button>
+
       <Card title={dormitory.name}>
-        <p className="text-sm text-gray-500">{dormitory.address}</p>
+        <p className="text-sm text-sand-300/60">{dormitory.address}</p>
         <div className="mt-4">
-          <div className="mb-1 flex justify-between text-sm text-gray-600">
-            <span>Сыйымдылық</span>
+          <div className="mb-1 flex justify-between text-sm text-sand-300/70">
+            <span>Жалпы орын саны / құрылған орын саны</span>
             <span>
-              {capacity.allocated_beds}/{capacity.total_capacity}
+              {capacity.total_capacity}/{capacity.allocated_beds}
             </span>
           </div>
-          <div className="h-2 w-full rounded-full bg-gray-200">
+          <div className="h-2 w-full rounded-full bg-navy-700">
             <div
-              className="h-2 rounded-full bg-indigo-600"
-              style={{ width: `${percent}%` }}
+              className="h-2 rounded-full bg-turquoise-500"
+              style={{ width: `${bedsPercent}%` }}
+            />
+          </div>
+        </div>
+        <div className="mt-4">
+          <div className="mb-1 flex justify-between text-sm text-sand-300/70">
+            <span>Жалпы бөлме саны / құрылған бөлме саны</span>
+            <span>
+              {capacity.total_rooms_target ?? '—'}/{capacity.rooms_created}
+            </span>
+          </div>
+          <div className="h-2 w-full rounded-full bg-navy-700">
+            <div
+              className="h-2 rounded-full bg-turquoise-500"
+              style={{ width: `${roomsPercent}%` }}
             />
           </div>
         </div>
       </Card>
 
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900">Бөлмелер</h2>
+        <h2 className="font-heading text-lg text-sand-100">Бөлмелер</h2>
         <Button onClick={() => navigate(`/admin/dormitories/${id}/rooms/new`)}>Жаңа бөлме</Button>
       </div>
 
+      {floorGroups.length > 0 && (
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap gap-2">
+            {floorGroups.map(([floor]) => (
+              <button
+                key={floor}
+                type="button"
+                onClick={() => setSelectedFloor(floor)}
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                  floor === activeFloor
+                    ? 'bg-turquoise-500 text-navy-950'
+                    : 'bg-navy-800 text-sand-300/70 hover:bg-navy-700'
+                }`}
+              >
+                {floor}-қабат
+              </button>
+            ))}
+          </div>
+          <FloorCorridorMap
+            rooms={activeFloorRooms}
+            onSelectRoom={(roomId) => navigate(`/admin/rooms/${roomId}/residents`)}
+          />
+          <div className="flex flex-wrap gap-4 text-xs text-sand-300/60">
+            <span className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded ring-1 ring-inset ring-mint-500/30 bg-mint-500/10" /> Бос
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded ring-1 ring-inset ring-amber-400/30 bg-amber-500/10" /> Ішінара
+              толған
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded ring-1 ring-inset ring-clay-500/30 bg-clay-500/10" /> Толған
+            </span>
+          </div>
+        </div>
+      )}
+
       <Card className="overflow-x-auto p-0">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-gray-200 text-xs uppercase text-gray-500">
+          <thead className="border-b border-sand-100/10 text-xs uppercase text-sand-300/60">
             <tr>
               <th className="px-4 py-3">Бөлме №</th>
+              <th className="px-4 py-3">Қабат</th>
               <th className="px-4 py-3">Сыйымдылық</th>
+              <th className="px-4 py-3">Ауданы</th>
+              <th className="px-4 py-3">Жабдықтаулар</th>
               <th className="px-4 py-3">Тұрғындар</th>
               <th className="px-4 py-3">Шектеулер</th>
               <th className="px-4 py-3">Әрекеттер</th>
@@ -98,21 +174,24 @@ export function DormitoryDetailPage() {
           </thead>
           <tbody>
             {rooms.map((room) => (
-              <tr key={room.id} className="border-b border-gray-100 last:border-0">
-                <td className="px-4 py-3 font-medium text-gray-900">{room.room_number}</td>
-                <td className="px-4 py-3 text-gray-600">{room.capacity}</td>
-                <td className="px-4 py-3 text-gray-600">{room.residentCount}</td>
-                <td className="px-4 py-3 text-gray-600">{restrictionsSummary(room)}</td>
+              <tr key={room.id} className="border-b border-sand-100/10 last:border-0">
+                <td className="px-4 py-3 font-medium text-sand-100">{room.room_number}</td>
+                <td className="px-4 py-3 text-sand-300/70">{room.floor ?? '—'}</td>
+                <td className="px-4 py-3 text-sand-300/70">{room.capacity}</td>
+                <td className="px-4 py-3 text-sand-300/70">{room.area_sq_m ?? '—'}</td>
+                <td className="px-4 py-3 text-sand-300/70">{room.equipment ?? '—'}</td>
+                <td className="px-4 py-3 text-sand-300/70">{room.residentCount}</td>
+                <td className="px-4 py-3 text-sand-300/70">{restrictionsSummary(room)}</td>
                 <td className="px-4 py-3">
                   <div className="flex gap-3">
                     <button
-                      className="text-indigo-600 hover:underline"
+                      className="text-turquoise-400 hover:underline"
                       onClick={() => navigate(`/admin/rooms/${room.id}/edit`)}
                     >
                       Өзгерту
                     </button>
                     <button
-                      className="text-indigo-600 hover:underline"
+                      className="text-turquoise-400 hover:underline"
                       onClick={() => navigate(`/admin/rooms/${room.id}/residents`)}
                     >
                       Тұрғындар
@@ -123,7 +202,7 @@ export function DormitoryDetailPage() {
             ))}
             {rooms.length === 0 && (
               <tr>
-                <td className="px-4 py-3 text-gray-500" colSpan={5}>
+                <td className="px-4 py-3 text-sand-300/60" colSpan={8}>
                   Бөлме жоқ
                 </td>
               </tr>

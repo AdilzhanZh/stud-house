@@ -32,29 +32,29 @@ export function NotificationsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold text-gray-900">Хабарламалар</h1>
+      <h1 className="font-heading text-2xl text-sand-100">Хабарламалар</h1>
 
       {error && <Alert variant="error" message={error} />}
-      {!error && !notifications && <p className="text-sm text-gray-500">Жүктелуде...</p>}
+      {!error && !notifications && <p className="text-sm text-sand-300/60">Жүктелуде...</p>}
       {notifications && notifications.length === 0 && (
-        <p className="text-sm text-gray-500">Хабарлама жоқ</p>
+        <p className="text-sm text-sand-300/60">Хабарлама жоқ</p>
       )}
 
       <div className="flex flex-col gap-2">
         {notifications?.map((n) => (
           <Card
             key={n.id}
-            className={`cursor-pointer transition-shadow hover:shadow-md ${n.is_read ? '' : 'border-indigo-300'}`}
+            className={`cursor-pointer transition-shadow hover:shadow-md ${n.is_read ? '' : 'border-turquoise-400/40'}`}
             onClick={() => handleClick(n)}
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className={`text-sm ${n.is_read ? 'text-gray-700' : 'font-semibold text-gray-900'}`}>
-                  {!n.is_read && <span className="mr-2 inline-block h-2 w-2 rounded-full bg-indigo-500" />}
+                <p className={`text-sm ${n.is_read ? 'text-sand-200' : 'font-semibold text-sand-100'}`}>
+                  {!n.is_read && <span className="mr-2 inline-block h-2 w-2 rounded-full bg-turquoise-500/100" />}
                   {n.title}
                 </p>
-                <p className="text-sm text-gray-600">{n.body}</p>
-                <p className="mt-1 text-xs text-gray-400">
+                <p className="text-sm text-sand-300/70">{n.body}</p>
+                <p className="mt-1 text-xs text-sand-400">
                   {new Date(n.created_at).toLocaleString('kk-KZ')}
                 </p>
               </div>

@@ -1,5 +1,11 @@
 import { apiClient } from './client'
-import type { Dormitory, DormitoryCapacity, DormitoryImage } from '../types/dormitories'
+import type {
+  Dormitory,
+  DormitoryCapacity,
+  DormitoryImage,
+  DormitoryRequiredDocument,
+  DormitoryType,
+} from '../types/dormitories'
 
 export async function listDormitories(): Promise<Dormitory[]> {
   const { data } = await apiClient.get<{ data: Dormitory[] }>('/dormitories')
@@ -26,8 +32,19 @@ export async function getDormitoryCapacity(id: string): Promise<DormitoryCapacit
 export interface DormitoryPayload {
   name: string
   address: string
+  phone: string | null
+  dorm_type: DormitoryType | null
+  floor_count: number | null
+  total_rooms_target: number | null
   total_capacity: number
-  payment_qr_code_url: string | null
+  rooms_male: number | null
+  rooms_female: number | null
+  rooms_mixed: number | null
+  monthly_payment: number | null
+  yearly_payment: number | null
+  built_year: string | null
+  commissioned_year: string | null
+  ownership_form: string | null
 }
 
 export async function createDormitory(payload: DormitoryPayload): Promise<Dormitory> {
@@ -53,4 +70,32 @@ export async function addDormitoryImage(
 
 export async function deleteDormitoryImage(dormitoryId: string, imageId: string): Promise<void> {
   await apiClient.delete(`/dormitories/${dormitoryId}/images/${imageId}`)
+}
+
+export async function deleteDormitory(id: string): Promise<void> {
+  await apiClient.delete(`/dormitories/${id}`)
+}
+
+export async function listDormitoryRequiredDocuments(
+  dormitoryId: string,
+): Promise<DormitoryRequiredDocument[]> {
+  const { data } = await apiClient.get<{ data: DormitoryRequiredDocument[] }>(
+    `/dormitories/${dormitoryId}/documents`,
+  )
+  return data.data
+}
+
+export async function addDormitoryRequiredDocument(
+  dormitoryId: string,
+  documentId: string,
+): Promise<DormitoryRequiredDocument> {
+  const { data } = await apiClient.post<{ data: DormitoryRequiredDocument }>(
+    `/dormitories/${dormitoryId}/documents`,
+    { document_id: documentId },
+  )
+  return data.data
+}
+
+export async function deleteDormitoryRequiredDocument(documentId: string): Promise<void> {
+  await apiClient.delete(`/dormitory-documents/${documentId}`)
 }

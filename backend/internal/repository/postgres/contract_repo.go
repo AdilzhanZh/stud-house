@@ -145,7 +145,7 @@ func (r *ContractRepo) ListByStudent(ctx context.Context, studentID uuid.UUID) (
 
 func (r *ContractRepo) GetDormitoryPrice(ctx context.Context, dormitoryID uuid.UUID) (*float64, error) {
 	var price *float64
-	err := r.db.QueryRow(ctx, `SELECT price_per_semester FROM dormitories WHERE id = $1`, dormitoryID).Scan(&price)
+	err := r.db.QueryRow(ctx, `SELECT yearly_payment FROM dormitories WHERE id = $1`, dormitoryID).Scan(&price)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, repository.ErrNotFound
@@ -186,10 +186,10 @@ func (t *contractTx) SetStatus(ctx context.Context, id uuid.UUID, status domain.
 
 func (t *contractTx) CreatePayment(ctx context.Context, p *domain.Payment) error {
 	const q = `
-		INSERT INTO payments (contract_id, amount, currency, status)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO payments (contract_id, amount, currency, status, deadline)
+		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id, created_at`
-	return t.tx.QueryRow(ctx, q, p.ContractID, p.Amount, p.Currency, string(p.Status)).Scan(&p.ID, &p.CreatedAt)
+	return t.tx.QueryRow(ctx, q, p.ContractID, p.Amount, p.Currency, string(p.Status), p.Deadline).Scan(&p.ID, &p.CreatedAt)
 }
 
 func (t *contractTx) MarkApplicationRejected(ctx context.Context, applicationID uuid.UUID, comment string, changedBy uuid.UUID) error {

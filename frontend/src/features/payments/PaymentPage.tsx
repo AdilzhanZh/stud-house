@@ -1,17 +1,14 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Card } from '../../components/Card'
-import { Input } from '../../components/Input'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import { extractErrorMessage } from '../../api/client'
 import { listMyContracts } from '../../api/contractApi'
-import { getApplication } from '../../api/applicationApi'
-import { getDormitory } from '../../api/dormitoryApi'
 import { getPaymentByContract, submitPayment } from '../../api/paymentApi'
+import { uploadFile } from '../../api/uploadApi'
 import type { Contract } from '../../types/contracts'
 import type { Payment } from '../../types/payments'
-import type { Dormitory } from '../../types/dormitories'
 
 // Same hardcoded text PaymentService.notifyStudentPaymentDecision sends —
 // there is no per-instance rejection reason field on Payment
@@ -21,13 +18,13 @@ const REJECTION_REASON = 'Сіздің төлеміңіз расталмады, 
 
 export function PaymentPage() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
 
   const [contract, setContract] = useState<Contract | null>(null)
-  const [dormitory, setDormitory] = useState<Dormitory | null>(null)
   const [payment, setPayment] = useState<Payment | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
-  const [receiptUrl, setReceiptUrl] = useState('')
+  const [receiptFile, setReceiptFile] = useState<File | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -43,12 +40,7 @@ export function PaymentPage() {
         setContract(found)
         if (found.status !== 'accepted') return
 
-        const [app, pay] = await Promise.all([
-          getApplication(found.application_id),
-          getPaymentByContract(found.id),
-        ])
-        setPayment(pay)
-        setDormitory(await getDormitory(app.dormitory_id))
+        setPayment(await getPaymentByContract(found.id))
       })
       .catch((err) => setLoadError(extractErrorMessage(err, 'Жүктеу сәтсіз аяқталды')))
   }
@@ -57,13 +49,14 @@ export function PaymentPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!payment) return
+    if (!payment || !receiptFile) return
     setSubmitError(null)
     setIsSubmitting(true)
     try {
+      const receiptUrl = await uploadFile(receiptFile)
       const updated = await submitPayment(payment.id, receiptUrl)
       setPayment(updated)
-      setReceiptUrl('')
+      setReceiptFile(null)
     } catch (err) {
       setSubmitError(extractErrorMessage(err, 'Жіберу сәтсіз аяқталды'))
     } finally {
@@ -72,7 +65,7 @@ export function PaymentPage() {
   }
 
   if (loadError) return <Alert variant="error" message={loadError} />
-  if (!contract) return <p className="text-sm text-gray-500">Жүктелуде...</p>
+  if (!contract) return <p className="text-sm text-sand-300/60">Жүктелуде...</p>
   if (contract.status !== 'accepted') {
     return (
       <Alert
@@ -81,48 +74,33 @@ export function PaymentPage() {
       />
     )
   }
-  if (!payment) return <p className="text-sm text-gray-500">Жүктелуде...</p>
+  if (!payment) return <p className="text-sm text-sand-300/60">Жүктелуде...</p>
 
   return (
     <div className="flex flex-col gap-6">
-      <Card title="Жатақхана QR-коды">
-        {dormitory?.payment_qr_code_url ? (
-          <img
-            src={dormitory.payment_qr_code_url}
-            alt="Төлем QR-коды"
-            className="h-56 w-56 rounded-md border border-gray-200 object-contain"
-          />
-        ) : (
-          <p className="text-sm text-gray-500">QR-код жоқ</p>
-        )}
-        <p className="mt-3 text-sm text-gray-600">
+      <Button variant="secondary" className="self-start" onClick={() => navigate('/contracts/my')}>
+        ← Артқа
+      </Button>
+
+      <Card title="Төлем ақпараты">
+        <p className="text-sm text-sand-300/70">
           Сомасы: {payment.amount} {payment.currency}
+        </p>
+        <p className="mt-3 text-sm text-sand-100">
+          Төлемді <strong>бухгалтерияға (212-кабинет)</strong> апарып төлеңіз, содан кейін төлем
+          чегін <strong>315-кабинетке</strong> әкеліп беріңіз.
         </p>
       </Card>
 
-      {payment.status === 'pending' && (
-        <Card title="Төлем чегін жүктеу">
-          <p className="mb-3 text-xs text-gray-500">
-            Файл жүктеу қызметі кейін қосылады — әзірге чектің сілтемесін (URL) енгізіңіз.
-          </p>
-          <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-            {submitError && <Alert variant="error" message={submitError} />}
-            <Input
-              label="Чек файлының URL-і"
-              type="url"
-              value={receiptUrl}
-              onChange={(e) => setReceiptUrl(e.target.value)}
-              required
-            />
-            <Button type="submit" isLoading={isSubmitting} className="self-start">
-              Жіберу
-            </Button>
-          </form>
-        </Card>
-      )}
-
       {payment.status === 'submitted' && (
         <Alert variant="success" message="Төлеміңіз расталуын күтуде." />
+      )}
+
+      {payment.status === 'awaiting_manager_decision' && (
+        <Alert
+          variant="error"
+          message="Төлемнің мерзімі өтті, менеджердің шешімі күтілуде. Тезірек бухгалтерияға хабарласыңыз."
+        />
       )}
 
       {payment.status === 'confirmed' && (
@@ -135,14 +113,18 @@ export function PaymentPage() {
           <Card title="Чекті қайта жүктеу">
             <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
               {submitError && <Alert variant="error" message={submitError} />}
-              <Input
-                label="Чек файлының URL-і"
-                type="url"
-                value={receiptUrl}
-                onChange={(e) => setReceiptUrl(e.target.value)}
-                required
-              />
-              <Button type="submit" isLoading={isSubmitting} className="self-start">
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-sand-200">
+                  Чек файлы <span className="text-clay-400">*</span>
+                </label>
+                <input
+                  type="file"
+                  required
+                  onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)}
+                  className="rounded-md border border-sand-100/15 bg-navy-950/60 px-3 py-2 text-sand-100 text-sm outline-none file:mr-3 file:rounded-md file:border-0 file:bg-turquoise-500/10 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-turquoise-400 hover:file:bg-turquoise-500/15"
+                />
+              </div>
+              <Button type="submit" isLoading={isSubmitting} disabled={!receiptFile} className="self-start">
                 Қайта жіберу
               </Button>
             </form>

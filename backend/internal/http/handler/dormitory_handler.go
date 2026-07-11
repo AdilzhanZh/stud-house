@@ -2,10 +2,12 @@ package handler
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"student-house/internal/domain"
 	"student-house/internal/http/middleware"
 	"student-house/internal/service"
 	"student-house/pkg/apperror"
@@ -20,21 +22,79 @@ func NewDormitoryHandler(dormitories *service.DormitoryService) *DormitoryHandle
 	return &DormitoryHandler{dormitories: dormitories}
 }
 
-type createDormitoryRequest struct {
-	Name             string  `json:"name" binding:"required"`
-	Address          string  `json:"address" binding:"required"`
-	TotalCapacity    int     `json:"total_capacity"`
-	PaymentQRCodeURL *string `json:"payment_qr_code_url"`
+// dormitoryRequest is shared by create/update — the wire representation
+// closely mirrors service.DormitoryInput, except dates come in as
+// "2006-01-02" strings (frontend <input type="date">).
+type dormitoryRequest struct {
+	Name             string                `json:"name" binding:"required"`
+	Address          string                `json:"address" binding:"required"`
+	Phone            *string               `json:"phone"`
+	Type             *domain.DormitoryType `json:"dorm_type"`
+	FloorCount       *int                  `json:"floor_count"`
+	TotalRoomsTarget *int                  `json:"total_rooms_target"`
+	TotalCapacity    int                   `json:"total_capacity"`
+	RoomsMale        *int                  `json:"rooms_male"`
+	RoomsFemale      *int                  `json:"rooms_female"`
+	RoomsMixed       *int                  `json:"rooms_mixed"`
+	MonthlyPayment   *float64              `json:"monthly_payment"`
+	YearlyPayment    *float64              `json:"yearly_payment"`
+	BuiltYear        *string               `json:"built_year"`
+	CommissionedYear *string               `json:"commissioned_year"`
+	OwnershipForm    *string               `json:"ownership_form"`
+}
+
+func (req dormitoryRequest) toInput() (service.DormitoryInput, error) {
+	builtYear, err := parseOptionalDate(req.BuiltYear)
+	if err != nil {
+		return service.DormitoryInput{}, apperror.BadRequest("салынған жылы дұрыс емес, ЖЖЖЖ-АА-КК форматында болуы керек")
+	}
+	commissionedYear, err := parseOptionalDate(req.CommissionedYear)
+	if err != nil {
+		return service.DormitoryInput{}, apperror.BadRequest("пайдалануға берілген жылы дұрыс емес, ЖЖЖЖ-АА-КК форматында болуы керек")
+	}
+	return service.DormitoryInput{
+		Name:             req.Name,
+		Address:          req.Address,
+		Phone:            req.Phone,
+		Type:             req.Type,
+		FloorCount:       req.FloorCount,
+		TotalRoomsTarget: req.TotalRoomsTarget,
+		TotalCapacity:    req.TotalCapacity,
+		RoomsMale:        req.RoomsMale,
+		RoomsFemale:      req.RoomsFemale,
+		RoomsMixed:       req.RoomsMixed,
+		MonthlyPayment:   req.MonthlyPayment,
+		YearlyPayment:    req.YearlyPayment,
+		BuiltYear:        builtYear,
+		CommissionedYear: commissionedYear,
+		OwnershipForm:    req.OwnershipForm,
+	}, nil
+}
+
+func parseOptionalDate(s *string) (*time.Time, error) {
+	if s == nil || *s == "" {
+		return nil, nil
+	}
+	t, err := time.Parse("2006-01-02", *s)
+	if err != nil {
+		return nil, err
+	}
+	return &t, nil
 }
 
 func (h *DormitoryHandler) Create(c *gin.Context) {
-	var req createDormitoryRequest
+	var req dormitoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, apperror.BadRequest(err.Error()))
 		return
 	}
+	in, err := req.toInput()
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
 	createdBy, _ := middleware.UserID(c)
-	d, err := h.dormitories.Create(c.Request.Context(), req.Name, req.Address, req.TotalCapacity, req.PaymentQRCodeURL, createdBy)
+	d, err := h.dormitories.Create(c.Request.Context(), in, createdBy)
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -45,7 +105,7 @@ func (h *DormitoryHandler) Create(c *gin.Context) {
 func (h *DormitoryHandler) Get(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid dormitory id"))
+		response.Error(c, apperror.BadRequest("жатақхана идентификаторы дұрыс емес"))
 		return
 	}
 	d, err := h.dormitories.GetByID(c.Request.Context(), id)
@@ -65,25 +125,23 @@ func (h *DormitoryHandler) List(c *gin.Context) {
 	response.OK(c, dormitoriesDTO(list))
 }
 
-type updateDormitoryRequest struct {
-	Name             string  `json:"name" binding:"required"`
-	Address          string  `json:"address" binding:"required"`
-	TotalCapacity    int     `json:"total_capacity"`
-	PaymentQRCodeURL *string `json:"payment_qr_code_url"`
-}
-
 func (h *DormitoryHandler) Update(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid dormitory id"))
+		response.Error(c, apperror.BadRequest("жатақхана идентификаторы дұрыс емес"))
 		return
 	}
-	var req updateDormitoryRequest
+	var req dormitoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, apperror.BadRequest(err.Error()))
 		return
 	}
-	d, err := h.dormitories.Update(c.Request.Context(), id, req.Name, req.Address, req.TotalCapacity, req.PaymentQRCodeURL)
+	in, err := req.toInput()
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	d, err := h.dormitories.Update(c.Request.Context(), id, in)
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -94,7 +152,7 @@ func (h *DormitoryHandler) Update(c *gin.Context) {
 func (h *DormitoryHandler) Delete(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid dormitory id"))
+		response.Error(c, apperror.BadRequest("жатақхана идентификаторы дұрыс емес"))
 		return
 	}
 	if err := h.dormitories.Delete(c.Request.Context(), id); err != nil {
@@ -108,7 +166,7 @@ func (h *DormitoryHandler) Delete(c *gin.Context) {
 func (h *DormitoryHandler) GetCapacity(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid dormitory id"))
+		response.Error(c, apperror.BadRequest("жатақхана идентификаторы дұрыс емес"))
 		return
 	}
 	capacity, err := h.dormitories.GetCapacity(c.Request.Context(), id)
@@ -126,7 +184,7 @@ type addImageRequest struct {
 func (h *DormitoryHandler) AddImage(c *gin.Context) {
 	dormitoryID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid dormitory id"))
+		response.Error(c, apperror.BadRequest("жатақхана идентификаторы дұрыс емес"))
 		return
 	}
 	var req addImageRequest
@@ -145,7 +203,7 @@ func (h *DormitoryHandler) AddImage(c *gin.Context) {
 func (h *DormitoryHandler) ListImages(c *gin.Context) {
 	dormitoryID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid dormitory id"))
+		response.Error(c, apperror.BadRequest("жатақхана идентификаторы дұрыс емес"))
 		return
 	}
 	images, err := h.dormitories.ListImages(c.Request.Context(), dormitoryID)
@@ -159,10 +217,60 @@ func (h *DormitoryHandler) ListImages(c *gin.Context) {
 func (h *DormitoryHandler) DeleteImage(c *gin.Context) {
 	imageID, err := uuid.Parse(c.Param("imageId"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid image id"))
+		response.Error(c, apperror.BadRequest("сурет идентификаторы дұрыс емес"))
 		return
 	}
 	if err := h.dormitories.DeleteImage(c.Request.Context(), imageID); err != nil {
+		response.Error(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+type addDormitoryRequiredDocumentRequest struct {
+	DocumentID uuid.UUID `json:"document_id" binding:"required"`
+}
+
+func (h *DormitoryHandler) AddRequiredDocument(c *gin.Context) {
+	dormitoryID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, apperror.BadRequest("жатақхана идентификаторы дұрыс емес"))
+		return
+	}
+	var req addDormitoryRequiredDocumentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.BadRequest(err.Error()))
+		return
+	}
+	d, err := h.dormitories.AddRequiredDocument(c.Request.Context(), dormitoryID, req.DocumentID)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.Created(c, dormitoryRequiredDocumentDTO(d))
+}
+
+func (h *DormitoryHandler) ListRequiredDocuments(c *gin.Context) {
+	dormitoryID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, apperror.BadRequest("жатақхана идентификаторы дұрыс емес"))
+		return
+	}
+	docs, err := h.dormitories.ListRequiredDocuments(c.Request.Context(), dormitoryID)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, dormitoryRequiredDocumentsDTO(docs))
+}
+
+func (h *DormitoryHandler) DeleteRequiredDocument(c *gin.Context) {
+	docID, err := uuid.Parse(c.Param("documentId"))
+	if err != nil {
+		response.Error(c, apperror.BadRequest("құжат идентификаторы дұрыс емес"))
+		return
+	}
+	if err := h.dormitories.DeleteRequiredDocument(c.Request.Context(), docID); err != nil {
 		response.Error(c, err)
 		return
 	}

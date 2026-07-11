@@ -36,24 +36,60 @@ func NewRoomService(
 	}
 }
 
-func (s *RoomService) Create(ctx context.Context, dormitoryID uuid.UUID, roomNumber string, capacity int) (*domain.Room, error) {
-	if roomNumber == "" {
-		return nil, apperror.BadRequest("room_number is required")
+// RoomInput bundles the admin "create/edit room" form fields.
+type RoomInput struct {
+	RoomNumber string
+	Capacity   int
+	Floor      *int
+	Category   string
+	AreaSqM    *float64
+	Equipment  *string
+	TopBeds    int
+	BottomBeds int
+}
+
+func validateBedLevels(in RoomInput) error {
+	if in.TopBeds+in.BottomBeds != in.Capacity {
+		return apperror.BadRequest("үстіңгі және астыңғы орын саны сыйымдылыққа тең болуы керек")
 	}
-	if capacity <= 0 {
-		return nil, apperror.BadRequest("capacity must be positive")
+	return nil
+}
+
+func (s *RoomService) Create(ctx context.Context, dormitoryID uuid.UUID, in RoomInput) (*domain.Room, error) {
+	if in.RoomNumber == "" {
+		return nil, apperror.BadRequest("бөлме нөмірі міндетті")
+	}
+	if in.Capacity <= 0 {
+		return nil, apperror.BadRequest("сыйымдылық оң сан болуы керек")
+	}
+	if err := validateBedLevels(in); err != nil {
+		return nil, err
 	}
 	if _, err := s.dormitories.GetByID(ctx, dormitoryID); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, apperror.NotFound("dormitory not found")
+			return nil, apperror.NotFound("жатақхана табылмады")
 		}
 		return nil, err
 	}
 
-	room := &domain.Room{DormitoryID: dormitoryID, RoomNumber: roomNumber, Capacity: capacity}
+	category := in.Category
+	if category == "" {
+		category = "general"
+	}
+	room := &domain.Room{
+		DormitoryID: dormitoryID,
+		RoomNumber:  in.RoomNumber,
+		Capacity:    in.Capacity,
+		Floor:       in.Floor,
+		Category:    category,
+		AreaSqM:     in.AreaSqM,
+		Equipment:   in.Equipment,
+		TopBeds:     in.TopBeds,
+		BottomBeds:  in.BottomBeds,
+	}
 	if err := s.rooms.Create(ctx, room); err != nil {
 		if errors.Is(err, repository.ErrConflict) {
-			return nil, apperror.Conflict("a room with this number already exists in this dormitory")
+			return nil, apperror.Conflict("бұл жатақханада осы нөмірлі бөлме бұрыннан бар")
 		}
 		return nil, err
 	}
@@ -64,7 +100,7 @@ func (s *RoomService) GetByID(ctx context.Context, id uuid.UUID) (*domain.Room, 
 	room, err := s.rooms.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, apperror.NotFound("room not found")
+			return nil, apperror.NotFound("бөлме табылмады")
 		}
 		return nil, err
 	}
@@ -79,7 +115,7 @@ func (s *RoomService) GetActiveResidence(ctx context.Context, studentID uuid.UUI
 	resident, err := s.rooms.GetActiveResidentByStudent(ctx, studentID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, nil, apperror.NotFound("no active room assignment")
+			return nil, nil, apperror.NotFound("белсенді бөлмеге орналасу жоқ")
 		}
 		return nil, nil, err
 	}
@@ -94,17 +130,34 @@ func (s *RoomService) ListByDormitory(ctx context.Context, dormitoryID uuid.UUID
 	return s.rooms.ListByDormitory(ctx, dormitoryID)
 }
 
-func (s *RoomService) Update(ctx context.Context, id uuid.UUID, roomNumber string, capacity int) (*domain.Room, error) {
-	if roomNumber == "" {
-		return nil, apperror.BadRequest("room_number is required")
+func (s *RoomService) Update(ctx context.Context, id uuid.UUID, in RoomInput) (*domain.Room, error) {
+	if in.RoomNumber == "" {
+		return nil, apperror.BadRequest("бөлме нөмірі міндетті")
 	}
-	if capacity <= 0 {
-		return nil, apperror.BadRequest("capacity must be positive")
+	if in.Capacity <= 0 {
+		return nil, apperror.BadRequest("сыйымдылық оң сан болуы керек")
 	}
-	room := &domain.Room{ID: id, RoomNumber: roomNumber, Capacity: capacity}
+	if err := validateBedLevels(in); err != nil {
+		return nil, err
+	}
+	category := in.Category
+	if category == "" {
+		category = "general"
+	}
+	room := &domain.Room{
+		ID:         id,
+		RoomNumber: in.RoomNumber,
+		Capacity:   in.Capacity,
+		Floor:      in.Floor,
+		Category:   category,
+		AreaSqM:    in.AreaSqM,
+		Equipment:  in.Equipment,
+		TopBeds:    in.TopBeds,
+		BottomBeds: in.BottomBeds,
+	}
 	if err := s.rooms.Update(ctx, room); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, apperror.NotFound("room not found")
+			return nil, apperror.NotFound("бөлме табылмады")
 		}
 		return nil, err
 	}
@@ -114,7 +167,7 @@ func (s *RoomService) Update(ctx context.Context, id uuid.UUID, roomNumber strin
 func (s *RoomService) Delete(ctx context.Context, id uuid.UUID) error {
 	if err := s.rooms.Delete(ctx, id); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return apperror.NotFound("room not found")
+			return apperror.NotFound("бөлме табылмады")
 		}
 		return err
 	}
@@ -142,7 +195,7 @@ func (s *RoomService) UpdateRestrictions(ctx context.Context, roomID uuid.UUID, 
 
 	if err := s.rooms.UpdateRestrictions(ctx, roomID, restrictions); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, apperror.NotFound("room not found")
+			return nil, apperror.NotFound("бөлме табылмады")
 		}
 		return nil, err
 	}
@@ -167,13 +220,13 @@ func (s *RoomService) checkStudentAgainstRestrictions(ctx context.Context, stude
 
 	if restrictions.Gender != nil {
 		if profile == nil || profile.Gender == nil || *profile.Gender != *restrictions.Gender {
-			return apperror.Conflict(fmt.Sprintf("resident %s does not match the room's gender restriction", studentID))
+			return apperror.Conflict(fmt.Sprintf("%s студенті бөлменің жыныс шектеуіне сай келмейді", studentID))
 		}
 	}
 
 	if len(restrictions.Courses) > 0 {
 		if profile == nil || profile.Course == nil || !containsCourse(restrictions.Courses, *profile.Course) {
-			return apperror.Conflict(fmt.Sprintf("resident %s does not match the room's course restriction", studentID))
+			return apperror.Conflict(fmt.Sprintf("%s студенті бөлменің курс шектеуіне сай келмейді", studentID))
 		}
 	}
 
@@ -183,7 +236,7 @@ func (s *RoomService) checkStudentAgainstRestrictions(ctx context.Context, stude
 			return err
 		}
 		if !anyBenefitMatches(restrictions.BenefitIDs, studentBenefits) {
-			return apperror.Conflict(fmt.Sprintf("resident %s does not hold any of the room's required benefits", studentID))
+			return apperror.Conflict(fmt.Sprintf("%s студентінде бөлме талап ететін льготалардың бірде-біреуі жоқ", studentID))
 		}
 	}
 
@@ -210,6 +263,18 @@ func anyBenefitMatches(required []uuid.UUID, held []*domain.StudentBenefit) bool
 	return false
 }
 
+// CheckAssignable reports whether studentID satisfies roomID's current
+// restrictions (gender/course/benefit) — used by ApplicationService.Create to
+// reject a student's preferred-room pick up front, before it ever reaches a
+// manager.
+func (s *RoomService) CheckAssignable(ctx context.Context, roomID, studentID uuid.UUID) error {
+	room, err := s.GetByID(ctx, roomID)
+	if err != nil {
+		return err
+	}
+	return s.checkStudentAgainstRestrictions(ctx, studentID, room.Restrictions)
+}
+
 // AddResident assigns a student to a room. It enforces that the student has
 // no other active room, that the room still has free capacity, and that the
 // student satisfies the room's current restrictions.
@@ -222,16 +287,16 @@ func (s *RoomService) AddResident(ctx context.Context, roomID, studentID uuid.UU
 	student, err := s.users.GetByID(ctx, studentID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, apperror.NotFound("student not found")
+			return nil, apperror.NotFound("студент табылмады")
 		}
 		return nil, err
 	}
 	if student.Role != domain.RoleStudent {
-		return nil, apperror.BadRequest("only users with role=student can be assigned to a room")
+		return nil, apperror.BadRequest("бөлмеге тек студент рөліндегі пайдаланушыны орналастыруға болады")
 	}
 
 	if _, err := s.rooms.GetActiveResidentByStudent(ctx, studentID); err == nil {
-		return nil, apperror.Conflict("student already has an active room assignment")
+		return nil, apperror.Conflict("студент бұрыннан бір бөлмеге орналастырылған")
 	} else if !errors.Is(err, repository.ErrNotFound) {
 		return nil, err
 	}
@@ -241,7 +306,7 @@ func (s *RoomService) AddResident(ctx context.Context, roomID, studentID uuid.UU
 		return nil, err
 	}
 	if len(residents) >= room.Capacity {
-		return nil, apperror.Conflict("room is already at full capacity")
+		return nil, apperror.Conflict("бөлме толығымен толған")
 	}
 
 	if err := s.checkStudentAgainstRestrictions(ctx, studentID, room.Restrictions); err != nil {
@@ -258,7 +323,7 @@ func (s *RoomService) AddResident(ctx context.Context, roomID, studentID uuid.UU
 func (s *RoomService) MoveOutResident(ctx context.Context, residentRowID uuid.UUID) error {
 	if err := s.rooms.MoveOutResident(ctx, residentRowID); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return apperror.NotFound("active resident record not found")
+			return apperror.NotFound("белсенді тұрғын жазбасы табылмады")
 		}
 		return err
 	}

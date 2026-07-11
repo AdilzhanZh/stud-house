@@ -21,11 +21,21 @@ func NewBenefitService(benefits repository.BenefitRepository, users repository.U
 	return &BenefitService{benefits: benefits, users: users, assigns: assigns}
 }
 
-func (s *BenefitService) Create(ctx context.Context, name, description string, createdBy uuid.UUID) (*domain.Benefit, error) {
-	if name == "" {
-		return nil, apperror.BadRequest("name is required")
+func validateBenefitPriority(priority int) error {
+	if priority < 1 || priority > 10 {
+		return apperror.BadRequest("приоритет салмағы 1 мен 10 аралығында болуы керек")
 	}
-	b := &domain.Benefit{Name: name, Description: description, CreatedBy: createdBy}
+	return nil
+}
+
+func (s *BenefitService) Create(ctx context.Context, name, description string, priority int, createdBy uuid.UUID) (*domain.Benefit, error) {
+	if name == "" {
+		return nil, apperror.BadRequest("атауы міндетті")
+	}
+	if err := validateBenefitPriority(priority); err != nil {
+		return nil, err
+	}
+	b := &domain.Benefit{Name: name, Description: description, Priority: priority, CreatedBy: createdBy}
 	if err := s.benefits.Create(ctx, b); err != nil {
 		return nil, err
 	}
@@ -36,7 +46,7 @@ func (s *BenefitService) GetByID(ctx context.Context, id uuid.UUID) (*domain.Ben
 	b, err := s.benefits.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, apperror.NotFound("benefit not found")
+			return nil, apperror.NotFound("льгота табылмады")
 		}
 		return nil, err
 	}
@@ -47,14 +57,17 @@ func (s *BenefitService) List(ctx context.Context) ([]*domain.Benefit, error) {
 	return s.benefits.List(ctx)
 }
 
-func (s *BenefitService) Update(ctx context.Context, id uuid.UUID, name, description string) (*domain.Benefit, error) {
+func (s *BenefitService) Update(ctx context.Context, id uuid.UUID, name, description string, priority int) (*domain.Benefit, error) {
 	if name == "" {
-		return nil, apperror.BadRequest("name is required")
+		return nil, apperror.BadRequest("атауы міндетті")
 	}
-	b := &domain.Benefit{ID: id, Name: name, Description: description}
+	if err := validateBenefitPriority(priority); err != nil {
+		return nil, err
+	}
+	b := &domain.Benefit{ID: id, Name: name, Description: description, Priority: priority}
 	if err := s.benefits.Update(ctx, b); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, apperror.NotFound("benefit not found")
+			return nil, apperror.NotFound("льгота табылмады")
 		}
 		return nil, err
 	}
@@ -64,50 +77,25 @@ func (s *BenefitService) Update(ctx context.Context, id uuid.UUID, name, descrip
 func (s *BenefitService) Delete(ctx context.Context, id uuid.UUID) error {
 	if err := s.benefits.Delete(ctx, id); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return apperror.NotFound("benefit not found")
+			return apperror.NotFound("льгота табылмады")
 		}
 		return err
 	}
 	return nil
 }
 
-func (s *BenefitService) AddField(ctx context.Context, benefitID uuid.UUID, fieldName, fieldType string) (*domain.BenefitField, error) {
-	if fieldName == "" || fieldType == "" {
-		return nil, apperror.BadRequest("field_name and field_type are required")
-	}
+func (s *BenefitService) AddRequiredDocument(ctx context.Context, benefitID, documentID uuid.UUID) (*domain.BenefitRequiredDocument, error) {
 	if _, err := s.GetByID(ctx, benefitID); err != nil {
 		return nil, err
 	}
-	f := &domain.BenefitField{BenefitID: benefitID, FieldName: fieldName, FieldType: fieldType}
-	if err := s.benefits.AddField(ctx, f); err != nil {
-		return nil, err
-	}
-	return f, nil
-}
-
-func (s *BenefitService) ListFields(ctx context.Context, benefitID uuid.UUID) ([]*domain.BenefitField, error) {
-	return s.benefits.ListFields(ctx, benefitID)
-}
-
-func (s *BenefitService) DeleteField(ctx context.Context, fieldID uuid.UUID) error {
-	if err := s.benefits.DeleteField(ctx, fieldID); err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
-			return apperror.NotFound("field not found")
-		}
-		return err
-	}
-	return nil
-}
-
-func (s *BenefitService) AddRequiredDocument(ctx context.Context, benefitID uuid.UUID, documentName string) (*domain.BenefitRequiredDocument, error) {
-	if documentName == "" {
-		return nil, apperror.BadRequest("document_name is required")
-	}
-	if _, err := s.GetByID(ctx, benefitID); err != nil {
-		return nil, err
-	}
-	d := &domain.BenefitRequiredDocument{BenefitID: benefitID, DocumentName: documentName}
+	d := &domain.BenefitRequiredDocument{BenefitID: benefitID, DocumentID: documentID}
 	if err := s.benefits.AddRequiredDocument(ctx, d); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, apperror.BadRequest("құжат каталогта табылмады")
+		}
+		if errors.Is(err, repository.ErrConflict) {
+			return nil, apperror.Conflict("бұл құжат льготаға бұрын қосылған")
+		}
 		return nil, err
 	}
 	return d, nil
@@ -120,7 +108,7 @@ func (s *BenefitService) ListRequiredDocuments(ctx context.Context, benefitID uu
 func (s *BenefitService) DeleteRequiredDocument(ctx context.Context, docID uuid.UUID) error {
 	if err := s.benefits.DeleteRequiredDocument(ctx, docID); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return apperror.NotFound("required document not found")
+			return apperror.NotFound("қажетті құжат табылмады")
 		}
 		return err
 	}
@@ -134,12 +122,12 @@ func (s *BenefitService) AssignBenefit(ctx context.Context, studentID, benefitID
 	student, err := s.users.GetByID(ctx, studentID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, apperror.NotFound("student not found")
+			return nil, apperror.NotFound("студент табылмады")
 		}
 		return nil, err
 	}
 	if student.Role != domain.RoleStudent {
-		return nil, apperror.BadRequest("benefits can only be assigned to users with role=student")
+		return nil, apperror.BadRequest("льготаны тек студент рөліндегі пайдаланушыға тағайындауға болады")
 	}
 	if _, err := s.GetByID(ctx, benefitID); err != nil {
 		return nil, err
@@ -148,7 +136,7 @@ func (s *BenefitService) AssignBenefit(ctx context.Context, studentID, benefitID
 	sb := &domain.StudentBenefit{StudentID: studentID, BenefitID: benefitID, AssignedBy: assignedBy}
 	if err := s.assigns.Assign(ctx, sb); err != nil {
 		if errors.Is(err, repository.ErrConflict) {
-			return nil, apperror.Conflict("student already has this benefit")
+			return nil, apperror.Conflict("студентте бұл льгота бұрыннан бар")
 		}
 		return nil, err
 	}
@@ -162,7 +150,7 @@ func (s *BenefitService) ListStudentBenefits(ctx context.Context, studentID uuid
 func (s *BenefitService) RevokeBenefit(ctx context.Context, studentID, benefitID uuid.UUID) error {
 	if err := s.assigns.Revoke(ctx, studentID, benefitID); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return apperror.NotFound("student does not have this benefit")
+			return apperror.NotFound("студентте бұл льгота жоқ")
 		}
 		return err
 	}

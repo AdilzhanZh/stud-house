@@ -21,23 +21,43 @@ func NewRoomHandler(rooms *service.RoomService) *RoomHandler {
 	return &RoomHandler{rooms: rooms}
 }
 
-type createRoomRequest struct {
-	RoomNumber string `json:"room_number" binding:"required"`
-	Capacity   int    `json:"capacity" binding:"required"`
+// roomRequest is shared by create/update.
+type roomRequest struct {
+	RoomNumber string   `json:"room_number" binding:"required"`
+	Capacity   int      `json:"capacity" binding:"required"`
+	Floor      *int     `json:"floor"`
+	Category   string   `json:"category"`
+	AreaSqM    *float64 `json:"area_sq_m"`
+	Equipment  *string  `json:"equipment"`
+	TopBeds    int      `json:"top_beds"`
+	BottomBeds int      `json:"bottom_beds"`
+}
+
+func (req roomRequest) toInput() service.RoomInput {
+	return service.RoomInput{
+		RoomNumber: req.RoomNumber,
+		Capacity:   req.Capacity,
+		Floor:      req.Floor,
+		Category:   req.Category,
+		AreaSqM:    req.AreaSqM,
+		Equipment:  req.Equipment,
+		TopBeds:    req.TopBeds,
+		BottomBeds: req.BottomBeds,
+	}
 }
 
 func (h *RoomHandler) Create(c *gin.Context) {
 	dormitoryID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid dormitory id"))
+		response.Error(c, apperror.BadRequest("жатақхана идентификаторы дұрыс емес"))
 		return
 	}
-	var req createRoomRequest
+	var req roomRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, apperror.BadRequest(err.Error()))
 		return
 	}
-	room, err := h.rooms.Create(c.Request.Context(), dormitoryID, req.RoomNumber, req.Capacity)
+	room, err := h.rooms.Create(c.Request.Context(), dormitoryID, req.toInput())
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -48,7 +68,7 @@ func (h *RoomHandler) Create(c *gin.Context) {
 func (h *RoomHandler) ListByDormitory(c *gin.Context) {
 	dormitoryID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid dormitory id"))
+		response.Error(c, apperror.BadRequest("жатақхана идентификаторы дұрыс емес"))
 		return
 	}
 	rooms, err := h.rooms.ListByDormitory(c.Request.Context(), dormitoryID)
@@ -62,7 +82,7 @@ func (h *RoomHandler) ListByDormitory(c *gin.Context) {
 func (h *RoomHandler) Get(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("roomId"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid room id"))
+		response.Error(c, apperror.BadRequest("бөлме идентификаторы дұрыс емес"))
 		return
 	}
 	room, err := h.rooms.GetByID(c.Request.Context(), id)
@@ -73,23 +93,18 @@ func (h *RoomHandler) Get(c *gin.Context) {
 	response.OK(c, roomDTO(room))
 }
 
-type updateRoomRequest struct {
-	RoomNumber string `json:"room_number" binding:"required"`
-	Capacity   int    `json:"capacity" binding:"required"`
-}
-
 func (h *RoomHandler) Update(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("roomId"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid room id"))
+		response.Error(c, apperror.BadRequest("бөлме идентификаторы дұрыс емес"))
 		return
 	}
-	var req updateRoomRequest
+	var req roomRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, apperror.BadRequest(err.Error()))
 		return
 	}
-	room, err := h.rooms.Update(c.Request.Context(), id, req.RoomNumber, req.Capacity)
+	room, err := h.rooms.Update(c.Request.Context(), id, req.toInput())
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -100,7 +115,7 @@ func (h *RoomHandler) Update(c *gin.Context) {
 func (h *RoomHandler) Delete(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("roomId"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid room id"))
+		response.Error(c, apperror.BadRequest("бөлме идентификаторы дұрыс емес"))
 		return
 	}
 	if err := h.rooms.Delete(c.Request.Context(), id); err != nil {
@@ -121,7 +136,7 @@ type updateRestrictionsRequest struct {
 func (h *RoomHandler) UpdateRestrictions(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("roomId"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid room id"))
+		response.Error(c, apperror.BadRequest("бөлме идентификаторы дұрыс емес"))
 		return
 	}
 	var req updateRestrictionsRequest
@@ -145,7 +160,7 @@ type addResidentRequest struct {
 func (h *RoomHandler) AddResident(c *gin.Context) {
 	roomID, err := uuid.Parse(c.Param("roomId"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid room id"))
+		response.Error(c, apperror.BadRequest("бөлме идентификаторы дұрыс емес"))
 		return
 	}
 	var req addResidentRequest
@@ -164,7 +179,7 @@ func (h *RoomHandler) AddResident(c *gin.Context) {
 func (h *RoomHandler) ListActiveResidents(c *gin.Context) {
 	roomID, err := uuid.Parse(c.Param("roomId"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid room id"))
+		response.Error(c, apperror.BadRequest("бөлме идентификаторы дұрыс емес"))
 		return
 	}
 	residents, err := h.rooms.ListActiveResidents(c.Request.Context(), roomID)
@@ -189,11 +204,11 @@ type residenceResponse struct {
 func (h *RoomHandler) GetMyResidence(c *gin.Context) {
 	studentID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid student id"))
+		response.Error(c, apperror.BadRequest("студент идентификаторы дұрыс емес"))
 		return
 	}
 	if !canAccessStudentResource(c, studentID) {
-		response.Error(c, apperror.Forbidden("you can only view your own residence"))
+		response.Error(c, apperror.Forbidden("тек өз тұрғылықты жеріңізді ғана көре аласыз"))
 		return
 	}
 	resident, room, err := h.rooms.GetActiveResidence(c.Request.Context(), studentID)
@@ -213,7 +228,7 @@ func (h *RoomHandler) GetMyResidence(c *gin.Context) {
 func (h *RoomHandler) MoveOutResident(c *gin.Context) {
 	residentRowID, err := uuid.Parse(c.Param("residentId"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid resident id"))
+		response.Error(c, apperror.BadRequest("тұрғын идентификаторы дұрыс емес"))
 		return
 	}
 	if err := h.rooms.MoveOutResident(c.Request.Context(), residentRowID); err != nil {

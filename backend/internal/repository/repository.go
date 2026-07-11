@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -18,12 +19,27 @@ type UserRepository interface {
 	Create(ctx context.Context, u *domain.User) error
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error)
 	GetByEmail(ctx context.Context, email string) (*domain.User, error)
+	GetByIIN(ctx context.Context, iin string) (*domain.User, error)
 	UpdateRole(ctx context.Context, id uuid.UUID, role domain.Role) error
+	UpdateCommitteeMember(ctx context.Context, id uuid.UUID, isCommitteeMember bool) error
 	UpdateChairperson(ctx context.Context, id uuid.UUID, isChairperson bool) error
 	ListByRole(ctx context.Context, role domain.Role) ([]*domain.User, error)
+	// ListCommitteeMembers returns every user with is_committee_member = true
+	// (a flag on managers, elected by admin — not a separate role).
+	ListCommitteeMembers(ctx context.Context) ([]*domain.User, error)
 	// List optionally filters by role (nil = every user), for the admin
 	// panel's user list (frontend kezeng 4: GET /admin/users?role=).
 	List(ctx context.Context, role *domain.Role) ([]*domain.User, error)
+	// ListPendingStudents is the manager/admin queue of self-registered
+	// students awaiting approval before they can log in.
+	ListPendingStudents(ctx context.Context) ([]*domain.User, error)
+	UpdateApprovalStatus(ctx context.Context, id uuid.UUID, status domain.ApprovalStatus) error
+	UpdatePassword(ctx context.Context, id uuid.UUID, passwordHash string) error
+	Delete(ctx context.Context, id uuid.UUID) error
+	// SetEmailVerificationCode stores a fresh code+expiry (registration or
+	// resend); MarkEmailVerified clears it and stamps email_verified_at.
+	SetEmailVerificationCode(ctx context.Context, id uuid.UUID, code string, expiresAt time.Time) error
+	MarkEmailVerified(ctx context.Context, id uuid.UUID) error
 }
 
 type StudentProfileRepository interface {
@@ -41,6 +57,10 @@ type DormitoryRepository interface {
 	AddImage(ctx context.Context, img *domain.DormitoryImage) error
 	ListImages(ctx context.Context, dormitoryID uuid.UUID) ([]*domain.DormitoryImage, error)
 	DeleteImage(ctx context.Context, imageID uuid.UUID) error
+
+	AddRequiredDocument(ctx context.Context, d *domain.DormitoryRequiredDocument) error
+	ListRequiredDocuments(ctx context.Context, dormitoryID uuid.UUID) ([]*domain.DormitoryRequiredDocument, error)
+	DeleteRequiredDocument(ctx context.Context, docID uuid.UUID) error
 }
 
 type RoomRepository interface {
@@ -56,16 +76,18 @@ type RoomRepository interface {
 	GetActiveResidentByStudent(ctx context.Context, studentID uuid.UUID) (*domain.RoomResident, error)
 }
 
+type RequiredDocumentRepository interface {
+	Create(ctx context.Context, d *domain.RequiredDocument) error
+	List(ctx context.Context) ([]*domain.RequiredDocument, error)
+	Delete(ctx context.Context, id uuid.UUID) error
+}
+
 type BenefitRepository interface {
 	Create(ctx context.Context, b *domain.Benefit) error
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Benefit, error)
 	List(ctx context.Context) ([]*domain.Benefit, error)
 	Update(ctx context.Context, b *domain.Benefit) error
 	Delete(ctx context.Context, id uuid.UUID) error
-
-	AddField(ctx context.Context, f *domain.BenefitField) error
-	ListFields(ctx context.Context, benefitID uuid.UUID) ([]*domain.BenefitField, error)
-	DeleteField(ctx context.Context, fieldID uuid.UUID) error
 
 	AddRequiredDocument(ctx context.Context, d *domain.BenefitRequiredDocument) error
 	ListRequiredDocuments(ctx context.Context, benefitID uuid.UUID) ([]*domain.BenefitRequiredDocument, error)

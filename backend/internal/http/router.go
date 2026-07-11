@@ -14,6 +14,7 @@ type Handlers struct {
 	Dormitory       *handler.DormitoryHandler
 	Room            *handler.RoomHandler
 	Benefit         *handler.BenefitHandler
+	Document        *handler.DocumentHandler
 	Application     *handler.ApplicationHandler
 	Notification    *handler.NotificationHandler
 	Report          *handler.ReportHandler
@@ -21,22 +22,29 @@ type Handlers struct {
 	Payment         *handler.PaymentHandler
 	ExitRequest     *handler.ExitRequestHandler
 	TransferRequest *handler.TransferRequestHandler
+	Upload          *handler.UploadHandler
 }
 
-func NewRouter(jwtSecret string, h Handlers) *gin.Engine {
+func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 	r := gin.Default()
 
 	admin := middleware.RequireRole(domain.RoleAdmin)
 	adminOrManager := middleware.RequireRole(domain.RoleAdmin, domain.RoleManager)
 	studentOnly := middleware.RequireRole(domain.RoleStudent)
-	committeeOnly := middleware.RequireRole(domain.RoleCommitteeMember)
+	committeeOnly := middleware.RequireCommitteeMember()
 	auth := middleware.RequireAuth(jwtSecret)
 
 	api := r.Group("/api/v1")
 	{
+		// Publicly readable (files are only linked from admin-authored report
+		// templates, same trust level as the plain external URLs this replaces).
+		api.Static("/uploads", uploadDir)
+
 		authGroup := api.Group("/auth")
 		{
 			authGroup.POST("/register", h.Auth.Register)
+			authGroup.POST("/verify-email", h.Auth.VerifyEmail)
+			authGroup.POST("/resend-verification", h.Auth.ResendVerification)
 			authGroup.POST("/login", h.Auth.Login)
 			authGroup.POST("/refresh", h.Auth.Refresh)
 			authGroup.POST("/logout", h.Auth.Logout)
@@ -51,7 +59,10 @@ func NewRouter(jwtSecret string, h Handlers) *gin.Engine {
 			{
 				adminGroup.POST("/users", h.User.CreateUser)
 				adminGroup.PATCH("/users/:id/role", h.User.UpdateRole)
+				adminGroup.PATCH("/users/:id/committee-member", h.User.SetCommitteeMember)
 				adminGroup.PATCH("/committee-members/:id/chairperson", h.User.SetChairperson)
+				adminGroup.DELETE("/users/:id", h.User.DeleteUser)
+				adminGroup.PATCH("/users/:id/password", h.User.SetPassword)
 			}
 
 			// Read-only for any authenticated role.
@@ -66,7 +77,7 @@ func NewRouter(jwtSecret string, h Handlers) *gin.Engine {
 			protected.GET("/rooms/:roomId/residents", h.Room.ListActiveResidents)
 			protected.GET("/benefits", h.Benefit.List)
 			protected.GET("/benefits/:id", h.Benefit.Get)
-			protected.GET("/benefits/:id/fields", h.Benefit.ListFields)
+			protected.GET("/dormitories/:id/documents", h.Dormitory.ListRequiredDocuments)
 			protected.GET("/benefits/:id/documents", h.Benefit.ListRequiredDocuments)
 			protected.GET("/students/:id/benefits", h.Benefit.ListStudentBenefits)
 
@@ -79,7 +90,13 @@ func NewRouter(jwtSecret string, h Handlers) *gin.Engine {
 			protected.GET("/notifications", h.Notification.ListMine)
 			protected.PATCH("/notifications/:id/read", h.Notification.MarkRead)
 
-			// Any authenticated user: read a report (only committee_member can vote).
+			// Any authenticated user: students upload application/payment
+			// documents, admins/managers upload dormitory images and report
+			// templates — all through the same generic file-storage endpoint.
+			protected.POST("/uploads", h.Upload.Upload)
+
+			// Any authenticated user: read a report (only a committee member
+			// — is_committee_member=true — can vote).
 			protected.GET("/reports/:id", h.Report.GetDetail)
 
 			// Any authenticated user: ownership (student) or admin/manager is
@@ -90,8 +107,8 @@ func NewRouter(jwtSecret string, h Handlers) *gin.Engine {
 			protected.GET("/exit-requests/:id", h.ExitRequest.Get)
 			protected.GET("/transfer-requests/:id", h.TransferRequest.Get)
 
-			// Committee-only: chairperson qualifies automatically (a flag on
-			// top of committee_member, not a separate role).
+			// Committee-only: is_committee_member=true, an admin-toggled flag on
+			// a manager (chairperson is a further flag on top of that).
 			committeeGroup := protected.Group("")
 			committeeGroup.Use(committeeOnly)
 			{
@@ -102,9 +119,12 @@ func NewRouter(jwtSecret string, h Handlers) *gin.Engine {
 			studentGroup := protected.Group("")
 			studentGroup.Use(studentOnly)
 			{
+				studentGroup.POST("/students/me/benefits", h.Benefit.AssignOwnBenefit)
+
 				studentGroup.POST("/applications", h.Application.Create)
 				studentGroup.GET("/applications/my", h.Application.ListMine)
 				studentGroup.PATCH("/applications/:id", h.Application.Resubmit)
+				studentGroup.DELETE("/applications/:id", h.Application.Delete)
 				studentGroup.POST("/applications/:id/documents", h.Application.AddDocument)
 
 				studentGroup.GET("/contracts/my", h.Contract.ListMine)
@@ -126,6 +146,8 @@ func NewRouter(jwtSecret string, h Handlers) *gin.Engine {
 				mgmt.DELETE("/dormitories/:id", h.Dormitory.Delete)
 				mgmt.POST("/dormitories/:id/images", h.Dormitory.AddImage)
 				mgmt.DELETE("/dormitories/:id/images/:imageId", h.Dormitory.DeleteImage)
+				mgmt.POST("/dormitories/:id/documents", h.Dormitory.AddRequiredDocument)
+				mgmt.DELETE("/dormitory-documents/:documentId", h.Dormitory.DeleteRequiredDocument)
 
 				mgmt.POST("/dormitories/:id/rooms", h.Room.Create)
 				mgmt.PATCH("/rooms/:roomId", h.Room.Update)
@@ -137,29 +159,37 @@ func NewRouter(jwtSecret string, h Handlers) *gin.Engine {
 				mgmt.POST("/benefits", h.Benefit.Create)
 				mgmt.PATCH("/benefits/:id", h.Benefit.Update)
 				mgmt.DELETE("/benefits/:id", h.Benefit.Delete)
-				mgmt.POST("/benefits/:id/fields", h.Benefit.AddField)
-				mgmt.DELETE("/benefit-fields/:fieldId", h.Benefit.DeleteField)
 				mgmt.POST("/benefits/:id/documents", h.Benefit.AddRequiredDocument)
 				mgmt.DELETE("/benefit-documents/:documentId", h.Benefit.DeleteRequiredDocument)
+
+				mgmt.POST("/documents", h.Document.Create)
+				mgmt.GET("/documents", h.Document.List)
+				mgmt.DELETE("/documents/:id", h.Document.Delete)
 
 				mgmt.POST("/students/:id/benefits", h.Benefit.AssignBenefit)
 				mgmt.DELETE("/students/:id/benefits/:benefitId", h.Benefit.RevokeBenefit)
 
 				mgmt.GET("/admin/users", h.User.List)
+				mgmt.GET("/admin/students/pending", h.User.ListPendingStudents)
+				mgmt.PATCH("/admin/students/:id/approval", h.User.DecideStudentApproval)
 
 				mgmt.GET("/applications", h.Application.List)
 				mgmt.PATCH("/applications/:id/decision", h.Application.Decide)
 
 				mgmt.POST("/report-templates", h.Report.CreateTemplate)
 				mgmt.GET("/report-templates", h.Report.ListTemplates)
+				mgmt.DELETE("/report-templates/:id", h.Report.DeleteTemplate)
 
-				mgmt.POST("/reports", h.Report.Create)
 				mgmt.GET("/reports", h.Report.List)
+				mgmt.POST("/reports", h.Report.Create)
 				mgmt.POST("/reports/:id/revise", h.Report.Revise)
 				mgmt.GET("/reports/:id/export", h.Report.Export)
+				mgmt.DELETE("/reports/:id", h.Report.Delete)
 
 				mgmt.GET("/payments", h.Payment.List)
 				mgmt.PATCH("/payments/:id/confirm", h.Payment.Confirm)
+				mgmt.POST("/admin/payments/expire-check", h.Payment.ExpireCheck)
+				mgmt.PATCH("/payments/:id/manager-decision", h.Payment.ManagerDecision)
 				mgmt.POST("/admin/contracts/expire-check", h.Contract.ExpireCheck)
 				mgmt.GET("/contracts", h.Contract.List)
 				mgmt.PATCH("/contracts/:id/manager-decision", h.Contract.ManagerDecision)

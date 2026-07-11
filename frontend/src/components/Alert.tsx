@@ -6,13 +6,16 @@ interface AlertProps {
 }
 
 const variantClasses: Record<Variant, string> = {
-  error: 'bg-red-50 text-red-700 border-red-200',
-  success: 'bg-green-50 text-green-700 border-green-200',
+  error: 'border-clay-500/20 bg-clay-500/10 text-clay-400 border-l-clay-400',
+  success: 'border-mint-500/20 bg-mint-500/10 text-mint-400 border-l-mint-400',
 }
 
 export function Alert({ variant, message }: AlertProps) {
   return (
-    <div className={`rounded-md border px-3 py-2 text-sm ${variantClasses[variant]}`} role="alert">
+    <div
+      className={`rounded-lg border border-l-4 px-3 py-2.5 text-sm ${variantClasses[variant]}`}
+      role="alert"
+    >
       {message}
     </div>
   )

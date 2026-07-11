@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
@@ -44,11 +46,11 @@ func (h *PaymentHandler) canAccessContract(c *gin.Context, contractID uuid.UUID)
 func (h *PaymentHandler) GetByContract(c *gin.Context) {
 	contractID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid contract id"))
+		response.Error(c, apperror.BadRequest("келісімшарт идентификаторы дұрыс емес"))
 		return
 	}
 	if !h.canAccessContract(c, contractID) {
-		response.Error(c, apperror.Forbidden("you cannot view this contract's payment"))
+		response.Error(c, apperror.Forbidden("бұл келісімшарттың төлемін көруге құқығыңыз жоқ"))
 		return
 	}
 	payment, err := h.payments.GetByContractID(c.Request.Context(), contractID)
@@ -81,10 +83,10 @@ func (h *PaymentHandler) List(c *gin.Context) {
 	if raw := c.Query("status"); raw != "" {
 		s := domain.PaymentStatus(raw)
 		switch s {
-		case domain.PaymentPending, domain.PaymentSubmitted, domain.PaymentConfirmed, domain.PaymentRejected:
+		case domain.PaymentPending, domain.PaymentSubmitted, domain.PaymentAwaitingManagerDecision, domain.PaymentConfirmed, domain.PaymentRejected:
 			status = &s
 		default:
-			response.Error(c, apperror.BadRequest("invalid status filter"))
+			response.Error(c, apperror.BadRequest("статус фильтрі дұрыс емес"))
 			return
 		}
 	}
@@ -108,7 +110,7 @@ type submitPaymentRequest struct {
 func (h *PaymentHandler) Submit(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid payment id"))
+		response.Error(c, apperror.BadRequest("төлем идентификаторы дұрыс емес"))
 		return
 	}
 	var req submitPaymentRequest
@@ -133,7 +135,7 @@ type confirmPaymentRequest struct {
 func (h *PaymentHandler) Confirm(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid payment id"))
+		response.Error(c, apperror.BadRequest("төлем идентификаторы дұрыс емес"))
 		return
 	}
 	var req confirmPaymentRequest
@@ -143,6 +145,53 @@ func (h *PaymentHandler) Confirm(c *gin.Context) {
 	}
 	actorID, _ := middleware.UserID(c)
 	payment, err := h.payments.Confirm(c.Request.Context(), actorID, id, req.Action)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, paymentDTO(payment))
+}
+
+// ExpireCheck is admin/manager-only: manually runs the same overdue-flagging
+// and deadline-reminder sweep the background ticker performs, for
+// cron-less environments. Flagging never rejects an application by itself —
+// see ManagerDecision.
+func (h *PaymentHandler) ExpireCheck(c *gin.Context) {
+	flagged, err := h.payments.FlagOverduePayments(c.Request.Context())
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	reminded, err := h.payments.RemindApproachingPaymentDeadline(c.Request.Context())
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, gin.H{"flagged_count": flagged, "reminded_count": reminded})
+}
+
+type paymentManagerDecisionRequest struct {
+	Action      string     `json:"action" binding:"required"`
+	NewDeadline *time.Time `json:"new_deadline"`
+}
+
+// ManagerDecision is admin/manager-only: resolves a payment that's
+// awaiting_manager_decision (deadline already passed) — void rejects the
+// application, frees the room, and blocks the student from reapplying;
+// extend gives a new deadline.
+func (h *PaymentHandler) ManagerDecision(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, apperror.BadRequest("төлем идентификаторы дұрыс емес"))
+		return
+	}
+	var req paymentManagerDecisionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.BadRequest(err.Error()))
+		return
+	}
+	actorID, _ := middleware.UserID(c)
+	payment, err := h.payments.ManagerDecision(c.Request.Context(), actorID, id, req.Action, req.NewDeadline)
 	if err != nil {
 		response.Error(c, err)
 		return

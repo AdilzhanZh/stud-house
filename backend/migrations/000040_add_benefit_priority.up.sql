@@ -1,0 +1,2 @@
+ALTER TABLE benefits
+    ADD COLUMN priority INT NOT NULL DEFAULT 1 CHECK (priority BETWEEN 1 AND 10);

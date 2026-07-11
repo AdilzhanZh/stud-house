@@ -19,6 +19,7 @@ export function ContractsPage() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [pendingAction, setPendingAction] = useState<PendingAction>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [acknowledged, setAcknowledged] = useState<Set<string>>(new Set())
 
   function load() {
     listMyContracts()
@@ -48,12 +49,12 @@ export function ContractsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold text-gray-900">Келісімшарттарым</h1>
+      <h1 className="font-heading text-2xl text-sand-100">Келісімшарттарым</h1>
 
       {error && <Alert variant="error" message={error} />}
-      {!error && !contracts && <p className="text-sm text-gray-500">Жүктелуде...</p>}
+      {!error && !contracts && <p className="text-sm text-sand-300/60">Жүктелуде...</p>}
       {contracts && contracts.length === 0 && (
-        <p className="text-sm text-gray-500">Сізде әлі келісімшарт жоқ.</p>
+        <p className="text-sm text-sand-300/60">Сізде әлі келісімшарт жоқ.</p>
       )}
 
       <div className="flex flex-col gap-3">
@@ -61,9 +62,9 @@ export function ContractsPage() {
           <Card key={contract.id}>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="font-medium text-gray-900">Келісімшарт</p>
+                <p className="font-medium text-sand-100">Келісімшарт</p>
                 {contract.status === 'sent' && (
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-sand-300/60">
                     {formatTimeRemaining(contract.response_deadline)}
                   </p>
                 )}
@@ -72,23 +73,45 @@ export function ContractsPage() {
             </div>
 
             {contract.status === 'sent' && (
-              <div className="mt-4 flex gap-3">
-                <Button
-                  onClick={() => setPendingAction({ contractId: contract.id, action: 'accept' })}
+              <div className="mt-4 flex flex-col gap-3">
+                <a
+                  href={contract.file_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="self-start text-sm font-medium text-turquoise-400 underline underline-offset-2 hover:text-turquoise-300"
                 >
-                  Қабылдау
-                </Button>
-                <Button
-                  variant="danger"
-                  onClick={() => setPendingAction({ contractId: contract.id, action: 'decline' })}
-                >
-                  Бас тарту
-                </Button>
+                  Келісімшартпен танысу
+                </a>
+                {acknowledged.has(contract.id) ? (
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={() => setPendingAction({ contractId: contract.id, action: 'accept' })}
+                    >
+                      Қабылдау
+                    </Button>
+                    <Button
+                      variant="danger"
+                      onClick={() => setPendingAction({ contractId: contract.id, action: 'decline' })}
+                    >
+                      Бас тарту
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    className="self-start"
+                    onClick={() =>
+                      setAcknowledged((prev) => new Set(prev).add(contract.id))
+                    }
+                  >
+                    Таныстым
+                  </Button>
+                )}
               </div>
             )}
 
             {contract.status === 'awaiting_manager_decision' && (
-              <p className="mt-3 text-sm text-orange-700">
+              <p className="mt-3 text-sm text-sand-200">
                 Мерзім өтті, менеджердің шешімін күтіңіз.
               </p>
             )}

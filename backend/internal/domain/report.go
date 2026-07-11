@@ -69,10 +69,10 @@ func (d VoteDecision) Valid() bool {
 	}
 }
 
-// CommitteeVote is created with Decision == nil for every committee_member
-// as soon as a report is sent for review; it is filled in once that member
-// votes. Approval requires every vote to end up VoteApproved (unanimous);
-// see ReportService.tallyVotes.
+// CommitteeVote is created with Decision == nil for every committee member
+// (is_committee_member = true) as soon as a report is sent for review; it
+// is filled in once that member votes. Approval requires every vote to end
+// up VoteApproved (unanimous); see ReportService.tallyVotes.
 type CommitteeVote struct {
 	ID                uuid.UUID
 	ReportID          uuid.UUID

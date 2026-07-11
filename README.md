@@ -65,7 +65,7 @@ docker compose exec postgres psql -U student_house -d student_house -c \
 ### 4. Тоқтату
 
 ```bash
-docker compose down        # деректі сақтап тоқтатады (postgres-data volume қалады)
+docker compose down        # деректі сақтап тоқтатады (postgres-data, uploads-data volume-дары қалады)
 docker compose down -v     # деректі толығымен өшіріп тоқтатады
 ```
 

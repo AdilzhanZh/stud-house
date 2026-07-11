@@ -54,7 +54,7 @@ func NewReportService(
 
 func (s *ReportService) CreateTemplate(ctx context.Context, actorID uuid.UUID, name, fileURL string) (*domain.ReportTemplate, error) {
 	if name == "" || fileURL == "" {
-		return nil, apperror.BadRequest("name and file_url are required")
+		return nil, apperror.BadRequest("атауы және файл сілтемесі міндетті")
 	}
 	t := &domain.ReportTemplate{Name: name, FileURL: fileURL, CreatedBy: actorID}
 	if err := s.reportTemplates.Create(ctx, t); err != nil {
@@ -67,11 +67,24 @@ func (s *ReportService) ListTemplates(ctx context.Context) ([]*domain.ReportTemp
 	return s.reportTemplates.List(ctx)
 }
 
+func (s *ReportService) DeleteTemplate(ctx context.Context, id uuid.UUID) error {
+	if err := s.reportTemplates.Delete(ctx, id); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return apperror.NotFound("рапорт шаблоны табылмады")
+		}
+		if errors.Is(err, repository.ErrConflict) {
+			return apperror.Conflict("бұл шаблон қолданыстағы рапортта пайдаланылып тұр, оны өшіру мүмкін емес")
+		}
+		return err
+	}
+	return nil
+}
+
 func (s *ReportService) GetByID(ctx context.Context, id uuid.UUID) (*domain.Report, error) {
 	report, err := s.reports.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, apperror.NotFound("report not found")
+			return nil, apperror.NotFound("рапорт табылмады")
 		}
 		return nil, err
 	}
@@ -82,15 +95,29 @@ func (s *ReportService) List(ctx context.Context, status *domain.ReportStatus) (
 	return s.reports.List(ctx, status)
 }
 
-// activeCommitteeMemberIDs fetches the current committee_member roster; a
-// report cannot be sent to committee if there is no one to review it.
+func (s *ReportService) Delete(ctx context.Context, id uuid.UUID) error {
+	if err := s.reports.Delete(ctx, id); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return apperror.NotFound("рапорт табылмады")
+		}
+		if errors.Is(err, repository.ErrConflict) {
+			return apperror.Conflict("бұл рапорт басқа рапорттың негізі болғандықтан оны өшіру мүмкін емес")
+		}
+		return err
+	}
+	return nil
+}
+
+// activeCommitteeMemberIDs fetches the current committee roster
+// (is_committee_member = true); a report cannot be sent to committee if
+// there is no one to review it.
 func (s *ReportService) activeCommitteeMemberIDs(ctx context.Context) ([]uuid.UUID, error) {
-	members, err := s.users.ListByRole(ctx, domain.RoleCommitteeMember)
+	members, err := s.users.ListCommitteeMembers(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if len(members) == 0 {
-		return nil, apperror.BadRequest("no committee members exist to review this report")
+		return nil, apperror.BadRequest("бұл рапортты қарайтын комиссия мүшесі жоқ")
 	}
 	ids := make([]uuid.UUID, len(members))
 	for i, m := range members {
@@ -102,11 +129,11 @@ func (s *ReportService) activeCommitteeMemberIDs(ctx context.Context) ([]uuid.UU
 func mapReportCreationError(err error) error {
 	switch {
 	case errors.Is(err, repository.ErrNotFound):
-		return apperror.BadRequest("one or more application_ids do not exist")
+		return apperror.BadRequest("бір немесе бірнеше өтініш табылмады")
 	case errors.Is(err, repository.ErrApplicationNotApproved):
-		return apperror.BadRequest("all applications must have status=approved")
+		return apperror.BadRequest("барлық өтініштер \"мақұлданды\" мәртебесінде болуы керек")
 	case errors.Is(err, repository.ErrConflict):
-		return apperror.Conflict("one or more applications are already part of another pending report")
+		return apperror.Conflict("бір немесе бірнеше өтініш басқа қаралып жатқан рапортта бар")
 	default:
 		return err
 	}
@@ -114,14 +141,15 @@ func mapReportCreationError(err error) error {
 
 // CreateReport bundles applicationIDs (all must be status=approved and not
 // already in another pending_committee report) into a new report and sends
-// it to every current committee_member for review.
+// it to every current committee member for review — approval requires every
+// member's vote (see Vote), it is not automatic.
 func (s *ReportService) CreateReport(ctx context.Context, actorID, templateID uuid.UUID, applicationIDs []uuid.UUID) (*domain.Report, error) {
 	if len(applicationIDs) == 0 {
-		return nil, apperror.BadRequest("application_ids is required")
+		return nil, apperror.BadRequest("өтініштер тізімі міндетті")
 	}
 	if _, err := s.reportTemplates.GetByID(ctx, templateID); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, apperror.NotFound("report template not found")
+			return nil, apperror.NotFound("рапорт шаблоны табылмады")
 		}
 		return nil, err
 	}
@@ -145,7 +173,7 @@ func (s *ReportService) CreateReport(ctx context.Context, actorID, templateID uu
 // fresh report is created (chained via PreviousReportID) with a clean vote.
 func (s *ReportService) Revise(ctx context.Context, actorID, oldReportID uuid.UUID, newApplicationIDs []uuid.UUID) (*domain.Report, error) {
 	if len(newApplicationIDs) == 0 {
-		return nil, apperror.BadRequest("application_ids is required")
+		return nil, apperror.BadRequest("өтініштер тізімі міндетті")
 	}
 
 	oldReport, err := s.GetByID(ctx, oldReportID)
@@ -153,7 +181,7 @@ func (s *ReportService) Revise(ctx context.Context, actorID, oldReportID uuid.UU
 		return nil, err
 	}
 	if oldReport.Status != domain.ReportRejected {
-		return nil, apperror.BadRequest("only a rejected report can be revised")
+		return nil, apperror.BadRequest("тек қабылданбаған рапортты қайта өңдеуге болады")
 	}
 
 	oldAppIDs, err := s.reports.ListApplicationIDs(ctx, oldReportID)
@@ -185,7 +213,7 @@ func (s *ReportService) Revise(ctx context.Context, actorID, oldReportID uuid.UU
 
 	if err := s.reports.Revise(ctx, oldReportID, newReport, newApplicationIDs, dropped, droppedApplicationComment, actorID, committeeMemberIDs); err != nil {
 		if errors.Is(err, repository.ErrConflict) {
-			return nil, apperror.Conflict("report is not rejected, or an application is already part of another pending report")
+			return nil, apperror.Conflict("рапорт қабылданбаған емес немесе өтініштердің бірі басқа қаралып жатқан рапортта бар")
 		}
 		return nil, mapReportCreationError(err)
 	}
@@ -218,21 +246,21 @@ func allVotesApproved(votes []*domain.CommitteeVote) bool {
 // under a row lock so concurrent votes on the same report serialize.
 func (s *ReportService) Vote(ctx context.Context, actorID, reportID uuid.UUID, decision domain.VoteDecision, reason *string) (*domain.Report, error) {
 	if !decision.Valid() {
-		return nil, apperror.BadRequest("invalid decision")
+		return nil, apperror.BadRequest("шешім жарамсыз")
 	}
 	if decision == domain.VoteRejected && (reason == nil || *reason == "") {
-		return nil, apperror.BadRequest("reason is required to reject")
+		return nil, apperror.BadRequest("қабылдамау үшін себебі міндетті")
 	}
 
 	var decided bool
 
 	err := s.reports.WithVoteLock(ctx, reportID, func(ctx context.Context, report *domain.Report, tx repository.ReportTx) error {
 		if report.Status != domain.ReportPendingCommittee {
-			return apperror.Conflict("report is no longer pending committee review")
+			return apperror.Conflict("рапорт енді комиссия қарауында емес")
 		}
 		if _, err := tx.GetVote(ctx, reportID, actorID); err != nil {
 			if errors.Is(err, repository.ErrNotFound) {
-				return apperror.Forbidden("you are not a committee member on this report")
+				return apperror.Forbidden("сіз бұл рапорттың комиссия мүшесі емессіз")
 			}
 			return err
 		}
@@ -265,10 +293,8 @@ func (s *ReportService) Vote(ctx context.Context, actorID, reportID uuid.UUID, d
 	}
 	if decided {
 		s.notifyReportDecision(ctx, updated)
-		if updated.Status == domain.ReportApproved && s.onApproved != nil {
-			if err := s.onApproved(ctx, updated.ID); err != nil {
-				log.Printf("report %s approved but onApproved hook failed: %v", updated.ID, err)
-			}
+		if updated.Status == domain.ReportApproved {
+			s.runOnApproved(ctx, updated.ID)
 		}
 	}
 	return updated, nil
@@ -278,6 +304,18 @@ func (s *ReportService) notifyCommitteeNewReport(ctx context.Context, reportID u
 	body := fmt.Sprintf("Жаңа рапорт (ID: %s) сіздің қарауыңызды күтуде.", reportID)
 	for _, memberID := range committeeMemberIDs {
 		_ = s.notifier.Notify(ctx, memberID, domain.NotificationReportReview, "Жаңа рапорт қарауға жіберілді", body, nil)
+	}
+}
+
+// runOnApproved invokes the post-approval hook (contract auto-generation)
+// right when a report is created, since it's now approved immediately
+// instead of waiting for a committee vote.
+func (s *ReportService) runOnApproved(ctx context.Context, reportID uuid.UUID) {
+	if s.onApproved == nil {
+		return
+	}
+	if err := s.onApproved(ctx, reportID); err != nil {
+		log.Printf("report %s approved but onApproved hook failed: %v", reportID, err)
 	}
 }
 
@@ -309,7 +347,7 @@ func (s *ReportService) GetDetail(ctx context.Context, reportID uuid.UUID) (*Rep
 	template, err := s.reportTemplates.GetByID(ctx, report.TemplateID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, apperror.NotFound("report template not found")
+			return nil, apperror.NotFound("рапорт шаблоны табылмады")
 		}
 		return nil, err
 	}

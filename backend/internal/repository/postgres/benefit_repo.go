@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"student-house/internal/domain"
@@ -22,16 +23,16 @@ func NewBenefitRepo(db *pgxpool.Pool) *BenefitRepo {
 
 func (r *BenefitRepo) Create(ctx context.Context, b *domain.Benefit) error {
 	const q = `
-		INSERT INTO benefits (name, description, created_by)
-		VALUES ($1, $2, $3)
+		INSERT INTO benefits (name, description, priority, created_by)
+		VALUES ($1, $2, $3, $4)
 		RETURNING id, created_at, updated_at`
-	return r.db.QueryRow(ctx, q, b.Name, b.Description, b.CreatedBy).Scan(&b.ID, &b.CreatedAt, &b.UpdatedAt)
+	return r.db.QueryRow(ctx, q, b.Name, b.Description, b.Priority, b.CreatedBy).Scan(&b.ID, &b.CreatedAt, &b.UpdatedAt)
 }
 
 func (r *BenefitRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Benefit, error) {
-	const q = `SELECT id, name, description, created_by, created_at, updated_at FROM benefits WHERE id = $1`
+	const q = `SELECT id, name, description, priority, created_by, created_at, updated_at FROM benefits WHERE id = $1`
 	b := &domain.Benefit{}
-	err := r.db.QueryRow(ctx, q, id).Scan(&b.ID, &b.Name, &b.Description, &b.CreatedBy, &b.CreatedAt, &b.UpdatedAt)
+	err := r.db.QueryRow(ctx, q, id).Scan(&b.ID, &b.Name, &b.Description, &b.Priority, &b.CreatedBy, &b.CreatedAt, &b.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, repository.ErrNotFound
@@ -42,7 +43,7 @@ func (r *BenefitRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Benefi
 }
 
 func (r *BenefitRepo) List(ctx context.Context) ([]*domain.Benefit, error) {
-	const q = `SELECT id, name, description, created_by, created_at, updated_at FROM benefits ORDER BY name`
+	const q = `SELECT id, name, description, priority, created_by, created_at, updated_at FROM benefits ORDER BY priority DESC, name`
 	rows, err := r.db.Query(ctx, q)
 	if err != nil {
 		return nil, err
@@ -52,7 +53,7 @@ func (r *BenefitRepo) List(ctx context.Context) ([]*domain.Benefit, error) {
 	var out []*domain.Benefit
 	for rows.Next() {
 		b := &domain.Benefit{}
-		if err := rows.Scan(&b.ID, &b.Name, &b.Description, &b.CreatedBy, &b.CreatedAt, &b.UpdatedAt); err != nil {
+		if err := rows.Scan(&b.ID, &b.Name, &b.Description, &b.Priority, &b.CreatedBy, &b.CreatedAt, &b.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, b)
@@ -62,10 +63,10 @@ func (r *BenefitRepo) List(ctx context.Context) ([]*domain.Benefit, error) {
 
 func (r *BenefitRepo) Update(ctx context.Context, b *domain.Benefit) error {
 	const q = `
-		UPDATE benefits SET name = $2, description = $3, updated_at = now()
+		UPDATE benefits SET name = $2, description = $3, priority = $4, updated_at = now()
 		WHERE id = $1
 		RETURNING updated_at`
-	err := r.db.QueryRow(ctx, q, b.ID, b.Name, b.Description).Scan(&b.UpdatedAt)
+	err := r.db.QueryRow(ctx, q, b.ID, b.Name, b.Description, b.Priority).Scan(&b.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return repository.ErrNotFound
@@ -86,54 +87,33 @@ func (r *BenefitRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-func (r *BenefitRepo) AddField(ctx context.Context, f *domain.BenefitField) error {
+func (r *BenefitRepo) AddRequiredDocument(ctx context.Context, d *domain.BenefitRequiredDocument) error {
 	const q = `
-		INSERT INTO benefit_fields (benefit_id, field_name, field_type)
-		VALUES ($1, $2, $3)
+		INSERT INTO benefit_required_documents (benefit_id, document_id)
+		VALUES ($1, $2)
 		RETURNING id, created_at`
-	return r.db.QueryRow(ctx, q, f.BenefitID, f.FieldName, f.FieldType).Scan(&f.ID, &f.CreatedAt)
-}
-
-func (r *BenefitRepo) ListFields(ctx context.Context, benefitID uuid.UUID) ([]*domain.BenefitField, error) {
-	const q = `SELECT id, benefit_id, field_name, field_type, created_at FROM benefit_fields WHERE benefit_id = $1 ORDER BY created_at`
-	rows, err := r.db.Query(ctx, q, benefitID)
+	err := r.db.QueryRow(ctx, q, d.BenefitID, d.DocumentID).Scan(&d.ID, &d.CreatedAt)
 	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var out []*domain.BenefitField
-	for rows.Next() {
-		f := &domain.BenefitField{}
-		if err := rows.Scan(&f.ID, &f.BenefitID, &f.FieldName, &f.FieldType, &f.CreatedAt); err != nil {
-			return nil, err
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			if pgErr.Code == "23503" {
+				return repository.ErrNotFound
+			}
+			if pgErr.Code == "23505" {
+				return repository.ErrConflict
+			}
 		}
-		out = append(out, f)
-	}
-	return out, rows.Err()
-}
-
-func (r *BenefitRepo) DeleteField(ctx context.Context, fieldID uuid.UUID) error {
-	tag, err := r.db.Exec(ctx, `DELETE FROM benefit_fields WHERE id = $1`, fieldID)
-	if err != nil {
 		return err
-	}
-	if tag.RowsAffected() == 0 {
-		return repository.ErrNotFound
 	}
 	return nil
 }
 
-func (r *BenefitRepo) AddRequiredDocument(ctx context.Context, d *domain.BenefitRequiredDocument) error {
-	const q = `
-		INSERT INTO benefit_required_documents (benefit_id, document_name)
-		VALUES ($1, $2)
-		RETURNING id, created_at`
-	return r.db.QueryRow(ctx, q, d.BenefitID, d.DocumentName).Scan(&d.ID, &d.CreatedAt)
-}
-
 func (r *BenefitRepo) ListRequiredDocuments(ctx context.Context, benefitID uuid.UUID) ([]*domain.BenefitRequiredDocument, error) {
-	const q = `SELECT id, benefit_id, document_name, created_at FROM benefit_required_documents WHERE benefit_id = $1 ORDER BY created_at`
+	const q = `
+		SELECT brd.id, brd.benefit_id, brd.document_id, rd.name, brd.created_at
+		FROM benefit_required_documents brd
+		JOIN required_documents rd ON rd.id = brd.document_id
+		WHERE brd.benefit_id = $1 ORDER BY brd.created_at`
 	rows, err := r.db.Query(ctx, q, benefitID)
 	if err != nil {
 		return nil, err
@@ -143,7 +123,7 @@ func (r *BenefitRepo) ListRequiredDocuments(ctx context.Context, benefitID uuid.
 	var out []*domain.BenefitRequiredDocument
 	for rows.Next() {
 		d := &domain.BenefitRequiredDocument{}
-		if err := rows.Scan(&d.ID, &d.BenefitID, &d.DocumentName, &d.CreatedAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.BenefitID, &d.DocumentID, &d.DocumentName, &d.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, d)

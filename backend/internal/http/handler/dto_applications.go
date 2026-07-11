@@ -14,6 +14,7 @@ type applicationResponse struct {
 	DormitoryID       uuid.UUID  `json:"dormitory_id"`
 	Status            string     `json:"status"`
 	PreferredRoomType *string    `json:"preferred_room_type"`
+	PreferredRoomID   *uuid.UUID `json:"preferred_room_id"`
 	Notes             *string    `json:"notes"`
 	AssignedRoomID    *uuid.UUID `json:"assigned_room_id"`
 	HandledBy         *uuid.UUID `json:"handled_by"`
@@ -28,6 +29,7 @@ func applicationDTO(a *domain.Application) applicationResponse {
 		DormitoryID:       a.DormitoryID,
 		Status:            string(a.Status),
 		PreferredRoomType: a.PreferredRoomType,
+		PreferredRoomID:   a.PreferredRoomID,
 		Notes:             a.Notes,
 		AssignedRoomID:    a.AssignedRoomID,
 		HandledBy:         a.HandledBy,
@@ -80,22 +82,26 @@ func applicationStatusHistoriesDTO(list []*domain.ApplicationStatusHistory) []ap
 }
 
 type applicationDocumentResponse struct {
-	ID                        uuid.UUID  `json:"id"`
-	ApplicationID             uuid.UUID  `json:"application_id"`
-	BenefitRequiredDocumentID *uuid.UUID `json:"benefit_required_document_id"`
-	DocumentName              *string    `json:"document_name"`
-	FileURL                   string     `json:"file_url"`
-	UploadedAt                time.Time  `json:"uploaded_at"`
+	ID                          uuid.UUID  `json:"id"`
+	ApplicationID               uuid.UUID  `json:"application_id"`
+	BenefitRequiredDocumentID   *uuid.UUID `json:"benefit_required_document_id"`
+	DormitoryRequiredDocumentID *uuid.UUID `json:"dormitory_required_document_id"`
+	DocumentName                *string    `json:"document_name"`
+	DisplayName                 string     `json:"display_name"`
+	FileURL                     string     `json:"file_url"`
+	UploadedAt                  time.Time  `json:"uploaded_at"`
 }
 
 func applicationDocumentDTO(d *domain.ApplicationDocument) applicationDocumentResponse {
 	return applicationDocumentResponse{
-		ID:                        d.ID,
-		ApplicationID:             d.ApplicationID,
-		BenefitRequiredDocumentID: d.BenefitRequiredDocumentID,
-		DocumentName:              d.DocumentName,
-		FileURL:                   d.FileURL,
-		UploadedAt:                d.UploadedAt,
+		ID:                          d.ID,
+		ApplicationID:               d.ApplicationID,
+		BenefitRequiredDocumentID:   d.BenefitRequiredDocumentID,
+		DormitoryRequiredDocumentID: d.DormitoryRequiredDocumentID,
+		DocumentName:                d.DocumentName,
+		DisplayName:                 d.DisplayName,
+		FileURL:                     d.FileURL,
+		UploadedAt:                  d.UploadedAt,
 	}
 }
 

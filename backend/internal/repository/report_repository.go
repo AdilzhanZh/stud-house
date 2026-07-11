@@ -17,6 +17,7 @@ type ReportTemplateRepository interface {
 	Create(ctx context.Context, t *domain.ReportTemplate) error
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.ReportTemplate, error)
 	List(ctx context.Context) ([]*domain.ReportTemplate, error)
+	Delete(ctx context.Context, id uuid.UUID) error
 }
 
 // ReportTx exposes the writes that must happen atomically together with the
@@ -52,4 +53,10 @@ type ReportRepository interface {
 	// atomically creates newReport (whose PreviousReportID must already be
 	// set to the old report's id) the same way CreateWithApplications does.
 	Revise(ctx context.Context, oldReportID uuid.UUID, newReport *domain.Report, newApplicationIDs, droppedApplicationIDs []uuid.UUID, droppedComment string, changedBy uuid.UUID, committeeMemberIDs []uuid.UUID) error
+
+	// Delete removes the report row (report_applications/committee_votes
+	// cascade). Returns ErrNotFound if it doesn't exist, ErrConflict if
+	// another report's previous_report_id still points at it (a revised
+	// report's original can't be deleted out from under the chain).
+	Delete(ctx context.Context, id uuid.UUID) error
 }

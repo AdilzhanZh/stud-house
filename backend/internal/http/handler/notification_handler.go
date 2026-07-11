@@ -33,7 +33,7 @@ func (h *NotificationHandler) ListMine(c *gin.Context) {
 func (h *NotificationHandler) MarkRead(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid notification id"))
+		response.Error(c, apperror.BadRequest("хабарландыру идентификаторы дұрыс емес"))
 		return
 	}
 	userID, _ := middleware.UserID(c)

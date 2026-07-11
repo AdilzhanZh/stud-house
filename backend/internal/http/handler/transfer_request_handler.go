@@ -55,7 +55,7 @@ func (h *TransferRequestHandler) ListMine(c *gin.Context) {
 func (h *TransferRequestHandler) Get(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid transfer request id"))
+		response.Error(c, apperror.BadRequest("ауыстыру сұранысының идентификаторы дұрыс емес"))
 		return
 	}
 	tr, err := h.transferRequests.GetByID(c.Request.Context(), id)
@@ -66,7 +66,7 @@ func (h *TransferRequestHandler) Get(c *gin.Context) {
 	role, _ := middleware.Role(c)
 	userID, _ := middleware.UserID(c)
 	if role != domain.RoleAdmin && role != domain.RoleManager && tr.StudentID != userID {
-		response.Error(c, apperror.Forbidden("you cannot view this transfer request"))
+		response.Error(c, apperror.Forbidden("бұл ауыстыру сұранысын көруге құқығыңыз жоқ"))
 		return
 	}
 	response.OK(c, transferRequestDTO(tr))
@@ -81,7 +81,7 @@ func (h *TransferRequestHandler) List(c *gin.Context) {
 		case domain.TransferRequestPending, domain.TransferRequestApproved, domain.TransferRequestRejected:
 			status = &s
 		default:
-			response.Error(c, apperror.BadRequest("invalid status filter"))
+			response.Error(c, apperror.BadRequest("статус фильтрі дұрыс емес"))
 			return
 		}
 	}
@@ -103,7 +103,7 @@ type decideTransferRequestRequest struct {
 func (h *TransferRequestHandler) Decide(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid transfer request id"))
+		response.Error(c, apperror.BadRequest("ауыстыру сұранысының идентификаторы дұрыс емес"))
 		return
 	}
 	var req decideTransferRequestRequest

@@ -105,16 +105,16 @@ export function MyResidencePage() {
   }
 
   if (loadError) return <Alert variant="error" message={loadError} />
-  if (!residence || !dormitory) return <p className="text-sm text-gray-500">Жүктелуде...</p>
+  if (!residence || !dormitory) return <p className="text-sm text-sand-300/60">Жүктелуде...</p>
 
   const hasPendingRequest = latestExit?.status === 'pending' || latestTransfer?.status === 'pending'
 
   return (
     <div className="flex flex-col gap-6">
       <Card title="Қазіргі орналасуым">
-        <p className="text-sm text-gray-900">{dormitory.name}</p>
-        <p className="text-sm text-gray-500">{dormitory.address}</p>
-        <p className="mt-2 text-sm text-gray-700">Бөлме: {residence.room_number}</p>
+        <p className="text-sm text-sand-100">{dormitory.name}</p>
+        <p className="text-sm text-sand-300/60">{dormitory.address}</p>
+        <p className="mt-2 text-sm text-sand-200">Бөлме: {residence.room_number}</p>
       </Card>
 
       {latestExit && (
@@ -152,13 +152,13 @@ export function MyResidencePage() {
             >
               {exitError && <Alert variant="error" message={exitError} />}
               <div className="flex flex-col gap-1">
-                <label htmlFor="exit-reason" className="text-sm font-medium text-gray-700">
+                <label htmlFor="exit-reason" className="text-sm font-medium text-sand-200">
                   Себебі
                 </label>
                 <textarea
                   id="exit-reason"
                   rows={3}
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200"
+                  className="rounded-md border border-sand-100/15 bg-navy-950/60 px-3 py-2 text-sand-100 text-sm outline-none focus:border-turquoise-400 focus:ring-2 focus:ring-turquoise-400/30"
                   value={exitReason}
                   onChange={(e) => setExitReason(e.target.value)}
                 />
@@ -191,13 +191,13 @@ export function MyResidencePage() {
                 ))}
               </Select>
               <div className="flex flex-col gap-1">
-                <label htmlFor="transfer-reason" className="text-sm font-medium text-gray-700">
+                <label htmlFor="transfer-reason" className="text-sm font-medium text-sand-200">
                   Себебі
                 </label>
                 <textarea
                   id="transfer-reason"
                   rows={3}
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200"
+                  className="rounded-md border border-sand-100/15 bg-navy-950/60 px-3 py-2 text-sand-100 text-sm outline-none focus:border-turquoise-400 focus:ring-2 focus:ring-turquoise-400/30"
                   value={transferReason}
                   onChange={(e) => setTransferReason(e.target.value)}
                 />

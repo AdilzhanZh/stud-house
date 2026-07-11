@@ -11,6 +11,7 @@ import (
 	"student-house/internal/repository/postgres"
 	"student-house/internal/service"
 	"student-house/internal/service/notifier"
+	"student-house/pkg/mailer"
 )
 
 func main() {
@@ -37,6 +38,7 @@ func main() {
 	dormitoryRepo := postgres.NewDormitoryRepo(pool)
 	roomRepo := postgres.NewRoomRepo(pool)
 	benefitRepo := postgres.NewBenefitRepo(pool)
+	requiredDocumentRepo := postgres.NewRequiredDocumentRepo(pool)
 	studentBenefitRepo := postgres.NewStudentBenefitRepo(pool)
 	refreshTokenRepo := postgres.NewRefreshTokenRepo(pool)
 	applicationRepo := postgres.NewApplicationRepo(pool)
@@ -49,19 +51,31 @@ func main() {
 	exitRequestRepo := postgres.NewExitRequestRepo(pool)
 	transferRequestRepo := postgres.NewTransferRequestRepo(pool)
 
-	authService := service.NewAuthService(userRepo, refreshTokenRepo, cfg.JWTSecret, cfg.AccessTokenTTL, cfg.RefreshTokenTTL)
-	userService := service.NewUserService(userRepo, studentProfileRepo)
-	dormitoryService := service.NewDormitoryService(dormitoryRepo)
+	mailerService := mailer.New(mailer.Config{
+		Host:     cfg.SMTPHost,
+		Port:     cfg.SMTPPort,
+		Username: cfg.SMTPUsername,
+		Password: cfg.SMTPPassword,
+		From:     cfg.SMTPFrom,
+	})
+	if !mailerService.Enabled() {
+		log.Print("SMTP not configured (SMTP_USERNAME/SMTP_PASSWORD empty) — approval emails will be skipped")
+	}
+
+	authService := service.NewAuthService(userRepo, studentProfileRepo, refreshTokenRepo, mailerService, cfg.JWTSecret, cfg.AccessTokenTTL, cfg.RefreshTokenTTL)
+	userService := service.NewUserService(userRepo, studentProfileRepo, mailerService)
+	dormitoryService := service.NewDormitoryService(dormitoryRepo, applicationRepo)
 	roomService := service.NewRoomService(roomRepo, dormitoryRepo, userRepo, studentProfileRepo, studentBenefitRepo)
 	benefitService := service.NewBenefitService(benefitRepo, userRepo, studentBenefitRepo)
+	documentService := service.NewDocumentService(requiredDocumentRepo)
 	notifierService := notifier.New(notificationRepo)
-	applicationService := service.NewApplicationService(applicationRepo, applicationDocumentRepo, dormitoryRepo, roomRepo, roomService, notifierService)
+	applicationService := service.NewApplicationService(applicationRepo, applicationDocumentRepo, dormitoryRepo, roomRepo, roomService, userRepo, notifierService, mailerService)
 	notificationService := service.NewNotificationService(notificationRepo)
 	reportService := service.NewReportService(reportTemplateRepo, reportRepo, applicationRepo, userRepo, notifierService)
-	contractService := service.NewContractService(contractRepo, applicationRepo, reportRepo, reportTemplateRepo, userRepo, notifierService, cfg.ContractResponseDeadline, cfg.ContractReminderWindow)
-	paymentService := service.NewPaymentService(paymentRepo, contractRepo, applicationRepo, userRepo, notifierService)
-	exitRequestService := service.NewExitRequestService(exitRequestRepo, roomRepo, userRepo, notifierService)
-	transferRequestService := service.NewTransferRequestService(transferRequestRepo, applicationRepo, roomRepo, roomService, userRepo, notifierService)
+	contractService := service.NewContractService(contractRepo, applicationRepo, reportRepo, reportTemplateRepo, userRepo, notifierService, mailerService, cfg.ContractResponseDeadline, cfg.ContractReminderWindow, cfg.PaymentDeadline)
+	paymentService := service.NewPaymentService(paymentRepo, contractRepo, applicationRepo, userRepo, notifierService, mailerService, cfg.ContractReminderWindow, cfg.PaymentReapplyBlock)
+	exitRequestService := service.NewExitRequestService(exitRequestRepo, roomRepo, userRepo, notifierService, mailerService)
+	transferRequestService := service.NewTransferRequestService(transferRequestRepo, applicationRepo, roomRepo, roomService, userRepo, notifierService, mailerService)
 
 	// Phase 4 hook into phase 3's vote tally: once a report is approved,
 	// auto-generate contracts for its applications.
@@ -73,6 +87,7 @@ func main() {
 		Dormitory:       handler.NewDormitoryHandler(dormitoryService),
 		Room:            handler.NewRoomHandler(roomService),
 		Benefit:         handler.NewBenefitHandler(benefitService),
+		Document:        handler.NewDocumentHandler(documentService),
 		Application:     handler.NewApplicationHandler(applicationService),
 		Notification:    handler.NewNotificationHandler(notificationService),
 		Report:          handler.NewReportHandler(reportService),
@@ -80,12 +95,16 @@ func main() {
 		Payment:         handler.NewPaymentHandler(paymentService, contractService, applicationService),
 		ExitRequest:     handler.NewExitRequestHandler(exitRequestService),
 		TransferRequest: handler.NewTransferRequestHandler(transferRequestService),
+		Upload:          handler.NewUploadHandler(cfg.UploadDir),
 	}
 
-	router := apihttp.NewRouter(cfg.JWTSecret, handlers)
+	router := apihttp.NewRouter(cfg.JWTSecret, cfg.UploadDir, handlers)
 
 	stopExpiryChecker := startContractExpiryChecker(contractService, cfg.ContractExpiryCheckInterval)
 	defer stopExpiryChecker()
+
+	stopPaymentExpiryChecker := startPaymentExpiryChecker(paymentService, cfg.ContractExpiryCheckInterval)
+	defer stopPaymentExpiryChecker()
 
 	log.Printf("listening on :%s", cfg.ServerPort)
 	if err := router.Run(":" + cfg.ServerPort); err != nil {
@@ -115,6 +134,39 @@ func startContractExpiryChecker(contracts *service.ContractService, interval tim
 					log.Printf("contract deadline reminder failed: %v", err)
 				} else if n > 0 {
 					log.Printf("sent %d contract deadline reminder(s)", n)
+				}
+			case <-done:
+				return
+			}
+		}
+	}()
+	return func() {
+		ticker.Stop()
+		close(done)
+	}
+}
+
+// startPaymentExpiryChecker runs PaymentService.FlagOverduePayments and
+// RemindApproachingPaymentDeadline on a ticker, mirroring
+// startContractExpiryChecker. Flagging never rejects an application by
+// itself — only PaymentService.ManagerDecision does that. Returns a stop func.
+func startPaymentExpiryChecker(payments *service.PaymentService, interval time.Duration) func() {
+	ticker := time.NewTicker(interval)
+	done := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				ctx := context.Background()
+				if n, err := payments.FlagOverduePayments(ctx); err != nil {
+					log.Printf("payment overdue flagging failed: %v", err)
+				} else if n > 0 {
+					log.Printf("flagged %d overdue payment(s) for manager decision", n)
+				}
+				if n, err := payments.RemindApproachingPaymentDeadline(ctx); err != nil {
+					log.Printf("payment deadline reminder failed: %v", err)
+				} else if n > 0 {
+					log.Printf("sent %d payment deadline reminder(s)", n)
 				}
 			case <-done:
 				return

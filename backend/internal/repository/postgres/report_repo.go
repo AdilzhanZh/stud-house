@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"student-house/internal/domain"
@@ -129,11 +130,18 @@ func lockAndValidateApprovedApplications(ctx context.Context, tx pgx.Tx, applica
 		}
 	}
 
+	// Reports are auto-approved on creation (see ReportService.CreateReport),
+	// so an application is "already reported" as soon as it's attached to
+	// any non-rejected report — not just one still pending_committee (that
+	// status is now effectively transient/unused). Rejected reports don't
+	// block reuse: Revise() re-adds their kept applications to a fresh
+	// report, and dropped ones are marked application.status='rejected'
+	// so they wouldn't pass the approved-status check above anyway.
 	var conflictCount int
 	const conflictQ = `
 		SELECT COUNT(*) FROM report_applications ra
 		JOIN reports r ON r.id = ra.report_id
-		WHERE ra.application_id = ANY($1) AND r.status = 'pending_committee'`
+		WHERE ra.application_id = ANY($1) AND r.status != 'rejected'`
 	if err := tx.QueryRow(ctx, conflictQ, applicationIDs).Scan(&conflictCount); err != nil {
 		return err
 	}
@@ -162,6 +170,9 @@ func insertReportApplications(ctx context.Context, tx pgx.Tx, reportID uuid.UUID
 	return nil
 }
 
+// insertCommitteeVotes seeds one NULL-decision row per committee member —
+// each must cast a real vote (see ReportService.Vote) before the report can
+// resolve to approved/rejected.
 func insertCommitteeVotes(ctx context.Context, tx pgx.Tx, reportID uuid.UUID, committeeMemberIDs []uuid.UUID) error {
 	for _, memberID := range committeeMemberIDs {
 		const q = `INSERT INTO committee_votes (report_id, committee_member_id, decision, reason, voted_at) VALUES ($1, $2, NULL, NULL, NULL)`
@@ -221,6 +232,24 @@ func (r *ReportRepo) ListApplicationIDs(ctx context.Context, reportID uuid.UUID)
 
 func (r *ReportRepo) ListVotes(ctx context.Context, reportID uuid.UUID) ([]*domain.CommitteeVote, error) {
 	return listVotes(ctx, r.db, reportID)
+}
+
+// Delete returns repository.ErrConflict if another report's
+// previous_report_id still points at this one (previous_report_id has no ON
+// DELETE clause, so Postgres rejects the delete with a foreign_key_violation).
+func (r *ReportRepo) Delete(ctx context.Context, id uuid.UUID) error {
+	tag, err := r.db.Exec(ctx, `DELETE FROM reports WHERE id = $1`, id)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+			return repository.ErrConflict
+		}
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return repository.ErrNotFound
+	}
+	return nil
 }
 
 func (r *ReportRepo) WithVoteLock(ctx context.Context, reportID uuid.UUID, fn func(ctx context.Context, report *domain.Report, tx repository.ReportTx) error) error {

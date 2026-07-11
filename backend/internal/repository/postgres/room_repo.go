@@ -21,13 +21,30 @@ func NewRoomRepo(db *pgxpool.Pool) *RoomRepo {
 	return &RoomRepo{db: db}
 }
 
+const roomColumns = `id, dormitory_id, room_number, capacity, floor, category, area_sq_m, equipment, top_beds, bottom_beds, restrictions, created_at, updated_at`
+
+func scanRoom(row pgx.Row) (*domain.Room, error) {
+	room := &domain.Room{}
+	err := row.Scan(
+		&room.ID, &room.DormitoryID, &room.RoomNumber, &room.Capacity, &room.Floor,
+		&room.Category, &room.AreaSqM, &room.Equipment, &room.TopBeds, &room.BottomBeds,
+		&room.Restrictions, &room.CreatedAt, &room.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return room, nil
+}
+
 func (r *RoomRepo) Create(ctx context.Context, room *domain.Room) error {
 	const q = `
-		INSERT INTO rooms (dormitory_id, room_number, capacity, restrictions)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO rooms (dormitory_id, room_number, capacity, floor, category, area_sq_m, equipment, top_beds, bottom_beds, restrictions)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING id, created_at, updated_at`
-	err := r.db.QueryRow(ctx, q, room.DormitoryID, room.RoomNumber, room.Capacity, room.Restrictions).
-		Scan(&room.ID, &room.CreatedAt, &room.UpdatedAt)
+	err := r.db.QueryRow(ctx, q,
+		room.DormitoryID, room.RoomNumber, room.Capacity, room.Floor,
+		room.Category, room.AreaSqM, room.Equipment, room.TopBeds, room.BottomBeds, room.Restrictions,
+	).Scan(&room.ID, &room.CreatedAt, &room.UpdatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -39,11 +56,8 @@ func (r *RoomRepo) Create(ctx context.Context, room *domain.Room) error {
 }
 
 func (r *RoomRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Room, error) {
-	const q = `
-		SELECT id, dormitory_id, room_number, capacity, restrictions, created_at, updated_at
-		FROM rooms WHERE id = $1`
-	room := &domain.Room{}
-	err := r.db.QueryRow(ctx, q, id).Scan(&room.ID, &room.DormitoryID, &room.RoomNumber, &room.Capacity, &room.Restrictions, &room.CreatedAt, &room.UpdatedAt)
+	q := `SELECT ` + roomColumns + ` FROM rooms WHERE id = $1`
+	room, err := scanRoom(r.db.QueryRow(ctx, q, id))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, repository.ErrNotFound
@@ -54,9 +68,7 @@ func (r *RoomRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Room, err
 }
 
 func (r *RoomRepo) ListByDormitory(ctx context.Context, dormitoryID uuid.UUID) ([]*domain.Room, error) {
-	const q = `
-		SELECT id, dormitory_id, room_number, capacity, restrictions, created_at, updated_at
-		FROM rooms WHERE dormitory_id = $1 ORDER BY room_number`
+	q := `SELECT ` + roomColumns + ` FROM rooms WHERE dormitory_id = $1 ORDER BY room_number`
 	rows, err := r.db.Query(ctx, q, dormitoryID)
 	if err != nil {
 		return nil, err
@@ -65,8 +77,8 @@ func (r *RoomRepo) ListByDormitory(ctx context.Context, dormitoryID uuid.UUID) (
 
 	var out []*domain.Room
 	for rows.Next() {
-		room := &domain.Room{}
-		if err := rows.Scan(&room.ID, &room.DormitoryID, &room.RoomNumber, &room.Capacity, &room.Restrictions, &room.CreatedAt, &room.UpdatedAt); err != nil {
+		room, err := scanRoom(rows)
+		if err != nil {
 			return nil, err
 		}
 		out = append(out, room)
@@ -76,10 +88,15 @@ func (r *RoomRepo) ListByDormitory(ctx context.Context, dormitoryID uuid.UUID) (
 
 func (r *RoomRepo) Update(ctx context.Context, room *domain.Room) error {
 	const q = `
-		UPDATE rooms SET room_number = $2, capacity = $3, updated_at = now()
+		UPDATE rooms
+		SET room_number = $2, capacity = $3, floor = $4, category = $5,
+			area_sq_m = $6, equipment = $7, top_beds = $8, bottom_beds = $9, updated_at = now()
 		WHERE id = $1
 		RETURNING updated_at`
-	err := r.db.QueryRow(ctx, q, room.ID, room.RoomNumber, room.Capacity).Scan(&room.UpdatedAt)
+	err := r.db.QueryRow(ctx, q,
+		room.ID, room.RoomNumber, room.Capacity, room.Floor, room.Category,
+		room.AreaSqM, room.Equipment, room.TopBeds, room.BottomBeds,
+	).Scan(&room.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return repository.ErrNotFound

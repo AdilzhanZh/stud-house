@@ -35,11 +35,15 @@ type Application struct {
 	DormitoryID       uuid.UUID
 	Status            ApplicationStatus
 	PreferredRoomType *string
-	Notes             *string
-	AssignedRoomID    *uuid.UUID
-	HandledBy         *uuid.UUID
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	// PreferredRoomID is the room the student picked at application time
+	// (gender-filtered client-side). It's only a preference — a manager may
+	// assign a different room later via RoomService.AddResident.
+	PreferredRoomID *uuid.UUID
+	Notes           *string
+	AssignedRoomID  *uuid.UUID
+	HandledBy       *uuid.UUID
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 // ApplicationStatusHistory is an immutable audit log entry for one status

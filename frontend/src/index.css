@@ -1,10 +1,98 @@
 @import "tailwindcss";
 
+/* Site-wide design tokens (colors + type families), defined as real CSS
+   custom properties (Tailwind v4's @theme mechanism) so every utility class
+   built from them — bg-navy-950, text-sand-100, text-turquoise-400, etc. —
+   re-resolves automatically when [data-theme] overrides the variables below.
+   Default (no attribute, or data-theme="night") is the dark palette; the
+   day palette lives in the `[data-theme="day"]` block further down. No
+   component needs its own day/night variant classes because of this. */
+@theme {
+  --font-heading: 'Fraunces', ui-serif, Georgia, serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  --color-navy-950: #0a1420;
+  --color-navy-900: #101d2e;
+  --color-navy-800: #182a40;
+  --color-navy-700: #223a54;
+  --color-navy-600: #2d4c6b;
+
+  --color-sand-100: #f4ecdd;
+  --color-sand-200: #e7d9bf;
+  --color-sand-300: #d3bf97;
+  --color-sand-400: #b39d6f;
+
+  --color-turquoise-300: #82e0d3;
+  --color-turquoise-400: #45c4b6;
+  --color-turquoise-500: #2aa89a;
+  --color-turquoise-600: #1f8b80;
+
+  --color-clay-400: #d9836a;
+  --color-clay-500: #c1654c;
+
+  --color-mint-400: #7ed7a5;
+  --color-mint-500: #55b881;
+
+  /* Fixed — does NOT flip between day/night. Used only as text sitting on
+     top of a solid turquoise/clay accent button; dark ink reads correctly
+     on that mid-toned accent color regardless of which theme is active. */
+  --color-ink: #0d1a26;
+}
+
+/* Day palette: same slots, light values. navy-* becomes the light
+   surface/background scale and sand-* becomes the dark ink/text scale —
+   the names stay put, only what they point to changes. Turquoise/clay/mint
+   are deepened where they're used as small text/icons (needs real contrast
+   against a light page), not where they're a button's own fill color. */
+:root[data-theme='day'] {
+  --color-navy-950: #faf6ec;
+  --color-navy-900: #fffaf2;
+  --color-navy-800: #f0e6d2;
+  --color-navy-700: #e3d5b8;
+  --color-navy-600: #d0bd94;
+
+  --color-sand-100: #241b10;
+  --color-sand-200: #3a2d1c;
+  --color-sand-300: #5c4b34;
+  --color-sand-400: #8a7355;
+
+  --color-turquoise-300: #1f8a7f;
+  --color-turquoise-400: #167b70;
+  --color-turquoise-500: #2aa89a;
+  --color-turquoise-600: #145f58;
+
+  --color-clay-400: #b8462b;
+  --color-clay-500: #9c3a22;
+
+  --color-mint-400: #2f8f5c;
+  --color-mint-500: #237049;
+
+  color-scheme: light;
+}
+
 :root {
-  color-scheme: light dark;
+  color-scheme: dark;
 }
 
 body {
   margin: 0;
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--color-navy-950);
+  color: var(--color-sand-100);
+  font-family: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Browser autofill renders its own text/background colors that ignore our
+   Tailwind classes — force it to match whichever theme's form fields are
+   currently active instead of flashing a fixed light/dark box. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-sand-100);
+  -webkit-box-shadow: 0 0 0px 1000px var(--color-navy-900) inset;
+  box-shadow: 0 0 0px 1000px var(--color-navy-900) inset;
+  transition: background-color 5000s ease-in-out 0s;
 }

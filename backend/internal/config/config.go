@@ -14,6 +14,17 @@ type Config struct {
 	JWTSecret       string
 	AccessTokenTTL  time.Duration
 	RefreshTokenTTL time.Duration
+	// UploadDir is where POST /uploads writes files (report template files
+	// uploaded from the admin's computer, instead of pasting an external URL).
+	UploadDir string
+
+	// SMTP* configure outgoing email (e.g. student registration approval
+	// notices). Empty Username/Password disables sending — see pkg/mailer.
+	SMTPHost     string
+	SMTPPort     string
+	SMTPUsername string
+	SMTPPassword string
+	SMTPFrom     string
 
 	// ContractResponseDeadline is how long a student has to accept/decline a
 	// contract before it's eligible to be flagged awaiting_manager_decision
@@ -26,6 +37,14 @@ type Config struct {
 	// ContractReminderWindow: managers get reminded about a 'sent' contract
 	// once its deadline is within this window (phase 5).
 	ContractReminderWindow time.Duration
+
+	// PaymentDeadline is how long a manager has to confirm/reject a payment
+	// before it's eligible to be flagged awaiting_manager_decision (mirrors
+	// ContractResponseDeadline's "never auto-reject" fix).
+	PaymentDeadline time.Duration
+	// PaymentReapplyBlock is how long a student is barred from submitting a
+	// new application after a manager voids one of their overdue payments.
+	PaymentReapplyBlock time.Duration
 }
 
 func Load() (*Config, error) {
@@ -33,9 +52,15 @@ func Load() (*Config, error) {
 	_ = godotenv.Load()
 
 	cfg := &Config{
-		ServerPort:  getEnv("SERVER_PORT", "8080"),
-		DatabaseURL: getEnv("DATABASE_URL", ""),
-		JWTSecret:   getEnv("JWT_SECRET", ""),
+		ServerPort:   getEnv("SERVER_PORT", "8080"),
+		DatabaseURL:  getEnv("DATABASE_URL", ""),
+		JWTSecret:    getEnv("JWT_SECRET", ""),
+		UploadDir:    getEnv("UPLOAD_DIR", "./uploads"),
+		SMTPHost:     getEnv("SMTP_HOST", "smtp.gmail.com"),
+		SMTPPort:     getEnv("SMTP_PORT", "587"),
+		SMTPUsername: getEnv("SMTP_USERNAME", ""),
+		SMTPPassword: getEnv("SMTP_PASSWORD", ""),
+		SMTPFrom:     getEnv("SMTP_FROM", getEnv("SMTP_USERNAME", "")),
 	}
 
 	accessMinutes, err := strconv.Atoi(getEnv("ACCESS_TOKEN_TTL_MINUTES", "15"))
@@ -67,6 +92,18 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	cfg.ContractReminderWindow = time.Duration(reminderHours) * time.Hour
+
+	paymentDeadlineDays, err := strconv.Atoi(getEnv("PAYMENT_DEADLINE_DAYS", "7"))
+	if err != nil {
+		return nil, err
+	}
+	cfg.PaymentDeadline = time.Duration(paymentDeadlineDays) * 24 * time.Hour
+
+	paymentReapplyBlockDays, err := strconv.Atoi(getEnv("PAYMENT_REAPPLY_BLOCK_DAYS", "7"))
+	if err != nil {
+		return nil, err
+	}
+	cfg.PaymentReapplyBlock = time.Duration(paymentReapplyBlockDays) * 24 * time.Hour
 
 	return cfg, nil
 }

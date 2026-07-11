@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
@@ -49,6 +51,20 @@ func (h *ReportHandler) ListTemplates(c *gin.Context) {
 	response.OK(c, reportTemplatesDTO(list))
 }
 
+// DeleteTemplate is manager/admin-only.
+func (h *ReportHandler) DeleteTemplate(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, apperror.BadRequest("үлгі идентификаторы дұрыс емес"))
+		return
+	}
+	if err := h.reports.DeleteTemplate(c.Request.Context(), id); err != nil {
+		response.Error(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
 type createReportRequest struct {
 	TemplateID     uuid.UUID   `json:"template_id" binding:"required"`
 	ApplicationIDs []uuid.UUID `json:"application_ids" binding:"required"`
@@ -76,7 +92,7 @@ func (h *ReportHandler) List(c *gin.Context) {
 	if raw := c.Query("status"); raw != "" {
 		s := domain.ReportStatus(raw)
 		if !s.Valid() {
-			response.Error(c, apperror.BadRequest("invalid status filter"))
+			response.Error(c, apperror.BadRequest("статус фильтрі дұрыс емес"))
 			return
 		}
 		status = &s
@@ -89,12 +105,26 @@ func (h *ReportHandler) List(c *gin.Context) {
 	response.OK(c, reportsDTO(list))
 }
 
-// GetDetail is available to any authenticated user (read-only unless they
-// are a committee_member, who can additionally vote via PATCH .../vote).
+// Delete is manager/admin-only.
+func (h *ReportHandler) Delete(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, apperror.BadRequest("рапорт идентификаторы дұрыс емес"))
+		return
+	}
+	if err := h.reports.Delete(c.Request.Context(), id); err != nil {
+		response.Error(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+// GetDetail is available to any authenticated user (read-only unless
+// is_committee_member=true, who can additionally vote via PATCH .../vote).
 func (h *ReportHandler) GetDetail(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid report id"))
+		response.Error(c, apperror.BadRequest("рапорт идентификаторы дұрыс емес"))
 		return
 	}
 	detail, err := h.reports.GetDetail(c.Request.Context(), id)
@@ -117,12 +147,13 @@ type voteReportRequest struct {
 	Reason   *string             `json:"reason"`
 }
 
-// Vote is committee_member-only (a chairperson qualifies automatically,
-// since it's a flag on top of that role, not a separate one).
+// Vote requires is_committee_member=true (a chairperson qualifies
+// automatically, since it's a further flag on top of that, not a separate
+// role).
 func (h *ReportHandler) Vote(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid report id"))
+		response.Error(c, apperror.BadRequest("рапорт идентификаторы дұрыс емес"))
 		return
 	}
 	var req voteReportRequest
@@ -147,7 +178,7 @@ type reviseReportRequest struct {
 func (h *ReportHandler) Revise(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("invalid report id"))
+		response.Error(c, apperror.BadRequest("рапорт идентификаторы дұрыс емес"))
 		return
 	}
 	var req reviseReportRequest

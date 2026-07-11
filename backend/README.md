@@ -102,7 +102,16 @@ Chairperson бөлек рөл емес — `committee_member` рөлінің ү�
 
 - **Dormitory capacity progress**: `GET /dormitories/{id}/capacity`
   `total_capacity` мен барлық бөлмелер `capacity`-сының қосындысын
-  (`allocated_beds`) қайтарады.
+  (`allocated_beds`) қайтарады, сонымен қатар `total_rooms_target` пен
+  нақты құрылған бөлме санын (`rooms_created`) — ТЗ-дегі "256/32" екі
+  өлшемі де (орын саны және бөлме саны) осы бір endpoint-те.
+- **Dormitory/Room толық өрістері** (ТЗ conformance түзетуі): admin
+  жатақхана формасына ТЗ талап еткен өрістер қосылды — `phone`,
+  `dorm_type` (sectional/corridor/block), `floor_count`,
+  `total_rooms_target`, `monthly_payment`/`yearly_payment`, `built_year`/
+  `commissioned_year`, `ownership_form`, `has_ramps`/`has_elevators`/
+  `has_handrails`/`has_parking` (миграция `000027`+`000028`). Бөлме
+  формасына `floor`, `category`, `area_sq_m`, `equipment` қосылды.
 - **Room restriction validation**: `PATCH /rooms/{roomId}/restrictions`
   бөлмедегі әрбір қазіргі тұрғынды (`gender`/`course`/`benefit_ids`)
   жаңа шектеумен салыстырады; біреуі де сәйкес келмесе — `409 Conflict`.
@@ -292,9 +301,22 @@ exit_requests: pending → approved (moved_out_at=now()) | rejected
 
 ## Auth және RBAC
 
-- `POST /api/v1/auth/register` — тек student үшін self-registration
+- `POST /api/v1/auth/register` — тек student үшін self-registration.
+  `iin` (ЖСН, 12 таңбалы сан, бірегей) міндетті өріс. Тіркелген аккаунт
+  бірден жұмыс істемейді — `approval_status='pending'` күйінде жасалады,
+  токен қайтармайды
 - `POST /api/v1/auth/login` — access (қысқа мерзімді JWT) + refresh
-  (ұзақ мерзімді, DB-де хэші сақталған) token қайтарады
+  (ұзақ мерзімді, DB-де хэші сақталған) token қайтарады. `role=student`
+  болса, `approval_status != 'approved'` кезінде 403 қайтарады
+  ("тіркелуіңіз әлі менеджердің растауын күтуде" / "қабылданбады") —
+  admin/manager/committee_member үшін бұл тексеріс жоқ (олар тек admin
+  арқылы, әрдайым `approved` етіп жасалады)
+- `GET /api/v1/admin/students/pending` — **admin немесе manager**: растауды
+  күтіп тұрған студенттер тізімі
+- `PATCH /api/v1/admin/students/{id}/approval` — **admin немесе manager**:
+  `{"action": "approve"|"reject"}`. `reject` аккаунтты өшірмейді, тек
+  логинді мәңгі бұғаттайды (басқа "reject" ағындарымен бірдей — мыс.
+  өтініштер де өшірілмейді)
 - `POST /api/v1/auth/refresh` — refresh token-ды rotate етеді (ескісі revoke)
 - `POST /api/v1/auth/logout` — refresh token-ды revoke етеді
 - Admin/Manager/CommitteeMember пайдаланушыларын тек **admin**
@@ -339,6 +361,7 @@ exit_requests: pending → approved (moved_out_at=now()) | rejected
 **Manager (admin да істей алады):**
 | Метод | Маршрут | Сипаттама |
 |---|---|---|
+| POST | `/api/v1/uploads` | `multipart/form-data` (`file` өрісі) — файлды серверге сақтайды, абсолют URL қайтарады (кейін `report-templates`-тің `file_url`-і ретінде қолданылады; frontend-тегі "компьютерден таңдау" талабы бойынша қосылған, бұрын тек сыртқы URL қолмен енгізілетін) |
 | POST | `/api/v1/report-templates` | шаблон жүктеу (`name`, `file_url`) |
 | GET | `/api/v1/report-templates` | шаблондар тізімі |
 | POST | `/api/v1/reports` | `{template_id, application_ids}` — жаңа рапорт, комиссияға жіберіледі |
@@ -442,6 +465,7 @@ cp .env.example .env
 | `CONTRACT_RESPONSE_DEADLINE_DAYS` | келісімшартқа жауап беру мерзімі (күн) | `7` |
 | `CONTRACT_EXPIRY_CHECK_INTERVAL_MINUTES` | фондық "overdue флаг қою + ескерту" тексерісінің жиілігі | `60` |
 | `CONTRACT_REMINDER_HOURS_BEFORE_DEADLINE` | deadline-ге дейін неше сағат қалғанда менеджерге ескерту жіберу | `24` |
+| `UPLOAD_DIR` | `POST /uploads` файлдарды сақтайтын жергілікті папка (`/api/v1/uploads/`-тен статикалық түрде беріледі) | `./uploads` |
 
 ### 2. Миграцияларды қолдану
 

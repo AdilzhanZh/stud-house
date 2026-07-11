@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -11,6 +13,7 @@ import (
 	"student-house/internal/repository"
 	"student-house/internal/service/notifier"
 	"student-house/pkg/apperror"
+	"student-house/pkg/mailer"
 )
 
 type DecisionAction string
@@ -27,7 +30,9 @@ type ApplicationService struct {
 	dormitories  repository.DormitoryRepository
 	roomRepo     repository.RoomRepository
 	rooms        *RoomService
+	users        repository.UserRepository
 	notifier     *notifier.Notifier
+	mailer       *mailer.Mailer
 }
 
 func NewApplicationService(
@@ -36,7 +41,9 @@ func NewApplicationService(
 	dormitories repository.DormitoryRepository,
 	roomRepo repository.RoomRepository,
 	rooms *RoomService,
+	users repository.UserRepository,
 	notifier *notifier.Notifier,
+	m *mailer.Mailer,
 ) *ApplicationService {
 	return &ApplicationService{
 		applications: applications,
@@ -44,7 +51,9 @@ func NewApplicationService(
 		dormitories:  dormitories,
 		roomRepo:     roomRepo,
 		rooms:        rooms,
+		users:        users,
 		notifier:     notifier,
+		mailer:       m,
 	}
 }
 
@@ -55,24 +64,54 @@ func statusPtr(s domain.ApplicationStatus) *domain.ApplicationStatus { return &s
 // of some room (an active room_residents row) — settled students must go
 // through a move-out flow, not a new intake application, which is out of
 // scope for this phase.
-func (s *ApplicationService) Create(ctx context.Context, studentID, dormitoryID uuid.UUID, preferredRoomType, notes *string) (*domain.Application, error) {
+func (s *ApplicationService) Create(ctx context.Context, studentID, dormitoryID uuid.UUID, preferredRoomType, notes *string, preferredRoomID *uuid.UUID) (*domain.Application, error) {
 	if _, err := s.dormitories.GetByID(ctx, dormitoryID); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, apperror.NotFound("dormitory not found")
+			return nil, apperror.NotFound("жатақхана табылмады")
 		}
 		return nil, err
 	}
 
+	if rooms, err := s.roomRepo.ListByDormitory(ctx, dormitoryID); err != nil {
+		return nil, err
+	} else if len(rooms) == 0 {
+		return nil, apperror.BadRequest("бұл жатақханада әлі бөлме енгізілмеген, өтініш беруге болмайды")
+	}
+
 	if _, err := s.applications.GetActiveByStudent(ctx, studentID); err == nil {
-		return nil, apperror.Conflict("you already have an active application")
+		return nil, apperror.Conflict("сізде белсенді өтінішіңіз бар")
+	} else if !errors.Is(err, repository.ErrNotFound) {
+		return nil, err
+	}
+
+	if blockedUntil, err := s.applications.GetReapplyBlock(ctx, studentID); err == nil {
+		if blockedUntil.After(time.Now()) {
+			return nil, apperror.Conflict(fmt.Sprintf("төлем мерзімде расталмағандықтан, сіз %s дейін жаңа өтініш бере алмайсыз", blockedUntil.Format("2006-01-02")))
+		}
 	} else if !errors.Is(err, repository.ErrNotFound) {
 		return nil, err
 	}
 
 	if _, err := s.roomRepo.GetActiveResidentByStudent(ctx, studentID); err == nil {
-		return nil, apperror.Conflict("you already live in a room; a new application is not allowed")
+		return nil, apperror.Conflict("сіз бұрыннан бөлмеде тұрасыз, жаңа өтініш беруге болмайды")
 	} else if !errors.Is(err, repository.ErrNotFound) {
 		return nil, err
+	}
+
+	if preferredRoomID != nil {
+		room, err := s.roomRepo.GetByID(ctx, *preferredRoomID)
+		if err != nil {
+			if errors.Is(err, repository.ErrNotFound) {
+				return nil, apperror.NotFound("бөлме табылмады")
+			}
+			return nil, err
+		}
+		if room.DormitoryID != dormitoryID {
+			return nil, apperror.BadRequest("таңдалған бөлме көрсетілген жатақханаға жатпайды")
+		}
+		if err := s.rooms.CheckAssignable(ctx, *preferredRoomID, studentID); err != nil {
+			return nil, err
+		}
 	}
 
 	app := &domain.Application{
@@ -80,11 +119,12 @@ func (s *ApplicationService) Create(ctx context.Context, studentID, dormitoryID 
 		DormitoryID:       dormitoryID,
 		Status:            domain.ApplicationPending,
 		PreferredRoomType: preferredRoomType,
+		PreferredRoomID:   preferredRoomID,
 		Notes:             notes,
 	}
 	if err := s.applications.Create(ctx, app); err != nil {
 		if errors.Is(err, repository.ErrConflict) {
-			return nil, apperror.Conflict("you already have an active application")
+			return nil, apperror.Conflict("сізде белсенді өтінішіңіз бар")
 		}
 		return nil, err
 	}
@@ -100,11 +140,37 @@ func (s *ApplicationService) Create(ctx context.Context, studentID, dormitoryID 
 	return app, nil
 }
 
+// CancelOwn lets a student delete their own application while it is still
+// pending — used to roll back a submission whose document/benefit
+// attachment failed partway through (NewApplicationPage uploads files and
+// creates the application, then attaches document metadata; if that last
+// step fails, it calls this to undo the create rather than leaving a
+// half-submitted application behind).
+func (s *ApplicationService) CancelOwn(ctx context.Context, studentID, applicationID uuid.UUID) error {
+	app, err := s.GetByID(ctx, applicationID)
+	if err != nil {
+		return err
+	}
+	if app.StudentID != studentID {
+		return apperror.Forbidden("тек өз өтінішіңізді өшіре аласыз")
+	}
+	if app.Status != domain.ApplicationPending {
+		return apperror.Conflict("тек шешім қабылдауды күтіп тұрған өтінішті өшіруге болады")
+	}
+	if err := s.applications.Delete(ctx, applicationID); err != nil {
+		if errors.Is(err, repository.ErrConflict) {
+			return apperror.Conflict("бұл өтініш басқа жазбамен байланысты, оны өшіру мүмкін емес")
+		}
+		return err
+	}
+	return nil
+}
+
 func (s *ApplicationService) GetByID(ctx context.Context, id uuid.UUID) (*domain.Application, error) {
 	app, err := s.applications.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, apperror.NotFound("application not found")
+			return nil, apperror.NotFound("өтініш табылмады")
 		}
 		return nil, err
 	}
@@ -125,13 +191,20 @@ func (s *ApplicationService) ListHistory(ctx context.Context, applicationID uuid
 
 // AddDocument attaches a document to the student's own application, while it
 // is still editable (pending / needs_correction). Exactly one of
-// benefitRequiredDocumentID or documentName must be given.
-func (s *ApplicationService) AddDocument(ctx context.Context, actorStudentID, applicationID uuid.UUID, benefitRequiredDocumentID *uuid.UUID, documentName *string, fileURL string) (*domain.ApplicationDocument, error) {
+// benefitRequiredDocumentID, dormitoryRequiredDocumentID, or documentName
+// must be given.
+func (s *ApplicationService) AddDocument(ctx context.Context, actorStudentID, applicationID uuid.UUID, benefitRequiredDocumentID, dormitoryRequiredDocumentID *uuid.UUID, documentName *string, fileURL string) (*domain.ApplicationDocument, error) {
 	if fileURL == "" {
-		return nil, apperror.BadRequest("file_url is required")
+		return nil, apperror.BadRequest("файл сілтемесі міндетті")
 	}
-	if (benefitRequiredDocumentID == nil) == (documentName == nil) {
-		return nil, apperror.BadRequest("exactly one of benefit_required_document_id or document_name must be provided")
+	setCount := 0
+	for _, set := range []bool{benefitRequiredDocumentID != nil, dormitoryRequiredDocumentID != nil, documentName != nil} {
+		if set {
+			setCount++
+		}
+	}
+	if setCount != 1 {
+		return nil, apperror.BadRequest("льгота құжаты, жатақхана құжаты немесе құжат атауының тек біреуі көрсетілуі керек")
 	}
 
 	app, err := s.GetByID(ctx, applicationID)
@@ -139,21 +212,22 @@ func (s *ApplicationService) AddDocument(ctx context.Context, actorStudentID, ap
 		return nil, err
 	}
 	if app.StudentID != actorStudentID {
-		return nil, apperror.Forbidden("you can only upload documents to your own application")
+		return nil, apperror.Forbidden("тек өз өтінішіңізге құжат жүктей аласыз")
 	}
 	if app.Status == domain.ApplicationApproved || app.Status == domain.ApplicationRejected {
-		return nil, apperror.BadRequest("documents cannot be added to a finalized application")
+		return nil, apperror.BadRequest("аяқталған өтінішке құжат қосуға болмайды")
 	}
 
 	doc := &domain.ApplicationDocument{
-		ApplicationID:             applicationID,
-		BenefitRequiredDocumentID: benefitRequiredDocumentID,
-		DocumentName:              documentName,
-		FileURL:                   fileURL,
+		ApplicationID:               applicationID,
+		BenefitRequiredDocumentID:   benefitRequiredDocumentID,
+		DormitoryRequiredDocumentID: dormitoryRequiredDocumentID,
+		DocumentName:                documentName,
+		FileURL:                     fileURL,
 	}
 	if err := s.documents.Add(ctx, doc); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, apperror.BadRequest("invalid benefit_required_document_id")
+			return nil, apperror.BadRequest("көрсетілген құжат жарамсыз")
 		}
 		return nil, err
 	}
@@ -169,10 +243,10 @@ func (s *ApplicationService) ListDocuments(ctx context.Context, applicationID uu
 func (s *ApplicationService) Resubmit(ctx context.Context, actorStudentID, applicationID uuid.UUID, preferredRoomType, notes *string) (*domain.Application, error) {
 	err := s.applications.WithLock(ctx, applicationID, func(ctx context.Context, app *domain.Application, tx repository.ApplicationTx) error {
 		if app.StudentID != actorStudentID {
-			return apperror.Forbidden("you can only edit your own application")
+			return apperror.Forbidden("тек өз өтінішіңізді өзгерте аласыз")
 		}
 		if app.Status != domain.ApplicationNeedsCorrection {
-			return apperror.BadRequest("the application can only be edited while it needs correction")
+			return apperror.BadRequest("өтінішті тек түзету қажет болған кезде ғана өзгертуге болады")
 		}
 		if err := tx.UpdateEditableFieldsAndResubmit(ctx, applicationID, preferredRoomType, notes); err != nil {
 			return err
@@ -196,17 +270,18 @@ func (s *ApplicationService) Resubmit(ctx context.Context, actorStudentID, appli
 // locked for the duration, so two concurrent decisions on the same
 // application serialize and the second one sees a non-pending status.
 //
-// On approve, the room assignment reuses RoomService.AddResident (capacity +
-// restriction validation from phase 1) before the application's own status
-// is committed; if that room assignment fails, nothing about the
-// application is changed.
+// On approve, roomID is optional: a manager may assign a room immediately
+// (reusing RoomService.AddResident's capacity + restriction validation from
+// phase 1) before the application's own status is committed — if that room
+// assignment fails, nothing about the application is changed — or leave the
+// student unassigned for now and place them in a room later.
 func (s *ApplicationService) Decide(ctx context.Context, actorID, applicationID uuid.UUID, action DecisionAction, roomID *uuid.UUID, comment *string) (*domain.Application, error) {
 	var finalStatus domain.ApplicationStatus
 	var studentID uuid.UUID
 
 	err := s.applications.WithLock(ctx, applicationID, func(ctx context.Context, app *domain.Application, tx repository.ApplicationTx) error {
 		if app.Status != domain.ApplicationPending {
-			return apperror.Conflict("application is not awaiting a decision")
+			return apperror.Conflict("өтініш шешім қабылдауды күтіп тұрған жоқ")
 		}
 		studentID = app.StudentID
 
@@ -221,11 +296,10 @@ func (s *ApplicationService) Decide(ctx context.Context, actorID, applicationID 
 
 		switch action {
 		case ActionApprove:
-			if roomID == nil {
-				return apperror.BadRequest("room_id is required to approve")
-			}
-			if _, err := s.rooms.AddResident(ctx, *roomID, app.StudentID); err != nil {
-				return err
+			if roomID != nil {
+				if _, err := s.rooms.AddResident(ctx, *roomID, app.StudentID); err != nil {
+					return err
+				}
 			}
 			finalStatus = domain.ApplicationApproved
 			if err := tx.SetDecision(ctx, applicationID, finalStatus, roomID, actorID); err != nil {
@@ -233,7 +307,7 @@ func (s *ApplicationService) Decide(ctx context.Context, actorID, applicationID 
 			}
 		case ActionReject:
 			if comment == nil || *comment == "" {
-				return apperror.BadRequest("comment is required to reject")
+				return apperror.BadRequest("қабылдамау үшін пікір міндетті")
 			}
 			finalStatus = domain.ApplicationRejected
 			if err := tx.SetDecision(ctx, applicationID, finalStatus, nil, actorID); err != nil {
@@ -241,14 +315,14 @@ func (s *ApplicationService) Decide(ctx context.Context, actorID, applicationID 
 			}
 		case ActionRequestCorrection:
 			if comment == nil || *comment == "" {
-				return apperror.BadRequest("comment is required to request a correction")
+				return apperror.BadRequest("түзету сұрау үшін пікір міндетті")
 			}
 			finalStatus = domain.ApplicationNeedsCorrection
 			if err := tx.SetDecision(ctx, applicationID, finalStatus, nil, actorID); err != nil {
 				return err
 			}
 		default:
-			return apperror.BadRequest("invalid action")
+			return apperror.BadRequest("әрекет жарамсыз")
 		}
 
 		return tx.AddHistory(ctx, &domain.ApplicationStatusHistory{
@@ -269,7 +343,8 @@ func (s *ApplicationService) Decide(ctx context.Context, actorID, applicationID 
 }
 
 // notifyDecision is best-effort: the decision has already been committed, so
-// a notification failure is logged but does not fail the request.
+// a notification (in-app or email) failure is logged but does not fail the
+// request.
 func (s *ApplicationService) notifyDecision(ctx context.Context, studentID, applicationID uuid.UUID, status domain.ApplicationStatus, comment *string) {
 	title, body := decisionNotificationText(status, comment)
 	notifType := domain.NotificationApplicationStatusChanged
@@ -277,6 +352,14 @@ func (s *ApplicationService) notifyDecision(ctx context.Context, studentID, appl
 		notifType = domain.NotificationDocumentRequested
 	}
 	_ = s.notifier.Notify(ctx, studentID, notifType, title, body, &applicationID)
+
+	if student, err := s.users.GetByID(ctx, studentID); err == nil {
+		go func(email, subject, body string) {
+			if err := s.mailer.Send(email, subject, body); err != nil {
+				log.Printf("failed to send application-decision email to %s: %v", email, err)
+			}
+		}(student.Email, title, body)
+	}
 }
 
 func decisionNotificationText(status domain.ApplicationStatus, comment *string) (title, body string) {

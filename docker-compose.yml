@@ -46,6 +46,14 @@ services:
       CONTRACT_RESPONSE_DEADLINE_DAYS: ${CONTRACT_RESPONSE_DEADLINE_DAYS}
       CONTRACT_EXPIRY_CHECK_INTERVAL_MINUTES: ${CONTRACT_EXPIRY_CHECK_INTERVAL_MINUTES}
       CONTRACT_REMINDER_HOURS_BEFORE_DEADLINE: ${CONTRACT_REMINDER_HOURS_BEFORE_DEADLINE}
+      UPLOAD_DIR: ${UPLOAD_DIR}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM}
+    volumes:
+      - uploads-data:${UPLOAD_DIR}
     restart: unless-stopped
     networks:
       - app-network
@@ -68,6 +76,7 @@ services:
 
 volumes:
   postgres-data:
+  uploads-data:
 
 networks:
   app-network:

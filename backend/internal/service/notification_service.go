@@ -26,7 +26,7 @@ func (s *NotificationService) ListMine(ctx context.Context, userID uuid.UUID) ([
 func (s *NotificationService) MarkRead(ctx context.Context, id, userID uuid.UUID) error {
 	if err := s.notifications.MarkRead(ctx, id, userID); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return apperror.NotFound("notification not found")
+			return apperror.NotFound("хабарландыру табылмады")
 		}
 		return err
 	}

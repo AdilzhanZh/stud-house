@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next'
 import type { JourneyStep } from '../../components/ApplicationJourneyStepper'
 import type { ApplicationStatus } from '../../types/applications'
 import type { Contract } from '../../types/contracts'
@@ -65,16 +66,7 @@ export function journeyStepIndex(step: JourneyStep): number {
   return STEP_ORDER.indexOf(step)
 }
 
-const STEP_CAPTIONS: Record<JourneyStep, string> = {
-  submitted: 'қадам — өтініш қабылданды',
-  under_review: 'қадам — менеджер қарап жатыр, әдетте 2–3 күн',
-  approved: 'қадам — мақұлданды, келісімшарт дайындалуда',
-  contract: 'қадам — келісімшартқа қол қою қажет',
-  payment: 'қадам — төлемді растау күтілуде',
-  settled: 'қадам — сіз орналастыңыз 🎉',
-}
-
-export function journeyStepCaption(step: JourneyStep): string {
+export function journeyStepCaption(step: JourneyStep, t: TFunction): string {
   const n = journeyStepIndex(step) + 1
-  return `${n}/${STEP_ORDER.length} ${STEP_CAPTIONS[step]}`
+  return `${n}/${STEP_ORDER.length} ${t(`journeyCaption.${step}`)}`
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { ChevronLeft, Clock } from 'lucide-react'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
@@ -14,13 +15,8 @@ import { formatTenge } from '../../utils/dormitoryLabels'
 import type { Contract } from '../../types/contracts'
 import type { Payment } from '../../types/payments'
 
-// Same hardcoded text PaymentService.notifyStudentPaymentDecision sends —
-// there is no per-instance rejection reason field on Payment
-// (internal/domain/payment.go), so this static copy stands in for it
-// (see backend/README.md's note on this).
-const REJECTION_REASON = 'Сіздің төлеміңіз расталмады, чекті қайта жүктеңіз.'
-
 export function PaymentPage() {
+  const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
@@ -39,7 +35,7 @@ export function PaymentPage() {
       .then(async (contracts) => {
         const found = contracts.find((c) => c.id === id)
         if (!found) {
-          setLoadError('Келісімшарт табылмады')
+          setLoadError(t('payment.contractNotFound'))
           return
         }
         setContract(found)
@@ -51,10 +47,10 @@ export function PaymentPage() {
 
         setPayment(await getPaymentByContract(found.id))
       })
-      .catch((err) => setLoadError(extractErrorMessage(err, 'Жүктеу сәтсіз аяқталды')))
+      .catch((err) => setLoadError(extractErrorMessage(err, t('payment.loadError'))))
   }
 
-  useEffect(load, [id])
+  useEffect(load, [id, t])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -67,18 +63,30 @@ export function PaymentPage() {
       setPayment(updated)
       setReceiptFile(null)
     } catch (err) {
-      setSubmitError(extractErrorMessage(err, 'Жіберу сәтсіз аяқталды'))
+      setSubmitError(extractErrorMessage(err, t('payment.submitFailed')))
     } finally {
       setIsSubmitting(false)
     }
   }
 
   if (loadError) return <Alert variant="error" message={loadError} />
-  if (!contract) return <p className="text-sm text-sand-300">Жүктелуде...</p>
+  if (!contract) return <p className="text-sm text-sand-300">{t('payment.loading')}</p>
   if (contract.status !== 'accepted') {
-    return <Alert variant="error" message="Төлем беті тек келісімшарт қабылданғаннан кейін қолжетімді." />
+    return <Alert variant="error" message={t('payment.onlyAfterAccept')} />
   }
-  if (!payment) return <p className="text-sm text-sand-300">Жүктелуде...</p>
+  if (!payment) return <p className="text-sm text-sand-300">{t('payment.loading')}</p>
+
+  const steps = [
+    <>
+      {t('payment.step1Prefix')} <strong className="text-sand-100">{t('payment.accountingOffice')}</strong>{' '}
+      {t('payment.step1Suffix')}
+    </>,
+    <>
+      {t('payment.step2Prefix')} <strong className="text-sand-100">{t('payment.receiptOffice')}</strong>{' '}
+      {t('payment.step2Suffix')}
+    </>,
+    t('payment.step3'),
+  ]
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -86,12 +94,12 @@ export function PaymentPage() {
         onClick={() => navigate('/contracts/my')}
         className="inline-flex w-fit items-center gap-1 text-sm font-semibold text-sand-300 hover:text-sand-100"
       >
-        <ChevronLeft className="h-4 w-4" /> Келісімшарт
+        <ChevronLeft className="h-4 w-4" /> {t('nav.contract')}
       </button>
-      <h1 className="text-[23px] font-bold text-sand-100">Төлем</h1>
+      <h1 className="text-[23px] font-bold text-sand-100">{t('payment.title')}</h1>
 
       <Card>
-        <p className="text-xs font-semibold tracking-wide text-sand-300 uppercase">Төленетін сома</p>
+        <p className="text-xs font-semibold tracking-wide text-sand-300 uppercase">{t('payment.amountDue')}</p>
         <p className="mt-1.5 text-[32px] font-bold text-sand-100">
           {payment.currency === 'KZT' ? formatTenge(payment.amount) : `${payment.amount} ${payment.currency}`}
         </p>
@@ -99,17 +107,9 @@ export function PaymentPage() {
       </Card>
 
       <Card>
-        <p className="mb-3 text-[15px] font-bold text-sand-100">Қалай төлеу керек</p>
+        <p className="mb-3 text-[15px] font-bold text-sand-100">{t('payment.howToPay')}</p>
         <div className="flex flex-col gap-3">
-          {[
-            <>
-              Төлемді <strong className="text-sand-100">бухгалтерияға (212-кабинет)</strong> апарып төле
-            </>,
-            <>
-              Чекті <strong className="text-sand-100">315-кабинетке</strong> әкеліп бер
-            </>,
-            'Растауды осы жерден күт — хабарлама келеді',
-          ].map((text, i) => (
+          {steps.map((text, i) => (
             <div key={i} className="flex gap-3">
               <span className="flex h-6.5 w-6.5 shrink-0 items-center justify-center rounded-full bg-navy-800 text-sm font-bold text-sand-200">
                 {i + 1}
@@ -123,24 +123,25 @@ export function PaymentPage() {
       {payment.status === 'submitted' && (
         <div className="flex items-center gap-3 rounded-2xl bg-mint-500/10 px-4 py-3.5">
           <Clock className="h-5 w-5 shrink-0 text-mint-400" />
-          <p className="text-sm font-semibold text-mint-400">Төлеміңіз расталуын күтуде</p>
+          <p className="text-sm font-semibold text-mint-400">{t('payment.awaitingConfirmation')}</p>
         </div>
       )}
 
       {payment.status === 'awaiting_manager_decision' && (
-        <Alert
-          variant="warning"
-          message="Төлемнің мерзімі өтті, менеджердің шешімі күтілуде. Тезірек бухгалтерияға хабарласыңыз."
-        />
+        <Alert variant="warning" message={t('payment.awaitingManagerWarning')} />
       )}
 
-      {payment.status === 'confirmed' && <Alert variant="success" message="Төлеміңіз расталды." />}
+      {payment.status === 'confirmed' && <Alert variant="success" message={t('payment.confirmed')} />}
 
       {payment.status === 'rejected' && (
         <>
-          <Alert variant="error" message={REJECTION_REASON} />
+          {/* Same hardcoded text PaymentService.notifyStudentPaymentDecision sends —
+              there is no per-instance rejection reason field on Payment
+              (internal/domain/payment.go), so this static copy stands in for it
+              (see backend/README.md's note on this). */}
+          <Alert variant="error" message={t('payment.rejectionReason')} />
           <Card>
-            <p className="mb-3 text-[15px] font-bold text-sand-100">Чекті қайта жүктеу</p>
+            <p className="mb-3 text-[15px] font-bold text-sand-100">{t('payment.reuploadTitle')}</p>
             <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
               {submitError && <Alert variant="error" message={submitError} />}
               <label className="block cursor-pointer rounded-2xl border-2 border-dashed border-navy-700 bg-navy-950 p-4">
@@ -151,11 +152,11 @@ export function PaymentPage() {
                   onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)}
                 />
                 <p className="text-sm font-semibold text-sand-100">
-                  {receiptFile ? receiptFile.name : 'Чек файлын таңдау'}
+                  {receiptFile ? receiptFile.name : t('payment.chooseReceiptFile')}
                 </p>
               </label>
               <Button type="submit" isLoading={isSubmitting} disabled={!receiptFile} className="self-start">
-                Қайта жіберу
+                {t('payment.resubmit')}
               </Button>
             </form>
           </Card>

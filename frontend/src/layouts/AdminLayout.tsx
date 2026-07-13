@@ -14,6 +14,7 @@ import {
   Users,
 } from 'lucide-react'
 import { useAuth } from '../features/auth/useAuth'
+import { Avatar } from '../components/Avatar'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { usePendingStudentsCount } from '../features/admin/users/usePendingStudentsCount'
 import { usePendingApplicationsCount } from '../features/admin/applications/usePendingApplicationsCount'
@@ -31,16 +32,6 @@ function CountBadge({ count }: { count: number }) {
       {count}
     </span>
   )
-}
-
-function initials(fullName: string | undefined): string {
-  if (!fullName) return '?'
-  return fullName
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase())
-    .join('')
 }
 
 // Separate from DashboardLayout (student portal) per spec — admin/manager
@@ -66,7 +57,7 @@ export function AdminLayout() {
       <aside className="flex shrink-0 flex-col gap-1 border-r border-navy-700 bg-navy-900 p-4 md:w-62">
         <div className="flex items-center gap-2.5 px-1 pb-4">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center">
-            <img src="/favicon.svg" alt="" className="h-full w-full object-contain" />
+            <img src="/favicon.svg" alt="" className="brand-icon h-full w-full object-contain" />
           </span>
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-sand-100">Student House</p>
@@ -141,9 +132,7 @@ export function AdminLayout() {
 
         <span className="flex-1" />
         <div className="flex items-center gap-2.5 border-t border-navy-700 px-1 pt-3.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-navy-800 text-xs font-bold text-sand-200">
-            {initials(user?.full_name)}
-          </span>
+          <Avatar fullName={user?.full_name} avatarUrl={user?.avatar_url} sizeClass="h-9 w-9" textClass="text-xs" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-sand-100">{user?.full_name}</p>
             <p className="text-xs text-sand-300">{user?.role === 'manager' ? 'Жатақхана менеджері' : 'Әкімші'}</p>

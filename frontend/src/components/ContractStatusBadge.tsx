@@ -1,12 +1,5 @@
+import { useTranslation } from 'react-i18next'
 import type { ContractStatus } from '../types/contracts'
-
-const labels: Record<ContractStatus, string> = {
-  sent: 'Жауап күтілуде',
-  awaiting_manager_decision: 'Мерзімі өтті, менеджер шешеді',
-  accepted: 'Қабылданды',
-  declined: 'Бас тартылды',
-  expired: 'Мерзімі аяқталды',
-}
 
 const classes: Record<ContractStatus, string> = {
   sent: 'bg-amber-500/10 text-amber-400',
@@ -17,11 +10,12 @@ const classes: Record<ContractStatus, string> = {
 }
 
 export function ContractStatusBadge({ status }: { status: ContractStatus }) {
+  const { t } = useTranslation()
   return (
     <span
       className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${classes[status]}`}
     >
-      {labels[status]}
+      {t(`contractStatus.${status}`)}
     </span>
   )
 }

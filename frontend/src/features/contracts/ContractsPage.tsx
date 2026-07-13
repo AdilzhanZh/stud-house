@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { AlertCircle } from 'lucide-react'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
@@ -18,6 +19,7 @@ import type { Dormitory } from '../../types/dormitories'
 type PendingAction = { contractId: string; action: 'accept' | 'decline' } | null
 
 export function ContractsPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [contracts, setContracts] = useState<Contract[] | null>(null)
   const [dormitoryByContract, setDormitoryByContract] = useState<Record<string, Dormitory>>({})
@@ -41,10 +43,10 @@ export function ContractsPage() {
         )
         setDormitoryByContract(Object.fromEntries(entries.filter((e): e is [string, Dormitory] => e !== null)))
       })
-      .catch((err) => setError(extractErrorMessage(err, 'Келісімшарттарды жүктеу сәтсіз аяқталды')))
+      .catch((err) => setError(extractErrorMessage(err, t('contracts.loadError'))))
   }
 
-  useEffect(load, [])
+  useEffect(load, [t])
 
   async function handleConfirm() {
     if (!pendingAction) return
@@ -58,7 +60,7 @@ export function ContractsPage() {
         navigate(`/contracts/${pendingAction.contractId}/payment`)
       }
     } catch (err) {
-      setActionError(extractErrorMessage(err, 'Әрекет сәтсіз аяқталды'))
+      setActionError(extractErrorMessage(err, t('contracts.actionFailed')))
     } finally {
       setIsSubmitting(false)
     }
@@ -66,12 +68,12 @@ export function ContractsPage() {
 
   return (
     <div className="flex flex-col gap-3.5">
-      <h1 className="text-[23px] font-bold text-sand-100">Келісімшарт</h1>
+      <h1 className="text-[23px] font-bold text-sand-100">{t('nav.contract')}</h1>
 
       {error && <Alert variant="error" message={error} />}
       {actionError && <Alert variant="error" message={actionError} />}
-      {!error && !contracts && <p className="text-sm text-sand-300">Жүктелуде...</p>}
-      {contracts && contracts.length === 0 && <p className="text-sm text-sand-300">Сізде әлі келісімшарт жоқ.</p>}
+      {!error && !contracts && <p className="text-sm text-sand-300">{t('contracts.loading')}</p>}
+      {contracts && contracts.length === 0 && <p className="text-sm text-sand-300">{t('contracts.empty')}</p>}
 
       <div className="flex flex-col gap-3.5">
         {contracts?.map((contract) => {
@@ -80,10 +82,12 @@ export function ContractsPage() {
             <Card key={contract.id}>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-base font-semibold text-sand-100">{dormitory?.name ?? 'Келісімшарт'}</p>
+                  <p className="text-base font-semibold text-sand-100">
+                    {dormitory?.name ?? t('contracts.contractFallback')}
+                  </p>
                   {contract.status === 'sent' && (
                     <p className="mt-0.5 text-sm font-semibold text-clay-400">
-                      Жауап беруге {formatTimeRemaining(contract.response_deadline)}
+                      {t('contracts.respondBy', { time: formatTimeRemaining(contract.response_deadline, t) })}
                     </p>
                   )}
                 </div>
@@ -93,11 +97,11 @@ export function ContractsPage() {
               {dormitory && (dormitory.monthly_payment != null || dormitory.yearly_payment != null) && (
                 <div className="mt-3.5 flex flex-col gap-1.5 rounded-2xl border border-navy-700 bg-navy-950 p-3.5 text-sm">
                   <div className="flex justify-between gap-3">
-                    <span className="text-sand-300">Айлық төлем</span>
+                    <span className="text-sand-300">{t('dorm.monthlyPayment')}</span>
                     <span className="font-semibold text-sand-100">{formatTenge(dormitory.monthly_payment)}</span>
                   </div>
                   <div className="flex justify-between gap-3">
-                    <span className="text-sand-300">Жылдық</span>
+                    <span className="text-sand-300">{t('dorm.yearlyPayment')}</span>
                     <span className="font-semibold text-sand-100">{formatTenge(dormitory.yearly_payment)}</span>
                   </div>
                 </div>
@@ -107,7 +111,7 @@ export function ContractsPage() {
                 <div className="mt-3.5 flex flex-wrap gap-2.5">
                   <a href={contract.file_url} target="_blank" rel="noopener noreferrer" className="flex-1">
                     <Button variant="secondary" className="w-full min-w-35">
-                      PDF ашу
+                      {t('contracts.openPdf')}
                     </Button>
                   </a>
                   {acknowledged.has(contract.id) ? (
@@ -116,14 +120,14 @@ export function ContractsPage() {
                         className="flex-1 min-w-35"
                         onClick={() => setPendingAction({ contractId: contract.id, action: 'accept' })}
                       >
-                        Қабылдаймын
+                        {t('contracts.accept')}
                       </Button>
                       <Button
                         variant="danger"
                         className="flex-1 min-w-35"
                         onClick={() => setPendingAction({ contractId: contract.id, action: 'decline' })}
                       >
-                        Бас тарту
+                        {t('contracts.decline')}
                       </Button>
                     </>
                   ) : (
@@ -131,19 +135,19 @@ export function ContractsPage() {
                       className="flex-1 min-w-35"
                       onClick={() => setAcknowledged((prev) => new Set(prev).add(contract.id))}
                     >
-                      Таныстым, қабылдаймын
+                      {t('contracts.acknowledgeAccept')}
                     </Button>
                   )}
                 </div>
               )}
 
               {contract.status === 'awaiting_manager_decision' && (
-                <p className="mt-3.5 text-sm text-sand-200">Мерзім өтті, менеджердің шешімін күтіңіз.</p>
+                <p className="mt-3.5 text-sm text-sand-200">{t('contracts.awaitingManagerText')}</p>
               )}
 
               {contract.status === 'accepted' && (
                 <Button variant="secondary" className="mt-3.5" onClick={() => navigate(`/contracts/${contract.id}/payment`)}>
-                  Төлемге өту
+                  {t('contracts.goToPayment')}
                 </Button>
               )}
             </Card>
@@ -156,20 +160,14 @@ export function ContractsPage() {
           <span className="flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-full bg-navy-800">
             <AlertCircle className="h-4.5 w-4.5 text-sand-200" />
           </span>
-          <p className="text-sm text-sand-200">
-            Қабылдағаннан кейін төлем қадамына өтесің. Мерзімінде жауап бермесең, орын келесі студентке беріледі.
-          </p>
+          <p className="text-sm text-sand-200">{t('contracts.footerHint')}</p>
         </Card>
       )}
 
       <ConfirmDialog
         open={pendingAction !== null}
-        title={pendingAction?.action === 'accept' ? 'Келісімшартты қабылдау' : 'Келісімшарттан бас тарту'}
-        message={
-          pendingAction?.action === 'accept'
-            ? 'Қабылдағаннан кейін бұл шешімді өзгерте алмайсыз. Жалғастырасыз ба?'
-            : 'Бас тартқаннан кейін бұл шешімді өзгерте алмайсыз. Жалғастырасыз ба?'
-        }
+        title={pendingAction?.action === 'accept' ? t('contracts.acceptTitle') : t('contracts.declineTitle')}
+        message={pendingAction?.action === 'accept' ? t('contracts.acceptConfirm') : t('contracts.declineConfirm')}
         danger={pendingAction?.action === 'decline'}
         isLoading={isSubmitting}
         onConfirm={handleConfirm}

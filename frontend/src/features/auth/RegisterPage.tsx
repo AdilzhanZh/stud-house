@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { Card } from '../../components/Card'
 import { Input } from '../../components/Input'
@@ -10,11 +11,12 @@ import { Alert } from '../../components/Alert'
 import { extractErrorMessage } from '../../api/client'
 import { resendVerification, verifyEmail } from '../../api/authApi'
 import { useAuth } from './useAuth'
-import { registerSchema, type RegisterFormValues } from './schemas'
+import { buildRegisterSchema, type RegisterFormValues } from './schemas'
 
 type Step = 'form' | 'verify' | 'done'
 
 export function RegisterPage() {
+  const { t } = useTranslation()
   const { register: registerStudent } = useAuth()
   const [serverError, setServerError] = useState<string | null>(null)
   const [step, setStep] = useState<Step>('form')
@@ -32,7 +34,7 @@ export function RegisterPage() {
     watch,
     resetField,
     formState: { errors, isSubmitting },
-  } = useForm<RegisterFormValues>({ resolver: zodResolver(registerSchema) })
+  } = useForm<RegisterFormValues>({ resolver: zodResolver(buildRegisterSchema(t)) })
 
   const academicDegree = watch('academic_degree')
   const courseOptions = academicDegree === 'master' ? [1, 2] : [1, 2, 3, 4]
@@ -59,7 +61,7 @@ export function RegisterPage() {
       setEmail(values.email)
       setStep('verify')
     } catch (error) {
-      setServerError(extractErrorMessage(error, 'Тіркелу сәтсіз аяқталды'))
+      setServerError(extractErrorMessage(error, t('auth.registerFailed')))
     }
   }
 
@@ -74,7 +76,7 @@ export function RegisterPage() {
       // approval_status=approved) before they can access the dashboard.
       setStep('done')
     } catch (error) {
-      setVerifyError(extractErrorMessage(error, 'Код қате немесе мерзімі өткен'))
+      setVerifyError(extractErrorMessage(error, t('auth.verifyFailed')))
     } finally {
       setIsVerifying(false)
     }
@@ -86,9 +88,9 @@ export function RegisterPage() {
     setIsResending(true)
     try {
       await resendVerification(email)
-      setResendMessage('Код қайта жіберілді')
+      setResendMessage(t('auth.resendSuccess'))
     } catch (error) {
-      setVerifyError(extractErrorMessage(error, 'Кодты қайта жіберу сәтсіз аяқталды'))
+      setVerifyError(extractErrorMessage(error, t('auth.resendFailed')))
     } finally {
       setIsResending(false)
     }
@@ -96,14 +98,11 @@ export function RegisterPage() {
 
   if (step === 'done') {
     return (
-      <Card title="Тіркелу сәтті өтті">
-        <Alert
-          variant="success"
-          message="Email расталды. Тіркелу өтінішіңіз менеджердің қарауында, растағаннан кейін жүйеге кіре аласыз."
-        />
+      <Card title={t('auth.doneTitle')}>
+        <Alert variant="success" message={t('auth.doneMessage')} />
         <p className="mt-4 text-center text-sm text-sand-300/70">
           <Link to="/login" className="font-medium text-turquoise-400 hover:underline">
-            Кіру бетіне оралу
+            {t('auth.backToLogin')}
           </Link>
         </p>
       </Card>
@@ -112,15 +111,13 @@ export function RegisterPage() {
 
   if (step === 'verify') {
     return (
-      <Card title="Email-ды растау">
-        <p className="mb-4 text-sm text-sand-300/70">
-          {email} мекенжайына жіберілген 6 таңбалы кодты енгізіңіз.
-        </p>
+      <Card title={t('auth.verifyTitle')}>
+        <p className="mb-4 text-sm text-sand-300/70">{t('auth.verifyPrompt', { email })}</p>
         <form className="flex flex-col gap-4" onSubmit={handleVerify} noValidate>
           {verifyError && <Alert variant="error" message={verifyError} />}
           {resendMessage && <Alert variant="success" message={resendMessage} />}
           <Input
-            label="Растау коды"
+            label={t('auth.verifyCodeLabel')}
             inputMode="numeric"
             maxLength={6}
             placeholder="123456"
@@ -129,10 +126,10 @@ export function RegisterPage() {
             required
           />
           <Button type="submit" isLoading={isVerifying}>
-            Растау
+            {t('auth.verifyButton')}
           </Button>
           <Button type="button" variant="secondary" isLoading={isResending} onClick={handleResend}>
-            Кодты қайта жіберу
+            {t('auth.resendButton')}
           </Button>
         </form>
       </Card>
@@ -140,20 +137,20 @@ export function RegisterPage() {
   }
 
   return (
-    <Card title="Тіркелу">
+    <Card title={t('auth.registerTitle')}>
       <form className="flex flex-col gap-4" onSubmit={handleSubmit(onSubmit)} noValidate>
         {serverError && <Alert variant="error" message={serverError} />}
         <Input
-          label="Аты"
+          label={t('auth.firstName')}
           autoComplete="given-name"
           error={errors.aty?.message}
           required
           {...register('aty')}
         />
-        <Input label="Фамилия" autoComplete="family-name" {...register('familiya')} />
-        <Input label="Тегі" {...register('tegi')} />
+        <Input label={t('auth.lastName')} autoComplete="family-name" {...register('familiya')} />
+        <Input label={t('auth.patronymic')} {...register('tegi')} />
         <Input
-          label="Email"
+          label={t('auth.email')}
           type="email"
           autoComplete="email"
           error={errors.email?.message}
@@ -161,7 +158,7 @@ export function RegisterPage() {
           {...register('email')}
         />
         <Input
-          label="Телефон"
+          label={t('auth.phone')}
           type="tel"
           autoComplete="tel"
           error={errors.phone?.message}
@@ -169,33 +166,33 @@ export function RegisterPage() {
           {...register('phone')}
         />
         <Input
-          label="ЖСН (ИИН)"
+          label={t('auth.iin')}
           inputMode="numeric"
           maxLength={12}
-          placeholder="12 таңбалы сан"
+          placeholder={t('auth.iinPlaceholder')}
           error={errors.iin?.message}
           required
           {...register('iin')}
         />
-        <Select label="Жынысы" error={errors.gender?.message} required {...register('gender')}>
-          <option value="">Таңдаңыз</option>
-          <option value="male">Ер</option>
-          <option value="female">Әйел</option>
+        <Select label={t('auth.gender')} error={errors.gender?.message} required {...register('gender')}>
+          <option value="">{t('auth.selectPlaceholder')}</option>
+          <option value="male">{t('auth.male')}</option>
+          <option value="female">{t('auth.female')}</option>
         </Select>
         <Select
-          label="Оқу деңгейі"
+          label={t('auth.academicDegree')}
           error={errors.academic_degree?.message}
           required
           {...register('academic_degree', {
             onChange: () => resetField('course'),
           })}
         >
-          <option value="">Таңдаңыз</option>
-          <option value="bachelor">Бакалавриат</option>
-          <option value="master">Магистратура</option>
+          <option value="">{t('auth.selectPlaceholder')}</option>
+          <option value="bachelor">{t('auth.bachelor')}</option>
+          <option value="master">{t('auth.master')}</option>
         </Select>
-        <Select label="Курс" error={errors.course?.message} required {...register('course')}>
-          <option value="">Таңдаңыз</option>
+        <Select label={t('auth.course')} error={errors.course?.message} required {...register('course')}>
+          <option value="">{t('auth.selectPlaceholder')}</option>
           {courseOptions.map((c) => (
             <option key={c} value={c}>
               {c}
@@ -203,7 +200,7 @@ export function RegisterPage() {
           ))}
         </Select>
         <Input
-          label="Құпия сөз"
+          label={t('auth.password')}
           type="password"
           autoComplete="new-password"
           error={errors.password?.message}
@@ -211,7 +208,7 @@ export function RegisterPage() {
           {...register('password')}
         />
         <Input
-          label="Құпия сөзді қайталаңыз"
+          label={t('auth.passwordConfirm')}
           type="password"
           autoComplete="new-password"
           error={errors.password_confirm?.message}
@@ -219,12 +216,12 @@ export function RegisterPage() {
           {...register('password_confirm')}
         />
         <Button type="submit" isLoading={isSubmitting}>
-          Тіркелу
+          {t('auth.registerButton')}
         </Button>
         <p className="text-center text-sm text-sand-300/70">
-          Аккаунтыңыз бар ма?{' '}
+          {t('auth.haveAccount')}{' '}
           <Link to="/login" className="font-medium text-turquoise-400 hover:underline">
-            Кіру
+            {t('auth.loginLink')}
           </Link>
         </p>
       </form>

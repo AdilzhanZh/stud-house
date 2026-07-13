@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Bell, Building2, Clock, FileText } from 'lucide-react'
 import { Card } from '../../components/Card'
 import { StatusBadge } from '../../components/StatusBadge'
@@ -16,15 +17,10 @@ import { useAuth } from '../auth/useAuth'
 import type { Application } from '../../types/applications'
 import type { JourneyStep } from '../../components/ApplicationJourneyStepper'
 
-const nextStepHint: Partial<Record<JourneyStep, string>> = {
-  submitted: 'Менеджер жауабын күтіңіз — хабарлама келеді',
-  under_review: 'Менеджер жауабын күтіңіз — хабарлама келеді',
-  approved: 'Келісімшарт дайындалуда — хабарлама келеді',
-  contract: 'Келісімшартқа қол қою керек — Келісімшарт бөліміне өтіңіз',
-  payment: 'Төлем жасау керек — Төлем бөліміне өтіңіз',
-}
+const NEXT_STEP_HINT_STEPS: JourneyStep[] = ['submitted', 'under_review', 'approved', 'contract', 'payment']
 
 export function HomePage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { user } = useAuth()
   const unreadCount = useUnreadCount()
@@ -37,8 +33,8 @@ export function HomePage() {
   useEffect(() => {
     listMyApplications()
       .then(setApplications)
-      .catch(() => setLoadError('Өтініштерді жүктеу сәтсіз аяқталды'))
-  }, [])
+      .catch(() => setLoadError(t('home.loadApplicationsError')))
+  }, [t])
 
   const latestApplication =
     applications && applications.length > 0
@@ -61,12 +57,12 @@ export function HomePage() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-sand-300">Қайырлы күн,</p>
+          <p className="text-sm text-sand-300">{t('home.greeting')}</p>
           <p className="text-[23px] font-bold text-sand-100">{firstName}</p>
         </div>
         <button
           onClick={() => navigate('/notifications')}
-          aria-label="Хабарламалар"
+          aria-label={t('nav.notifications')}
           className="relative flex h-10.5 w-10.5 items-center justify-center rounded-full border border-navy-700 bg-navy-900 text-sand-200 md:hidden"
         >
           <Bell className="h-4.5 w-4.5" />
@@ -84,63 +80,63 @@ export function HomePage() {
             <Card onClick={() => navigate(`/applications/${latestApplication.id}`)} className="flex flex-col">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">
-                  Менің өтінішім
+                  {t('home.myApplication')}
                 </span>
                 <StatusBadge status={latestApplication.status} />
               </div>
               <p className="mt-2 text-lg font-semibold text-sand-100">{dormitoryName ?? '...'}</p>
               <SegmentedProgress total={6} filled={journeyStepIndex(journey.step) + 1} className="mt-3" />
-              <p className="mt-2 text-sm text-sand-200">{journeyStepCaption(journey.step)}</p>
-              <p className="mt-3 text-sm font-semibold text-turquoise-400">Өтінішті ашу →</p>
+              <p className="mt-2 text-sm text-sand-200">{journeyStepCaption(journey.step, t)}</p>
+              <p className="mt-3 text-sm font-semibold text-turquoise-400">{t('home.openApplication')}</p>
             </Card>
           ) : applications && applications.length === 0 ? (
             <Card onClick={() => navigate('/dormitories')} className="flex flex-col gap-2">
-              <p className="text-base font-semibold text-sand-100">Әлі өтінішіңіз жоқ</p>
-              <p className="text-sm text-sand-300">
-                Жатақхана таңдап, өтініш беруден бастаңыз — бұл небәрі бірнеше минут алады.
-              </p>
-              <p className="mt-1 text-sm font-semibold text-turquoise-400">Жатақханаларды қарау →</p>
+              <p className="text-base font-semibold text-sand-100">{t('home.noApplicationTitle')}</p>
+              <p className="text-sm text-sand-300">{t('home.noApplicationBody')}</p>
+              <p className="mt-1 text-sm font-semibold text-turquoise-400">{t('home.browseDorms')}</p>
             </Card>
           ) : null}
 
-          {latestApplication && journey?.step && nextStepHint[journey.step] && (
-            <Card className="!p-3.5">
-              <div className="flex items-center gap-3">
-                <span className="flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-full bg-amber-500/15">
-                  <Clock className="h-4.5 w-4.5 text-amber-400" />
-                </span>
-                <div>
-                  <p className="text-sm font-semibold text-sand-100">Жақын қадам</p>
-                  <p className="text-sm text-sand-300">{nextStepHint[journey.step]}</p>
+          {latestApplication &&
+            journey?.step &&
+            NEXT_STEP_HINT_STEPS.includes(journey.step) && (
+              <Card className="!p-3.5">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-full bg-amber-500/15">
+                    <Clock className="h-4.5 w-4.5 text-amber-400" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-sand-100">{t('home.nextStep')}</p>
+                    <p className="text-sm text-sand-300">{t(`home.nextStepHint.${journey.step}`)}</p>
+                  </div>
                 </div>
-              </div>
-            </Card>
-          )}
+              </Card>
+            )}
 
           <div className="grid grid-cols-2 gap-3">
             <Card onClick={() => navigate('/dormitories')} className="!p-3.5 flex flex-col gap-2.5">
               <span className="flex h-8.5 w-8.5 items-center justify-center rounded-full bg-navy-800">
                 <Building2 className="h-4 w-4 text-turquoise-400" />
               </span>
-              <span className="text-sm font-semibold text-sand-100">Жатақханалар</span>
+              <span className="text-sm font-semibold text-sand-100">{t('home.dormsCard')}</span>
             </Card>
             <Card onClick={() => navigate('/contracts/my')} className="!p-3.5 flex flex-col gap-2.5">
               <span className="flex h-8.5 w-8.5 items-center justify-center rounded-full bg-navy-800">
                 <FileText className="h-4 w-4 text-turquoise-400" />
               </span>
-              <span className="text-sm font-semibold text-sand-100">Келісімшарт</span>
+              <span className="text-sm font-semibold text-sand-100">{t('home.contractCard')}</span>
             </Card>
           </div>
         </div>
 
         <div className="flex flex-col gap-2.5">
           <div className="flex items-baseline justify-between">
-            <span className="text-[15px] font-bold text-sand-100">Жатақханалар</span>
+            <span className="text-[15px] font-bold text-sand-100">{t('home.dormsSectionTitle')}</span>
             <button
               onClick={() => navigate('/dormitories')}
               className="text-sm font-semibold text-sand-100 hover:text-turquoise-400"
             >
-              Барлығы →
+              {t('home.seeAll')}
             </button>
           </div>
           {dormitories?.slice(0, 2).map((d) => (

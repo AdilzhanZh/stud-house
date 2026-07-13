@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { extractErrorMessage } from '../../api/client'
 import { getDormitoryCapacity, listDormitories, listDormitoryImages } from '../../api/dormitoryApi'
 import type { Dormitory } from '../../types/dormitories'
@@ -12,6 +13,7 @@ export interface DormitoryCardData extends Dormitory {
 // both compute "N бос орын" the same way (total_capacity - allocated_beds
 // from the capacity endpoint, not a second ad-hoc calculation).
 export function useDormitoriesWithMeta() {
+  const { t } = useTranslation()
   const [dormitories, setDormitories] = useState<DormitoryCardData[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -38,7 +40,7 @@ export function useDormitoriesWithMeta() {
         )
         if (!cancelled) setDormitories(withMeta)
       } catch (err) {
-        if (!cancelled) setError(extractErrorMessage(err, 'Жатақханаларды жүктеу сәтсіз аяқталды'))
+        if (!cancelled) setError(extractErrorMessage(err, t('dorm.loadError')))
       }
     }
 
@@ -46,7 +48,7 @@ export function useDormitoriesWithMeta() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [t])
 
   return { dormitories, error }
 }

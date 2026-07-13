@@ -14,6 +14,7 @@ export interface User {
   is_committee_member: boolean
   is_chairperson: boolean
   approval_status: ApprovalStatus
+  avatar_url: string | null
   created_at: string
   updated_at: string
 }

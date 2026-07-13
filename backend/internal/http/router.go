@@ -85,6 +85,7 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 			protected.PUT("/students/:id/profile", h.User.UpsertStudentProfile)
 			protected.GET("/students/:id/profile", h.User.GetStudentProfile)
 			protected.GET("/students/:id/residence", h.Room.GetMyResidence)
+			protected.PATCH("/users/:id/avatar", h.User.UpdateAvatar)
 
 			// Any authenticated user: their own in-app notifications.
 			protected.GET("/notifications", h.Notification.ListMine)

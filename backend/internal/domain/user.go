@@ -49,6 +49,7 @@ type User struct {
 	IsCommitteeMember          bool
 	IsChairperson              bool
 	ApprovalStatus             ApprovalStatus
+	AvatarURL                  *string
 	EmailVerifiedAt            *time.Time
 	EmailVerificationCode      *string
 	EmailVerificationExpiresAt *time.Time

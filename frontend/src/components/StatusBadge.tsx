@@ -1,13 +1,5 @@
+import { useTranslation } from 'react-i18next'
 import type { ApplicationStatus } from '../types/applications'
-
-const labels: Record<ApplicationStatus, string> = {
-  pending: 'Қаралуда',
-  manager_review: 'Қаралуда',
-  needs_correction: 'Түзету қажет',
-  approved: 'Мақұлданды',
-  rejected: 'Қабылданбады',
-  settled: 'Аяқталды',
-}
 
 const classes: Record<ApplicationStatus, string> = {
   pending: 'bg-turquoise-500/10 text-turquoise-300',
@@ -19,11 +11,12 @@ const classes: Record<ApplicationStatus, string> = {
 }
 
 export function StatusBadge({ status }: { status: ApplicationStatus }) {
+  const { t } = useTranslation()
   return (
     <span
       className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${classes[status]}`}
     >
-      {labels[status]}
+      {t(`status.${status}`)}
     </span>
   )
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { ChevronLeft, Check, Upload } from 'lucide-react'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
@@ -25,6 +26,7 @@ import { FloorCorridorMap } from '../../components/FloorCorridorMap'
 import { useDormitoriesWithMeta } from '../dormitories/useDormitoriesWithMeta'
 import { useAuth } from '../auth/useAuth'
 import { isActiveApplicationStatus } from './statusHelpers'
+import type { TFunction } from 'i18next'
 import type { DormitoryRequiredDocument } from '../../types/dormitories'
 import type { Benefit, BenefitRequiredDocument } from '../../types/benefits'
 import type { Room } from '../../types/rooms'
@@ -34,20 +36,16 @@ interface RoomWithOccupancy extends Room {
   residentCount: number
 }
 
-const STEP_CAPTIONS: Record<1 | 2 | 3, string> = {
-  1: '1/3 қадам · Жатақхана таңдау',
-  2: '2/3 қадам · Құжаттар',
-  3: '3/3 қадам · Тексеру және жіберу',
-}
-
 function DocumentCard({
   name,
   file,
   onChange,
+  t,
 }: {
   name: string
   file: File | null
   onChange: (file: File | null) => void
+  t: TFunction
 }) {
   if (file) {
     return (
@@ -58,10 +56,12 @@ function DocumentCard({
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-sand-100">{name}</p>
-            <p className="truncate text-sm text-mint-400">{file.name} · жүктелді</p>
+            <p className="truncate text-sm text-mint-400">
+              {file.name} · {t('wizard.uploaded')}
+            </p>
           </div>
           <label className="shrink-0 cursor-pointer text-sm font-semibold text-sand-300 hover:text-sand-100">
-            Өзгерту
+            {t('wizard.change')}
             <input
               type="file"
               accept="application/pdf"
@@ -87,10 +87,10 @@ function DocumentCard({
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-sand-100">{name}</p>
-          <p className="text-sm text-sand-300">PDF, 10 МБ-қа дейін</p>
+          <p className="text-sm text-sand-300">{t('wizard.pdfSizeHint')}</p>
         </div>
         <span className="shrink-0 rounded-full bg-turquoise-500/10 px-3.5 py-1.5 text-sm font-semibold whitespace-nowrap text-turquoise-400">
-          Жүктеу
+          {t('wizard.uploadLabel')}
         </span>
       </div>
     </label>
@@ -98,6 +98,7 @@ function DocumentCard({
 }
 
 export function NewApplicationPage() {
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -127,6 +128,12 @@ export function NewApplicationPage() {
   const [serverError, setServerError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  const STEP_CAPTIONS: Record<1 | 2 | 3, string> = {
+    1: t('wizard.stepCaption1'),
+    2: t('wizard.stepCaption2'),
+    3: t('wizard.stepCaption3'),
+  }
+
   useEffect(() => {
     if (!dormitories) return
     // A dormitory with no rooms entered yet can't be applied to — a manager
@@ -139,8 +146,8 @@ export function NewApplicationPage() {
       }),
     )
       .then((withRooms) => setDormitoriesWithRooms(new Set(withRooms.filter(([, has]) => has).map(([id]) => id))))
-      .catch((err) => setLoadError(extractErrorMessage(err, 'Жатақханаларды жүктеу сәтсіз аяқталды')))
-  }, [dormitories])
+      .catch((err) => setLoadError(extractErrorMessage(err, t('wizard.loadDormsError'))))
+  }, [dormitories, t])
 
   useEffect(() => {
     listMyApplications()
@@ -224,11 +231,11 @@ export function NewApplicationPage() {
     setServerError(null)
     if (step === 1) {
       if (!dormitoryId) {
-        setServerError('Жатақхананы таңдаңыз')
+        setServerError(t('wizard.dormNotSelected'))
         return
       }
       if (!dormitoriesWithRooms.has(dormitoryId)) {
-        setServerError('Бұл жатақханада әлі бөлме енгізілмеген, өтініш беруге болмайды')
+        setServerError(t('wizard.dormNoRooms'))
         return
       }
     }
@@ -248,17 +255,17 @@ export function NewApplicationPage() {
     const months = Number(stayMonths)
     const maxMonths = maxStayMonths()
     if (!Number.isInteger(months) || months < 1 || months > maxMonths) {
-      setServerError(`Неше айға тұратыныңызды дұрыс көрсетіңіз (1-${maxMonths} ай, маусымнан аспауы тиіс)`)
+      setServerError(t('wizard.stayMonthsError', { max: maxMonths }))
       return
     }
     const missingDoc = allRequiredDocs.find((doc) => !docFiles[doc.id])
     if (missingDoc) {
-      setServerError(`"${missingDoc.document_name}" құжатын жүктеңіз`)
+      setServerError(t('wizard.missingDocError', { doc: missingDoc.document_name }))
       return
     }
     const invalidDoc = allRequiredDocs.find((doc) => docFiles[doc.id]?.type !== 'application/pdf')
     if (invalidDoc) {
-      setServerError(`"${invalidDoc.document_name}" құжаты үшін тек PDF форматындағы файл жүктеуге болады`)
+      setServerError(t('wizard.invalidDocError', { doc: invalidDoc.document_name }))
       return
     }
 
@@ -334,7 +341,7 @@ export function NewApplicationPage() {
       if (createdApplicationId) {
         await deleteApplication(createdApplicationId).catch(() => {})
       }
-      setServerError(extractErrorMessage(err, 'Өтініш жіберу сәтсіз аяқталды'))
+      setServerError(extractErrorMessage(err, t('wizard.submitFailed')))
     } finally {
       setIsSubmitting(false)
     }
@@ -346,29 +353,22 @@ export function NewApplicationPage() {
         <span className="flex h-19 w-19 items-center justify-center rounded-full bg-mint-500/15">
           <Check className="h-8.5 w-8.5 text-mint-400" strokeWidth={2.5} />
         </span>
-        <p className="text-[22px] font-bold text-sand-100">Өтініш жіберілді!</p>
-        <p className="max-w-[300px] text-sm text-sand-300">
-          Менеджер 2–3 күнде қарайды. Статус өзгергенде хабарлама келеді — күтіп отырудың қажеті жоқ.
-        </p>
+        <p className="text-[22px] font-bold text-sand-100">{t('wizard.sentTitle')}</p>
+        <p className="max-w-[300px] text-sm text-sand-300">{t('wizard.sentBody')}</p>
         <SegmentedProgress total={6} filled={2} className="mt-1.5 w-full max-w-[300px]" />
-        <p className="text-xs text-sand-300">2/6 · Қаралуда</p>
+        <p className="text-xs text-sand-300">{t('wizard.sentStepCaption')}</p>
         <Button className="mt-2" onClick={() => navigate('/dashboard/home')}>
-          Бастыға оралу
+          {t('wizard.backToHome')}
         </Button>
       </div>
     )
   }
 
   if (loadError) return <Alert variant="error" message={loadError} />
-  if (!dormitories) return <p className="text-sm text-sand-300">Жүктелуде...</p>
+  if (!dormitories) return <p className="text-sm text-sand-300">{t('dorm.loading')}</p>
 
   if (hasActiveApplication) {
-    return (
-      <Alert
-        variant="error"
-        message="Сізде белсенді өтінішіңіз бар. Жаңа өтініш беру үшін алдымен ағымдағысын шешу керек."
-      />
-    )
+    return <Alert variant="error" message={t('wizard.hasActiveApplication')} />
   }
 
   return (
@@ -376,12 +376,12 @@ export function NewApplicationPage() {
       <div className="flex items-center gap-3">
         <button
           onClick={goBack}
-          aria-label="Артқа"
+          aria-label={t('wizard.back')}
           className="flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-full border border-navy-700 bg-navy-900 text-sand-200"
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
-        <span className="text-[19px] font-bold text-sand-100">Өтініш беру</span>
+        <span className="text-[19px] font-bold text-sand-100">{t('wizard.title')}</span>
       </div>
 
       <SegmentedProgress total={3} filled={step} />
@@ -391,10 +391,10 @@ export function NewApplicationPage() {
 
       {step === 1 && (
         <>
-          <p className="text-sm text-sand-200">Өзіңе ыңғайлысын таңда — бағасы мен бос орындар осында.</p>
+          <p className="text-sm text-sand-200">{t('wizard.chooseDormPrompt')}</p>
           <div className="flex max-w-[560px] flex-col gap-3">
             {dormitories.length === 0 && (
-              <Alert variant="error" message="Қазіргі уақытта тіркелген жатақхана жоқ" />
+              <Alert variant="error" message={t('wizard.noDormsAvailable')} />
             )}
             {dormitories.map((d) => {
               const hasRooms = dormitoriesWithRooms.has(d.id)
@@ -406,7 +406,9 @@ export function NewApplicationPage() {
                       <span className="h-5 w-5 shrink-0 rounded-full border-2 border-navy-700" />
                       <div>
                         <p className="text-[15px] font-semibold text-sand-100">{d.name}</p>
-                        <p className="text-sm text-sand-300">{d.address} · орын жоқ</p>
+                        <p className="text-sm text-sand-300">
+                          {d.address} · {t('wizard.noVacancyShort')}
+                        </p>
                       </div>
                     </div>
                   </Card>
@@ -437,10 +439,11 @@ export function NewApplicationPage() {
                         d.vacancy > 0 ? 'bg-turquoise-500/10 text-turquoise-400' : 'bg-clay-500/10 text-clay-400'
                       }`}
                     >
-                      {d.vacancy > 0 ? `${d.vacancy} бос орын` : 'орын жоқ'}
+                      {d.vacancy > 0 ? t('dorm.vacancyCount', { count: d.vacancy }) : t('wizard.noVacancyShort')}
                     </span>
                     <span className="inline-flex items-center rounded-full bg-navy-800 px-2.5 py-1 text-xs font-semibold text-sand-200">
-                      {formatTenge(d.monthly_payment)}/ай
+                      {formatTenge(d.monthly_payment)}
+                      {t('dorm.perMonth')}
                     </span>
                   </div>
                 </Card>
@@ -450,9 +453,7 @@ export function NewApplicationPage() {
 
           {dormitoryId && eligibleFloorGroups.length > 0 && (
             <div className="flex flex-col gap-3">
-              <label className="text-sm font-medium text-sand-200">
-                Бөлме (қалауыңыз бойынша, міндетті емес)
-              </label>
+              <label className="text-sm font-medium text-sand-200">{t('wizard.roomLabel')}</label>
               {eligibleFloorGroups.length > 1 && (
                 <div className="flex flex-wrap gap-2">
                   {eligibleFloorGroups.map(([floor]) => (
@@ -466,7 +467,7 @@ export function NewApplicationPage() {
                           : 'bg-navy-800 text-sand-300 hover:bg-navy-700'
                       }`}
                     >
-                      {floor === '0' ? 'Қабат көрсетілмеген' : `${floor}-қабат`}
+                      {floor === '0' ? t('wizard.floorNotSpecified') : t('wizard.floorLabel', { floor })}
                     </button>
                   ))}
                 </div>
@@ -478,17 +479,21 @@ export function NewApplicationPage() {
               />
               <p className="text-xs text-sand-300">
                 {selectedRoom
-                  ? `Таңдалды: ${selectedRoom.room_number}-бөлме (${selectedRoom.residentCount}/${selectedRoom.capacity} орын)`
-                  : 'Бөлме таңдалмады — оны кейін менеджер тағайындайды'}
+                  ? t('wizard.roomSelected', {
+                      room: selectedRoom.room_number,
+                      occupied: selectedRoom.residentCount,
+                      capacity: selectedRoom.capacity,
+                    })
+                  : t('wizard.roomNotSelected')}
               </p>
             </div>
           )}
 
           <div className="mt-1">
             <Button className="w-full" onClick={goNext}>
-              Жалғастыру
+              {t('wizard.continueButton')}
             </Button>
-            <p className="mt-2.5 text-center text-xs text-sand-300">Келесі: құжаттар · шамамен 2 минут</p>
+            <p className="mt-2.5 text-center text-xs text-sand-300">{t('wizard.nextDocsHint')}</p>
           </div>
         </>
       )}
@@ -496,9 +501,7 @@ export function NewApplicationPage() {
       {step === 2 && (
         <>
           <p className="text-sm text-sand-200">
-            {allRequiredDocs.length > 0
-              ? 'Қажетті құжаттарды жүкте, тек PDF. Телефоннан суретке түсіріп жүктесең де болады.'
-              : 'Бұл жатақхана үшін міндетті құжат жоқ. Льготаңыз болса, төменде белгілеңіз.'}
+            {allRequiredDocs.length > 0 ? t('wizard.docsHintWithRequired') : t('wizard.docsHintNoneRequired')}
           </p>
           <div className="flex max-w-[560px] flex-col gap-3">
             {dormitoryRequiredDocs.map((doc) => (
@@ -507,6 +510,7 @@ export function NewApplicationPage() {
                 name={doc.document_name}
                 file={docFiles[doc.id] ?? null}
                 onChange={(file) => setDocFiles((prev) => ({ ...prev, [doc.id]: file }))}
+                t={t}
               />
             ))}
 
@@ -519,11 +523,9 @@ export function NewApplicationPage() {
                     onChange={(e) => toggleHasBenefit(e.target.checked)}
                     className="h-4.5 w-4.5 accent-turquoise-500"
                   />
-                  Менде жеңілдік (льгота) бар
+                  {t('wizard.hasBenefit')}
                 </label>
-                <p className="mt-2 ml-7 text-sm text-sand-300">
-                  Жетімдік, мүгедектік немесе көпбалалы отбасы — растайтын құжатпен. Кезекте басымдық береді.
-                </p>
+                <p className="mt-2 ml-7 text-sm text-sand-300">{t('wizard.benefitHint')}</p>
 
                 {hasBenefit && (
                   <div className="mt-3 ml-7 flex flex-col gap-3">
@@ -549,6 +551,7 @@ export function NewApplicationPage() {
                                 name={doc.document_name}
                                 file={docFiles[doc.id] ?? null}
                                 onChange={(file) => setDocFiles((prev) => ({ ...prev, [doc.id]: file }))}
+                                t={t}
                               />
                             ))}
                           </div>
@@ -563,39 +566,40 @@ export function NewApplicationPage() {
 
           <div className="mt-1">
             <Button className="w-full" onClick={goNext}>
-              Жалғастыру
+              {t('wizard.continueButton')}
             </Button>
-            <p className="mt-2.5 text-center text-xs text-sand-300">Флюорографияны кейін де жүктеуге болады</p>
+            <p className="mt-2.5 text-center text-xs text-sand-300">{t('wizard.laterDocsHint')}</p>
           </div>
         </>
       )}
 
       {step === 3 && (
         <>
-          <p className="text-sm text-sand-200">Бәрін тексеріп, жібер. Кейін статусын Бастыдан бақылайсың.</p>
+          <p className="text-sm text-sand-200">{t('wizard.reviewIntro')}</p>
           <div className="flex max-w-[560px] flex-col gap-3">
             <Card className="!p-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-sand-300">Жатақхана</span>
+                <span className="text-sm text-sand-300">{t('wizard.dormSection')}</span>
                 <button onClick={() => setStep(1)} className="text-sm font-semibold text-sand-100">
-                  Өзгерту
+                  {t('wizard.change')}
                 </button>
               </div>
               <p className="mt-1.5 text-[15px] font-semibold text-sand-100">{chosenDormitory?.name}</p>
               <p className="text-sm text-sand-300">
-                {chosenDormitory?.address} · {formatTenge(chosenDormitory?.monthly_payment)}/ай
+                {chosenDormitory?.address} · {formatTenge(chosenDormitory?.monthly_payment)}
+                {t('dorm.perMonth')}
               </p>
             </Card>
 
             <Card className="!p-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-sand-300">Құжаттар</span>
+                <span className="text-sm text-sand-300">{t('wizard.docsSection')}</span>
                 <button onClick={() => setStep(2)} className="text-sm font-semibold text-sand-100">
-                  Өзгерту
+                  {t('wizard.change')}
                 </button>
               </div>
               {allRequiredDocs.length === 0 ? (
-                <p className="mt-1.5 text-sm text-sand-300">Міндетті құжат жоқ</p>
+                <p className="mt-1.5 text-sm text-sand-300">{t('wizard.noRequiredDocs')}</p>
               ) : (
                 allRequiredDocs.map((doc) => (
                   <p
@@ -610,7 +614,7 @@ export function NewApplicationPage() {
 
             <Card className="!p-4">
               <Input
-                label={`Неше айға тұрасыз (ең көбі ${maxStayMonths()} ай, маусымнан аспауы тиіс)`}
+                label={t('wizard.stayMonthsLabel', { max: maxStayMonths() })}
                 type="number"
                 min={1}
                 max={maxStayMonths()}
@@ -621,12 +625,12 @@ export function NewApplicationPage() {
             </Card>
 
             <Card className="!p-4">
-              <p className="mb-1.5 text-sm text-sand-300">Тілек (міндетті емес)</p>
+              <p className="mb-1.5 text-sm text-sand-300">{t('wizard.wishLabel')}</p>
               <textarea
                 rows={2}
                 value={wish}
                 onChange={(e) => setWish(e.target.value)}
-                placeholder="Мысалы: курстасыммен бір бөлмеде тұрғым келеді"
+                placeholder={t('wizard.wishPlaceholder')}
                 className="w-full resize-y rounded-xl border border-navy-700 bg-navy-950 px-3 py-2.5 text-sm text-sand-100 outline-none focus:border-turquoise-400"
               />
             </Card>
@@ -634,9 +638,9 @@ export function NewApplicationPage() {
 
           <div className="mt-1">
             <Button className="w-full" isLoading={isSubmitting} onClick={handleSubmit}>
-              Өтінішті жіберу
+              {t('wizard.submitButton')}
             </Button>
-            <p className="mt-2.5 text-center text-xs text-sand-300">Жібергеннен кейін де құжат қосуға болады</p>
+            <p className="mt-2.5 text-center text-xs text-sand-300">{t('wizard.afterSubmitHint')}</p>
           </div>
         </>
       )}

@@ -177,6 +177,20 @@ func (s *UserService) SetChairperson(ctx context.Context, id uuid.UUID, isChairp
 	return s.users.UpdateChairperson(ctx, id, isChairperson)
 }
 
+// UpdateAvatar sets or clears (avatarURL == "") the caller's profile picture
+// URL. Access (self, or admin/manager) is checked by the handler, same as
+// UpsertStudentProfile.
+func (s *UserService) UpdateAvatar(ctx context.Context, id uuid.UUID, avatarURL string) (*domain.User, error) {
+	var url *string
+	if avatarURL != "" {
+		url = &avatarURL
+	}
+	if err := s.users.UpdateAvatar(ctx, id, url); err != nil {
+		return nil, err
+	}
+	return s.GetByID(ctx, id)
+}
+
 func (s *UserService) ListCommitteeMembers(ctx context.Context) ([]*domain.User, error) {
 	return s.users.ListCommitteeMembers(ctx)
 }

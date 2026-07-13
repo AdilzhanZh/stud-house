@@ -1,15 +1,9 @@
 import { Check } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 export type JourneyStep = 'submitted' | 'under_review' | 'approved' | 'contract' | 'payment' | 'settled'
 
-const STEPS: { key: JourneyStep; label: string }[] = [
-  { key: 'submitted', label: 'Өтініш берілді' },
-  { key: 'under_review', label: 'Қаралуда' },
-  { key: 'approved', label: 'Мақұлданды' },
-  { key: 'contract', label: 'Келісімшарт' },
-  { key: 'payment', label: 'Төлем' },
-  { key: 'settled', label: 'Орналасты' },
-]
+const STEP_KEYS: JourneyStep[] = ['submitted', 'under_review', 'approved', 'contract', 'payment', 'settled']
 
 interface ApplicationJourneyStepperProps {
   currentStep: JourneyStep
@@ -47,20 +41,21 @@ export function ApplicationJourneyStepper({
   orientation = 'horizontal',
   className = '',
 }: ApplicationJourneyStepperProps) {
-  const currentIndex = STEPS.findIndex((s) => s.key === currentStep)
+  const { t } = useTranslation()
+  const currentIndex = STEP_KEYS.indexOf(currentStep)
 
   if (orientation === 'vertical') {
     return (
       <ol className={`flex flex-col ${className}`}>
-        {STEPS.map((step, i) => {
+        {STEP_KEYS.map((key, i) => {
           const done = i < currentIndex
           const active = i === currentIndex
           const upcoming = i > currentIndex
           return (
-            <li key={step.key} className="flex items-stretch gap-3">
+            <li key={key} className="flex items-stretch gap-3">
               <div className="flex flex-col items-center">
                 <StepNode done={done} active={active} />
-                {i < STEPS.length - 1 && (
+                {i < STEP_KEYS.length - 1 && (
                   <span
                     className={`mt-0.5 w-0.5 flex-1 ${done ? 'bg-turquoise-500' : 'bg-navy-700'}`}
                     style={{ minHeight: '1.25rem' }}
@@ -73,8 +68,8 @@ export function ApplicationJourneyStepper({
                     upcoming ? 'text-sand-400' : 'text-sand-100'
                   } ${active ? 'font-bold' : 'font-medium'}`}
                 >
-                  {step.label}
-                  {active && ' — қазір осында'}
+                  {t(`journeyStep.${key}`)}
+                  {active && t('journeyStep.currentSuffix')}
                 </p>
               </div>
             </li>
@@ -86,15 +81,15 @@ export function ApplicationJourneyStepper({
 
   return (
     <ol className={`flex items-start ${className}`}>
-      {STEPS.map((step, i) => {
+      {STEP_KEYS.map((key, i) => {
         const done = i < currentIndex
         const active = i === currentIndex
         const upcoming = i > currentIndex
         return (
-          <li key={step.key} className={`flex flex-col items-center ${i === STEPS.length - 1 ? '' : 'flex-1'}`}>
+          <li key={key} className={`flex flex-col items-center ${i === STEP_KEYS.length - 1 ? '' : 'flex-1'}`}>
             <div className="flex w-full items-center">
               <StepNode done={done} active={active} />
-              {i < STEPS.length - 1 && (
+              {i < STEP_KEYS.length - 1 && (
                 <span className={`mx-1 h-0.5 flex-1 ${done ? 'bg-turquoise-500' : 'bg-navy-700'}`} />
               )}
             </div>
@@ -103,7 +98,7 @@ export function ApplicationJourneyStepper({
                 upcoming ? 'text-sand-400' : 'text-sand-100'
               } ${active ? 'font-bold' : ''}`}
             >
-              {step.label}
+              {t(`journeyStep.${key}`)}
             </span>
           </li>
         )

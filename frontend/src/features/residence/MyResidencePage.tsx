@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Card } from '../../components/Card'
 import { Select } from '../../components/Select'
 import { Button } from '../../components/Button'
@@ -11,25 +12,15 @@ import { getDormitory, listDormitories } from '../../api/dormitoryApi'
 import { listRoomResidents } from '../../api/roomApi'
 import { createExitRequest, listMyExitRequests } from '../../api/exitRequestApi'
 import { createTransferRequest, listMyTransferRequests } from '../../api/transferRequestApi'
+import { formatDate } from '../../utils/dateFormat'
 import type { Residence } from '../../types/residence'
 import type { Dormitory } from '../../types/dormitories'
 import type { ExitRequest } from '../../types/exitRequests'
 import type { TransferRequest } from '../../types/transferRequests'
 import type { RoomResident } from '../../types/rooms'
 
-const exitStatusLabels: Record<ExitRequest['status'], string> = {
-  pending: 'Қаралуда',
-  approved: 'Мақұлданды',
-  rejected: 'Қабылданбады',
-}
-
-const transferStatusLabels: Record<TransferRequest['status'], string> = {
-  pending: 'Қаралуда',
-  approved: 'Мақұлданды',
-  rejected: 'Қабылданбады',
-}
-
 export function MyResidencePage() {
+  const { t } = useTranslation()
   const { user } = useAuth()
 
   const [residence, setResidence] = useState<Residence | null>(null)
@@ -64,10 +55,10 @@ export function MyResidencePage() {
         const residents = await listRoomResidents(res.room_id).catch(() => [])
         setRoommates(residents.filter((r) => r.student_id !== user.id && !r.moved_out_at))
       })
-      .catch((err) => setLoadError(extractErrorMessage(err, 'Жүктеу сәтсіз аяқталды')))
+      .catch((err) => setLoadError(extractErrorMessage(err, t('residence.loadError'))))
   }
 
-  useEffect(load, [user])
+  useEffect(load, [user, t])
 
   async function handleExitConfirm() {
     setExitError(null)
@@ -78,7 +69,7 @@ export function MyResidencePage() {
       setExitReason('')
       setConfirmExitOpen(false)
     } catch (err) {
-      setExitError(extractErrorMessage(err, 'Шығу өтінішін жіберу сәтсіз аяқталды'))
+      setExitError(extractErrorMessage(err, t('residence.exitRequestFailed')))
     } finally {
       setExitSubmitting(false)
     }
@@ -98,20 +89,20 @@ export function MyResidencePage() {
       setTransferReason('')
       setConfirmTransferOpen(false)
     } catch (err) {
-      setTransferError(extractErrorMessage(err, 'Ауыстыру сұрауын жіберу сәтсіз аяқталды'))
+      setTransferError(extractErrorMessage(err, t('residence.transferRequestFailed')))
     } finally {
       setTransferSubmitting(false)
     }
   }
 
   if (loadError) return <Alert variant="error" message={loadError} />
-  if (!residence || !dormitory) return <p className="text-sm text-sand-300">Жүктелуде...</p>
+  if (!residence || !dormitory) return <p className="text-sm text-sand-300">{t('residence.loading')}</p>
 
   const hasPendingRequest = latestExit?.status === 'pending' || latestTransfer?.status === 'pending'
 
   return (
     <div className="flex flex-col gap-3.5">
-      <h1 className="text-[23px] font-bold text-sand-100">Менің орным</h1>
+      <h1 className="text-[23px] font-bold text-sand-100">{t('residence.title')}</h1>
 
       <Card>
         <div className="flex items-center gap-3.5">
@@ -120,24 +111,26 @@ export function MyResidencePage() {
           </span>
           <div>
             <p className="text-base font-semibold text-sand-100">
-              {dormitory.name} · {residence.room_number}-бөлме
+              {dormitory.name} · {t('residence.roomSuffix', { room: residence.room_number })}
             </p>
             <p className="mt-0.5 text-sm text-sand-300">
-              {dormitory.address} · {residence.capacity} орындық
+              {dormitory.address} · {t('residence.capacitySuffix', { count: residence.capacity })}
             </p>
           </div>
         </div>
 
         {roommates.length > 0 && (
           <div className="mt-3.5 rounded-2xl border border-navy-700 bg-navy-950 p-3.5">
-            <p className="mb-2 text-xs font-semibold tracking-wide text-sand-300 uppercase">Бөлмелестер</p>
+            <p className="mb-2 text-xs font-semibold tracking-wide text-sand-300 uppercase">
+              {t('residence.roommatesTitle')}
+            </p>
             <div className="flex flex-col gap-2">
               {roommates.map((r, i) => (
                 <div key={r.id} className="flex items-center gap-2.5 text-sm text-sand-100">
                   <span className="flex h-7.5 w-7.5 shrink-0 items-center justify-center rounded-full bg-navy-800 text-xs font-bold text-sand-200">
                     {i + 1}
                   </span>
-                  Бөлмелес — {new Date(r.moved_in_at).toLocaleDateString('kk-KZ')} бастап
+                  {t('residence.roommateSince', { date: formatDate(r.moved_in_at) })}
                 </div>
               ))}
             </div>
@@ -148,7 +141,7 @@ export function MyResidencePage() {
       {latestExit && (
         <Alert
           variant={latestExit.status === 'rejected' ? 'error' : 'success'}
-          message={`Соңғы шығу өтінішіңіз: ${exitStatusLabels[latestExit.status]}${
+          message={`${t('residence.lastExitStatusPrefix')}: ${t(`status.${latestExit.status}`)}${
             latestExit.status === 'rejected' && latestExit.comment ? ` — ${latestExit.comment}` : ''
           }`}
         />
@@ -156,20 +149,18 @@ export function MyResidencePage() {
       {latestTransfer && (
         <Alert
           variant={latestTransfer.status === 'rejected' ? 'error' : 'success'}
-          message={`Соңғы ауыстыру сұрауыңыз: ${transferStatusLabels[latestTransfer.status]}${
+          message={`${t('residence.lastTransferStatusPrefix')}: ${t(`status.${latestTransfer.status}`)}${
             latestTransfer.status === 'rejected' && latestTransfer.comment ? ` — ${latestTransfer.comment}` : ''
           }`}
         />
       )}
-      {hasPendingRequest && (
-        <Alert variant="warning" message="Сұранысыңыз қаралуда. Жаңа сұраныс беру үшін алдымен ағымдағысы шешілуі керек." />
-      )}
+      {hasPendingRequest && <Alert variant="warning" message={t('residence.pendingRequestWarning')} />}
 
       {!hasPendingRequest && (
         <div className="flex flex-col gap-3.5 md:grid md:grid-cols-2">
           <Card>
-            <p className="text-[15px] font-bold text-sand-100">Ауысу сұрауы</p>
-            <p className="mt-1.5 mb-3.5 text-sm text-sand-300">Басқа бөлме немесе жатақханаға ауысқың келсе</p>
+            <p className="text-[15px] font-bold text-sand-100">{t('residence.transferTitle')}</p>
+            <p className="mt-1.5 mb-3.5 text-sm text-sand-300">{t('residence.transferSubtitle')}</p>
             <form
               className="flex flex-col gap-3"
               onSubmit={(e) => {
@@ -178,8 +169,12 @@ export function MyResidencePage() {
               }}
             >
               {transferError && <Alert variant="error" message={transferError} />}
-              <Select label="Жаңа жатақхана" value={transferDormitoryId} onChange={(e) => setTransferDormitoryId(e.target.value)}>
-                <option value="">Таңдалмаған</option>
+              <Select
+                label={t('residence.newDormitoryLabel')}
+                value={transferDormitoryId}
+                onChange={(e) => setTransferDormitoryId(e.target.value)}
+              >
+                <option value="">{t('residence.notSelected')}</option>
                 {dormitories.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.name}
@@ -188,20 +183,20 @@ export function MyResidencePage() {
               </Select>
               <textarea
                 rows={2}
-                placeholder="Себебі (міндетті емес)"
+                placeholder={t('residence.reasonPlaceholder')}
                 className="w-full resize-y rounded-xl border border-navy-700 bg-navy-950 px-3 py-2.5 text-sm text-sand-100 outline-none placeholder:text-sand-400 focus:border-turquoise-400"
                 value={transferReason}
                 onChange={(e) => setTransferReason(e.target.value)}
               />
               <Button type="submit" variant="secondary" className="self-start">
-                Сұрау жіберу
+                {t('residence.sendRequest')}
               </Button>
             </form>
           </Card>
 
           <Card>
-            <p className="text-[15px] font-bold text-sand-100">Шығу өтініші</p>
-            <p className="mt-1.5 mb-3.5 text-sm text-sand-300">Жатақханадан біржола шығатын болсаң</p>
+            <p className="text-[15px] font-bold text-sand-100">{t('residence.exitTitle')}</p>
+            <p className="mt-1.5 mb-3.5 text-sm text-sand-300">{t('residence.exitSubtitle')}</p>
             <form
               className="flex flex-col gap-3"
               onSubmit={(e) => {
@@ -212,13 +207,13 @@ export function MyResidencePage() {
               {exitError && <Alert variant="error" message={exitError} />}
               <textarea
                 rows={2}
-                placeholder="Себебі (міндетті емес)"
+                placeholder={t('residence.reasonPlaceholder')}
                 className="w-full resize-y rounded-xl border border-navy-700 bg-navy-950 px-3 py-2.5 text-sm text-sand-100 outline-none placeholder:text-sand-400 focus:border-turquoise-400"
                 value={exitReason}
                 onChange={(e) => setExitReason(e.target.value)}
               />
               <Button type="submit" variant="secondary" className="self-start !text-clay-400">
-                Өтініш беру
+                {t('residence.submitRequest')}
               </Button>
             </form>
           </Card>
@@ -227,8 +222,8 @@ export function MyResidencePage() {
 
       <ConfirmDialog
         open={confirmExitOpen}
-        title="Шығу өтінішін растау"
-        message="Шығу өтінішін жібергеннен кейін бұл процесті бастайсыз. Жалғастырасыз ба?"
+        title={t('residence.confirmExitTitle')}
+        message={t('residence.confirmExitMessage')}
         isLoading={exitSubmitting}
         danger
         onConfirm={handleExitConfirm}
@@ -236,8 +231,8 @@ export function MyResidencePage() {
       />
       <ConfirmDialog
         open={confirmTransferOpen}
-        title="Ауыстыру сұрауын растау"
-        message="Ауыстыру сұрауын жібергеннен кейін бұл процесті бастайсыз. Жалғастырасыз ба?"
+        title={t('residence.confirmTransferTitle')}
+        message={t('residence.confirmTransferMessage')}
         isLoading={transferSubmitting}
         onConfirm={handleTransferConfirm}
         onCancel={() => setConfirmTransferOpen(false)}

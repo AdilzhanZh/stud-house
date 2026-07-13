@@ -261,6 +261,35 @@ func (h *UserHandler) GetStudentProfile(c *gin.Context) {
 	response.OK(c, studentProfileDTO(profile))
 }
 
+type updateAvatarRequest struct {
+	AvatarURL string `json:"avatar_url"`
+}
+
+// UpdateAvatar is allowed for admin/manager (any user) or the user
+// themselves (their own avatar only). An empty avatar_url clears it.
+func (h *UserHandler) UpdateAvatar(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, apperror.BadRequest("пайдаланушы идентификаторы дұрыс емес"))
+		return
+	}
+	if !canAccessStudentResource(c, id) {
+		response.Error(c, apperror.Forbidden("тек өз суретіңізді ғана өзгерте аласыз"))
+		return
+	}
+	var req updateAvatarRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.BadRequest(err.Error()))
+		return
+	}
+	user, err := h.users.UpdateAvatar(c.Request.Context(), id, req.AvatarURL)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, userDTO(user))
+}
+
 type setPasswordRequest struct {
 	NewPassword string `json:"new_password" binding:"required"`
 }

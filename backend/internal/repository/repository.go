@@ -23,6 +23,7 @@ type UserRepository interface {
 	UpdateRole(ctx context.Context, id uuid.UUID, role domain.Role) error
 	UpdateCommitteeMember(ctx context.Context, id uuid.UUID, isCommitteeMember bool) error
 	UpdateChairperson(ctx context.Context, id uuid.UUID, isChairperson bool) error
+	UpdateAvatar(ctx context.Context, id uuid.UUID, avatarURL *string) error
 	ListByRole(ctx context.Context, role domain.Role) ([]*domain.User, error)
 	// ListCommitteeMembers returns every user with is_committee_member = true
 	// (a flag on managers, elected by admin — not a separate role).

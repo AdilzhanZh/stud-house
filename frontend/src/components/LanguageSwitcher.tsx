@@ -1,0 +1,68 @@
+import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { Check, Globe } from 'lucide-react'
+import { storeLanguage, type SupportedLanguage } from '../i18n'
+
+const LANGUAGES: { code: SupportedLanguage; label: string }[] = [
+  { code: 'kk', label: 'Қазақша' },
+  { code: 'ru', label: 'Русский' },
+  { code: 'en', label: 'English' },
+]
+
+export function LanguageSwitcher() {
+  const { i18n } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const current = (i18n.language as SupportedLanguage) in { kk: 1, ru: 1, en: 1 }
+    ? (i18n.language as SupportedLanguage)
+    : 'kk'
+
+  useEffect(() => {
+    if (!open) return
+    function onClickOutside(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [open])
+
+  function select(code: SupportedLanguage) {
+    void i18n.changeLanguage(code)
+    storeLanguage(code)
+    setOpen(false)
+  }
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-label="Тіл / Язык / Language"
+        title="Тіл / Язык / Language"
+        className="flex h-8 items-center gap-1 rounded-lg px-2 text-sand-300 transition-colors hover:bg-sand-100/10 hover:text-sand-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-turquoise-400 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-950"
+      >
+        <Globe className="h-4.5 w-4.5" />
+        <span className="text-xs font-bold uppercase">{current}</span>
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 z-20 mt-2 w-40 overflow-hidden rounded-2xl border border-navy-700 bg-navy-900 py-1.5 shadow-[var(--shadow-card)]"
+        >
+          {LANGUAGES.map((lang) => (
+            <button
+              key={lang.code}
+              type="button"
+              role="menuitem"
+              onClick={() => select(lang.code)}
+              className="flex w-full items-center justify-between gap-2 px-3.5 py-2 text-left text-sm font-semibold text-sand-100 hover:bg-navy-800"
+            >
+              {lang.label}
+              {current === lang.code && <Check className="h-4 w-4 text-turquoise-400" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}

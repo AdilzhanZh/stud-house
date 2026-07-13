@@ -1,8 +1,11 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Bell, Building2, ClipboardList, Home as HomeIcon, User } from 'lucide-react'
 import { useAuth } from '../features/auth/useAuth'
 import { BrandMark } from '../components/BrandMark'
+import { Avatar } from '../components/Avatar'
 import { ThemeToggle } from '../components/ThemeToggle'
+import { LanguageSwitcher } from '../components/LanguageSwitcher'
 import { useUnreadCount } from '../features/notifications/useUnreadCount'
 
 type MobileSection = 'home' | 'dorm' | 'apps' | 'profile' | null
@@ -38,36 +41,28 @@ function deskNavMatch(pathname: string, to: string): boolean {
   return false
 }
 
-const mobileTabs: { section: MobileSection; label: string; to: string; icon: typeof HomeIcon }[] = [
-  { section: 'home', label: 'Басты', to: '/dashboard/home', icon: HomeIcon },
-  { section: 'dorm', label: 'Жатақхана', to: '/dormitories', icon: Building2 },
-  { section: 'apps', label: 'Өтініштер', to: '/applications/my', icon: ClipboardList },
-  { section: 'profile', label: 'Профиль', to: '/dashboard/profile', icon: User },
-]
-
-const deskNav: { label: string; to: string }[] = [
-  { label: 'Басты', to: '/dashboard/home' },
-  { label: 'Жатақханалар', to: '/dormitories' },
-  { label: 'Өтініш беру', to: '/applications/new' },
-  { label: 'Менің өтініштерім', to: '/applications/my' },
-  { label: 'Келісімшарт', to: '/contracts/my' },
-]
-
-function initials(fullName: string | undefined): string {
-  if (!fullName) return '?'
-  const parts = fullName.trim().split(/\s+/)
-  return parts
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase())
-    .join('')
-}
-
 export function DashboardLayout() {
+  const { t } = useTranslation()
   const { user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const unreadCount = useUnreadCount()
   const activeMobileSection = mobileSectionFor(location.pathname)
+
+  const mobileTabs: { section: MobileSection; label: string; to: string; icon: typeof HomeIcon }[] = [
+    { section: 'home', label: t('nav.home'), to: '/dashboard/home', icon: HomeIcon },
+    { section: 'dorm', label: t('nav.dorms'), to: '/dormitories', icon: Building2 },
+    { section: 'apps', label: t('nav.applications'), to: '/applications/my', icon: ClipboardList },
+    { section: 'profile', label: t('nav.profile'), to: '/dashboard/profile', icon: User },
+  ]
+
+  const deskNav: { label: string; to: string }[] = [
+    { label: t('nav.home'), to: '/dashboard/home' },
+    { label: t('nav.dorms'), to: '/dormitories' },
+    { label: t('nav.applyNew'), to: '/applications/new' },
+    { label: t('nav.myApplications'), to: '/applications/my' },
+    { label: t('nav.contract'), to: '/contracts/my' },
+  ]
 
   return (
     <div className="min-h-screen bg-navy-950 font-body pb-20 md:pb-0">
@@ -91,10 +86,11 @@ export function DashboardLayout() {
               </NavLink>
             ))}
           </nav>
+          <LanguageSwitcher />
           <ThemeToggle />
           <button
             onClick={() => navigate('/notifications')}
-            aria-label="Хабарламалар"
+            aria-label={t('nav.notifications')}
             className="relative flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-full border border-navy-700 bg-navy-900 text-sand-200"
           >
             <Bell className="h-4.5 w-4.5" />
@@ -102,12 +98,8 @@ export function DashboardLayout() {
               <span className="absolute top-2 right-2.5 h-2 w-2 rounded-full border-2 border-navy-900 bg-clay-400" />
             )}
           </button>
-          <button
-            onClick={() => navigate('/dashboard/profile')}
-            aria-label="Профиль"
-            className="flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-full bg-navy-800 text-sm font-bold text-sand-200"
-          >
-            {initials(user?.full_name)}
+          <button onClick={() => navigate('/dashboard/profile')} aria-label={t('nav.profile')}>
+            <Avatar fullName={user?.full_name} avatarUrl={user?.avatar_url} sizeClass="h-9.5 w-9.5" />
           </button>
         </div>
       </header>

@@ -8,11 +8,13 @@ import {
   clearStoredUser,
 } from '../../store/tokenStorage'
 import * as authApi from '../../api/authApi'
+import type { User } from '../../types'
 
 export function useAuth() {
   const user = useAuthStore((s) => s.user)
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const setSession = useAuthStore((s) => s.setSession)
+  const setUserInStore = useAuthStore((s) => s.setUser)
   const clear = useAuthStore((s) => s.clear)
 
   const login = useCallback(
@@ -41,5 +43,16 @@ export function useAuth() {
     }
   }, [clear])
 
-  return { user, isAuthenticated, login, register, logout }
+  // Patches the cached user (e.g. after an avatar upload) without touching
+  // the access token — updates both the in-memory store and the localStorage
+  // cache useAuthBootstrap restores on a hard reload.
+  const updateUser = useCallback(
+    (updated: User) => {
+      setStoredUser(updated)
+      setUserInStore(updated)
+    },
+    [setUserInStore],
+  )
+
+  return { user, isAuthenticated, login, register, logout, updateUser }
 }

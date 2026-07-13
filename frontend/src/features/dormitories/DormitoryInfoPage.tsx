@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { ChevronLeft } from 'lucide-react'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import { extractErrorMessage } from '../../api/client'
 import { getDormitory, getDormitoryCapacity, listDormitoryImages } from '../../api/dormitoryApi'
-import { dormTypeLabels, formatTenge } from '../../utils/dormitoryLabels'
+import { dormTypeLabel, formatTenge } from '../../utils/dormitoryLabels'
 import type { Dormitory, DormitoryCapacity, DormitoryImage } from '../../types/dormitories'
 
 function formatYear(value: string | null): string {
@@ -14,6 +15,7 @@ function formatYear(value: string | null): string {
 }
 
 export function DormitoryInfoPage() {
+  const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [dormitory, setDormitory] = useState<Dormitory | null>(null)
@@ -33,11 +35,11 @@ export function DormitoryInfoPage() {
         setImages(imgs)
         setCapacity(cap)
       })
-      .catch((err) => setError(extractErrorMessage(err, 'Жатақхана туралы ақпаратты жүктеу сәтсіз аяқталды')))
-  }, [id])
+      .catch((err) => setError(extractErrorMessage(err, t('dorm.loadInfoError'))))
+  }, [id, t])
 
   if (error) return <Alert variant="error" message={error} />
-  if (!dormitory) return <p className="text-sm text-sand-300">Жүктелуде...</p>
+  if (!dormitory) return <p className="text-sm text-sand-300">{t('dorm.loading')}</p>
 
   const vacancy = capacity ? capacity.total_capacity - capacity.allocated_beds : dormitory.total_capacity
 
@@ -47,7 +49,7 @@ export function DormitoryInfoPage() {
         onClick={() => navigate('/dormitories')}
         className="inline-flex w-fit items-center gap-1 text-sm font-semibold text-sand-300 hover:text-sand-100"
       >
-        <ChevronLeft className="h-4 w-4" /> Жатақханалар
+        <ChevronLeft className="h-4 w-4" /> {t('dorm.title')}
       </button>
 
       {images.length > 0 ? (
@@ -60,7 +62,7 @@ export function DormitoryInfoPage() {
               'repeating-linear-gradient(45deg, var(--color-navy-800) 0 8px, var(--color-navy-950) 8px 16px)',
           }}
         >
-          <span className="font-mono text-[10px] text-sand-400">жатақхана фотосы</span>
+          <span className="font-mono text-[10px] text-sand-400">{t('dorm.photoPlaceholder')}</span>
         </div>
       )}
 
@@ -77,52 +79,52 @@ export function DormitoryInfoPage() {
             vacancy > 0 ? 'bg-turquoise-500/10 text-turquoise-400' : 'bg-navy-800 text-sand-300'
           }`}
         >
-          {vacancy > 0 ? `${vacancy} бос орын` : 'орын жоқ'}
+          {vacancy > 0 ? t('dorm.vacancyCount', { count: vacancy }) : t('dorm.noVacancy')}
         </span>
       </div>
 
       <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
         <Card className="!p-3.5">
-          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">Айлық төлем</p>
+          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('dorm.monthlyPayment')}</p>
           <p className="mt-1.5 text-lg font-bold text-sand-100">{formatTenge(dormitory.monthly_payment)}</p>
         </Card>
         <Card className="!p-3.5">
-          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">Жылдық</p>
+          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('dorm.yearlyPayment')}</p>
           <p className="mt-1.5 text-lg font-bold text-sand-100">{formatTenge(dormitory.yearly_payment)}</p>
         </Card>
         <Card className="!p-3.5">
-          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">Түрі</p>
+          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('dorm.type')}</p>
           <p className="mt-1.5 text-lg font-bold text-sand-100">
-            {dormitory.dorm_type ? dormTypeLabels[dormitory.dorm_type] : '—'}
+            {dormitory.dorm_type ? dormTypeLabel(dormitory.dorm_type, t) : '—'}
           </p>
         </Card>
         <Card className="!p-3.5">
-          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">Қабат</p>
+          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('dorm.floor')}</p>
           <p className="mt-1.5 text-lg font-bold text-sand-100">{dormitory.floor_count ?? '—'}</p>
         </Card>
       </div>
 
       <Card>
-        <p className="mb-2.5 text-[15px] font-bold text-sand-100">Толығырақ</p>
+        <p className="mb-2.5 text-[15px] font-bold text-sand-100">{t('dorm.details')}</p>
         <div className="flex flex-col gap-2 text-sm">
           <div className="flex justify-between gap-3">
-            <span className="text-sand-300">Жалпы орын / бөлме</span>
+            <span className="text-sand-300">{t('dorm.totalCapacityRooms')}</span>
             <span className="font-semibold text-sand-100">
               {dormitory.total_capacity} / {dormitory.total_rooms_target ?? '—'}
             </span>
           </div>
           <div className="flex justify-between gap-3">
-            <span className="text-sand-300">Ерлер / қыздар / ортақ бөлме</span>
+            <span className="text-sand-300">{t('dorm.roomsByGender')}</span>
             <span className="font-semibold text-sand-100">
               {dormitory.rooms_male ?? '—'} / {dormitory.rooms_female ?? '—'} / {dormitory.rooms_mixed ?? '—'}
             </span>
           </div>
           <div className="flex justify-between gap-3">
-            <span className="text-sand-300">Салынған жылы</span>
+            <span className="text-sand-300">{t('dorm.builtYear')}</span>
             <span className="font-semibold text-sand-100">{formatYear(dormitory.built_year)}</span>
           </div>
           <div className="flex justify-between gap-3">
-            <span className="text-sand-300">Меншік түрі</span>
+            <span className="text-sand-300">{t('dorm.ownershipForm')}</span>
             <span className="font-semibold text-sand-100">{dormitory.ownership_form ?? '—'}</span>
           </div>
         </div>
@@ -132,7 +134,7 @@ export function DormitoryInfoPage() {
         className="w-full"
         onClick={() => navigate(`/applications/new?dormitory_id=${dormitory.id}`)}
       >
-        Осы жатақханаға өтініш беру
+        {t('dorm.applyButton')}
       </Button>
     </div>
   )

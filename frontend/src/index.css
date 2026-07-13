@@ -110,3 +110,13 @@ input:-webkit-autofill:focus {
   box-shadow: 0 0 0px 1000px var(--color-navy-900) inset;
   transition: background-color 5000s ease-in-out 0s;
 }
+
+/* The brand icon is a plain black-fill SVG — fine on the day theme's light
+   background, but invisible on night's dark background. Invert it (black ->
+   white) by default (night) and reset to the original black on day. */
+.brand-icon {
+  filter: invert(1);
+}
+:root[data-theme='day'] .brand-icon {
+  filter: none;
+}

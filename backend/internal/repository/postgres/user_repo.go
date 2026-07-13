@@ -24,7 +24,7 @@ func NewUserRepo(db *pgxpool.Pool) *UserRepo {
 
 const userColumns = `
 	id, full_name, email, phone, iin, password_hash, role, is_committee_member,
-	is_chairperson, approval_status, email_verified_at, email_verification_code,
+	is_chairperson, approval_status, avatar_url, email_verified_at, email_verification_code,
 	email_verification_expires_at, created_at, updated_at`
 
 func (r *UserRepo) Create(ctx context.Context, u *domain.User) error {
@@ -125,6 +125,18 @@ func (r *UserRepo) UpdateChairperson(ctx context.Context, id uuid.UUID, isChairp
 		return repository.ErrNotFound
 	}
 	return tx.Commit(ctx)
+}
+
+func (r *UserRepo) UpdateAvatar(ctx context.Context, id uuid.UUID, avatarURL *string) error {
+	const q = `UPDATE users SET avatar_url = $2, updated_at = now() WHERE id = $1`
+	tag, err := r.db.Exec(ctx, q, id, avatarURL)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return repository.ErrNotFound
+	}
+	return nil
 }
 
 func (r *UserRepo) ListCommitteeMembers(ctx context.Context) ([]*domain.User, error) {
@@ -296,7 +308,7 @@ func scanUserRow(row rowScanner) (*domain.User, error) {
 	var approvalStatus string
 	err := row.Scan(
 		&u.ID, &u.FullName, &u.Email, &u.Phone, &u.IIN, &u.PasswordHash, &role, &u.IsCommitteeMember,
-		&u.IsChairperson, &approvalStatus, &u.EmailVerifiedAt, &u.EmailVerificationCode, &u.EmailVerificationExpiresAt,
+		&u.IsChairperson, &approvalStatus, &u.AvatarURL, &u.EmailVerifiedAt, &u.EmailVerificationCode, &u.EmailVerificationExpiresAt,
 		&u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {

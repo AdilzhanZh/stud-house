@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { AlertCircle, Bell, Check, FileText } from 'lucide-react'
 import { Card } from '../../components/Card'
 import { Alert } from '../../components/Alert'
@@ -11,6 +12,7 @@ import {
   listNotifications,
   markNotificationRead,
 } from '../../api/notificationApi'
+import { formatDateTime } from '../../utils/dateFormat'
 import type { Notification, NotificationType } from '../../types/notifications'
 
 const iconByType: Partial<Record<NotificationType, { icon: typeof Bell; tint: string; iconColor: string }>> = {
@@ -21,6 +23,7 @@ const iconByType: Partial<Record<NotificationType, { icon: typeof Bell; tint: st
 }
 
 export function NotificationsPage() {
+  const { t } = useTranslation()
   const [notifications, setNotifications] = useState<Notification[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Notification | null>(null)
@@ -32,10 +35,10 @@ export function NotificationsPage() {
   function load() {
     listNotifications()
       .then(setNotifications)
-      .catch((err) => setError(extractErrorMessage(err, 'Хабарламаларды жүктеу сәтсіз аяқталды')))
+      .catch((err) => setError(extractErrorMessage(err, t('notif.loadError'))))
   }
 
-  useEffect(load, [])
+  useEffect(load, [t])
 
   async function handleClick(notification: Notification) {
     if (notification.is_read) return
@@ -64,7 +67,7 @@ export function NotificationsPage() {
       setNotifications((prev) => prev?.filter((n) => n.id !== deleteTarget.id) ?? prev)
       setDeleteTarget(null)
     } catch (err) {
-      setDeleteError(extractErrorMessage(err, 'Хабарламаны өшіру сәтсіз аяқталды'))
+      setDeleteError(extractErrorMessage(err, t('notif.deleteOneFailed')))
     } finally {
       setIsDeleting(false)
     }
@@ -78,7 +81,7 @@ export function NotificationsPage() {
       setNotifications([])
       setClearAllOpen(false)
     } catch (err) {
-      setDeleteError(extractErrorMessage(err, 'Хабарламаларды тазарту сәтсіз аяқталды'))
+      setDeleteError(extractErrorMessage(err, t('notif.clearAllFailed')))
     } finally {
       setIsClearing(false)
     }
@@ -87,24 +90,24 @@ export function NotificationsPage() {
   return (
     <div className="flex flex-col gap-3.5">
       <div className="flex items-center justify-between">
-        <h1 className="text-[23px] font-bold text-sand-100">Хабарламалар</h1>
+        <h1 className="text-[23px] font-bold text-sand-100">{t('notif.title')}</h1>
         <div className="flex items-center gap-4">
           {notifications && notifications.some((n) => !n.is_read) && (
             <button onClick={handleMarkAllRead} className="text-sm font-semibold text-sand-100 hover:text-turquoise-400">
-              Бәрін оқылды деу
+              {t('notif.markAllRead')}
             </button>
           )}
           {notifications && notifications.length > 0 && (
             <button onClick={() => setClearAllOpen(true)} className="text-sm font-semibold text-clay-400 hover:text-clay-300">
-              Тазарту
+              {t('notif.clearAll')}
             </button>
           )}
         </div>
       </div>
 
       {error && <Alert variant="error" message={error} />}
-      {!error && !notifications && <p className="text-sm text-sand-300">Жүктелуде...</p>}
-      {notifications && notifications.length === 0 && <p className="text-sm text-sand-300">Хабарлама жоқ</p>}
+      {!error && !notifications && <p className="text-sm text-sand-300">{t('notif.loading')}</p>}
+      {notifications && notifications.length === 0 && <p className="text-sm text-sand-300">{t('notif.empty')}</p>}
 
       <div className="flex flex-col gap-2.5">
         {notifications?.map((n) => {
@@ -119,11 +122,11 @@ export function NotificationsPage() {
                 <div className="min-w-0 flex-1">
                   <p className={`text-sm ${n.is_read ? 'font-semibold' : 'font-bold'} text-sand-100`}>{n.title}</p>
                   <p className="mt-0.5 text-sm text-sand-200">{n.body}</p>
-                  <p className="mt-1.5 text-xs text-sand-300">{new Date(n.created_at).toLocaleString('kk-KZ')}</p>
+                  <p className="mt-1.5 text-xs text-sand-300">{formatDateTime(n.created_at)}</p>
                 </div>
                 {!n.is_read && <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-clay-400" />}
                 <div onClick={(e) => e.stopPropagation()}>
-                  <DeleteIconButton onClick={() => setDeleteTarget(n)} label="Хабарламаны өшіру" />
+                  <DeleteIconButton onClick={() => setDeleteTarget(n)} label={t('notif.deleteOne')} />
                 </div>
               </div>
             </Card>
@@ -133,8 +136,8 @@ export function NotificationsPage() {
 
       <ConfirmDialog
         open={deleteTarget != null}
-        title="Хабарламаны өшіру"
-        message="Бұл хабарламаны өшіргіңіз келе ме? Бұл әрекетті болдырмау мүмкін емес."
+        title={t('notif.deleteOne')}
+        message={t('notif.deleteOneConfirm')}
         danger
         isLoading={isDeleting}
         onConfirm={handleDelete}
@@ -145,9 +148,9 @@ export function NotificationsPage() {
 
       <ConfirmDialog
         open={clearAllOpen}
-        title="Барлық хабарламаны тазарту"
-        message="Барлық хабарламаңызды өшіргіңіз келе ме? Бұл әрекетті болдырмау мүмкін емес."
-        confirmLabel="Барлығын тазарту"
+        title={t('notif.clearAllTitle')}
+        message={t('notif.clearAllConfirm')}
+        confirmLabel={t('notif.clearAllButton')}
         danger
         isLoading={isClearing}
         onConfirm={handleClearAll}

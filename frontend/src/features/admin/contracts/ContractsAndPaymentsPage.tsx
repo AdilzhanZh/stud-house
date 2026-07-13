@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Card } from '../../../components/Card'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
@@ -25,6 +26,7 @@ interface PaymentRow extends Payment {
 }
 
 export function ContractsAndPaymentsPage() {
+  const { t } = useTranslation()
   const [contracts, setContracts] = useState<ContractRow[] | null>(null)
   const [overdueContracts, setOverdueContracts] = useState<ContractRow[] | null>(null)
   const [pendingPayments, setPendingPayments] = useState<PaymentRow[] | null>(null)
@@ -226,7 +228,7 @@ export function ContractsAndPaymentsPage() {
                   <div>
                     <p className="font-semibold text-sand-100">{c.studentName}</p>
                     <p className="text-sm text-sand-300">{c.dormitoryName}</p>
-                    <p className="text-sm text-sand-200">Мерзімі {formatTimeElapsed(c.response_deadline)}</p>
+                    <p className="text-sm text-sand-200">Мерзімі {formatTimeElapsed(c.response_deadline, t)}</p>
                   </div>
                   {contractExtendTarget !== c.id && (
                     <div className="flex gap-2.5">
@@ -331,7 +333,7 @@ export function ContractsAndPaymentsPage() {
                     <p className="text-sm text-sand-300">
                       {p.amount} {p.currency}
                     </p>
-                    <p className="text-sm text-sand-200">Мерзімі {formatTimeElapsed(p.deadline)}</p>
+                    <p className="text-sm text-sand-200">Мерзімі {formatTimeElapsed(p.deadline, t)}</p>
                   </div>
                   {paymentExtendTarget !== p.id && (
                     <div className="flex gap-2.5">

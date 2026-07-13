@@ -35,11 +35,11 @@ export function PendingStudentsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="font-heading text-2xl text-sand-100">Күтіп тұрған тіркелгілер</h1>
+      <h1 className="text-[23px] font-bold text-sand-100">Күтіп тұрған тіркелгілер</h1>
 
       {error && <Alert variant="error" message={error} />}
       {actionError && <Alert variant="error" message={actionError} />}
-      {!error && !students && <p className="text-sm text-sand-300/60">Жүктелуде...</p>}
+      {!error && !students && <p className="text-sm text-sand-300">Жүктелуде...</p>}
 
       <div className="flex flex-col gap-3">
         {students?.map((s) => (
@@ -47,9 +47,9 @@ export function PendingStudentsPage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="font-medium text-sand-100">{s.full_name}</p>
-                <p className="text-sm text-sand-300/60">{s.email}</p>
-                <p className="text-sm text-sand-300/60">Телефон: {s.phone || '—'}</p>
-                <p className="font-mono text-sm text-sand-300/60">ЖСН (ИИН): {s.iin ?? '—'}</p>
+                <p className="text-sm text-sand-300">{s.email}</p>
+                <p className="text-sm text-sand-300">Телефон: {s.phone || '—'}</p>
+                <p className="font-mono text-sm text-sand-300">ЖСН (ИИН): {s.iin ?? '—'}</p>
               </div>
               <div className="flex shrink-0 gap-3">
                 <Button
@@ -70,7 +70,7 @@ export function PendingStudentsPage() {
           </Card>
         ))}
         {students && students.length === 0 && (
-          <p className="text-sm text-sand-300/60">Күтіп тұрған тіркелгі жоқ</p>
+          <p className="text-sm text-sand-300">Күтіп тұрған тіркелгі жоқ</p>
         )}
       </div>
     </div>

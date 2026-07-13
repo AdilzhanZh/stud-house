@@ -60,7 +60,7 @@ export function RoomResidentsView() {
   }
 
   if (error) return <Alert variant="error" message={error} />
-  if (!room || !residents) return <p className="text-sm text-sand-300/60">Жүктелуде...</p>
+  if (!room || !residents) return <p className="text-sm text-sand-300">Жүктелуде...</p>
 
   const residentStudentIds = new Set(residents.map((r) => r.student_id))
   const eligibleApplications = settledApplications.filter(
@@ -78,12 +78,12 @@ export function RoomResidentsView() {
       </Button>
 
       <Card title={`Бөлме ${room.room_number} — тұрғындар`}>
-        {residents.length === 0 && <p className="text-sm text-sand-300/60">Тұрғын жоқ</p>}
+        {residents.length === 0 && <p className="text-sm text-sand-300">Тұрғын жоқ</p>}
         <ul className="flex flex-col gap-2">
           {residents.map((r) => (
             <li key={r.id} className="flex justify-between text-sm">
               <span className="text-sand-100">{namesById[r.student_id] ?? r.student_id}</span>
-              <span className="text-sand-300/60">
+              <span className="text-sand-300">
                 {new Date(r.moved_in_at).toLocaleDateString('kk-KZ')}
               </span>
             </li>
@@ -94,7 +94,7 @@ export function RoomResidentsView() {
       <Card title="Тұрғын қосу">
         {assignError && <Alert variant="error" message={assignError} />}
         {eligibleApplications.length === 0 ? (
-          <p className="text-sm text-sand-300/60">
+          <p className="text-sm text-sand-300">
             Осы жатақханада бөлмеге орналастыруды күтіп тұрған студент жоқ
           </p>
         ) : (

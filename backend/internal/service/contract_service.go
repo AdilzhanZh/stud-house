@@ -13,7 +13,6 @@ import (
 	"student-house/internal/repository"
 	"student-house/internal/service/notifier"
 	"student-house/pkg/apperror"
-	"student-house/pkg/mailer"
 )
 
 const contractDeclinedComment = "Студент келісімшартты қабылдамады"
@@ -26,7 +25,6 @@ type ContractService struct {
 	reportTemplates  repository.ReportTemplateRepository
 	users            repository.UserRepository
 	notifier         *notifier.Notifier
-	mailer           *mailer.Mailer
 	responseDeadline time.Duration
 	reminderWindow   time.Duration
 	// paymentDeadline is how long a manager has to confirm/reject a payment
@@ -43,7 +41,6 @@ func NewContractService(
 	reportTemplates repository.ReportTemplateRepository,
 	users repository.UserRepository,
 	notifier *notifier.Notifier,
-	m *mailer.Mailer,
 	responseDeadline time.Duration,
 	reminderWindow time.Duration,
 	paymentDeadline time.Duration,
@@ -55,7 +52,6 @@ func NewContractService(
 		reportTemplates:  reportTemplates,
 		users:            users,
 		notifier:         notifier,
-		mailer:           m,
 		responseDeadline: responseDeadline,
 		reminderWindow:   reminderWindow,
 		paymentDeadline:  paymentDeadline,
@@ -324,12 +320,4 @@ func (s *ContractService) notifyManagerDecision(ctx context.Context, contract *d
 		title, body = "Келісімшарт жойылды", "Сіз мерзімде жауап бермегендіктен, менеджер өтінішіңізді жойды."
 	}
 	_ = s.notifier.Notify(ctx, app.StudentID, domain.NotificationContractSent, title, body, &app.ID)
-
-	if student, err := s.users.GetByID(ctx, app.StudentID); err == nil {
-		go func(email, subject, body string) {
-			if err := s.mailer.Send(email, subject, body); err != nil {
-				log.Printf("failed to send contract-decision email to %s: %v", email, err)
-			}
-		}(student.Email, title, body)
-	}
 }

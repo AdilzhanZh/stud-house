@@ -46,10 +46,10 @@ export function CommitteeReportListPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="font-heading text-2xl text-sand-100">Комиссия рапорттары</h1>
+      <h1 className="text-[23px] font-bold text-sand-100">Комиссия рапорттары</h1>
 
       {error && <Alert variant="error" message={error} />}
-      {!error && !rows && <p className="text-sm text-sand-300/60">Жүктелуде...</p>}
+      {!error && !rows && <p className="text-sm text-sand-300">Жүктелуде...</p>}
 
       <div className="flex flex-col gap-2">
         {rows?.map((r) => (
@@ -59,7 +59,7 @@ export function CommitteeReportListPage() {
             onClick={() => navigate(`/committee/reports/${r.id}`)}
           >
             <span className="font-medium text-sand-100">{r.templateName}</span>
-            <span className="text-sm text-sand-300/70">
+            <span className="text-sm text-sand-300">
               Менің дауысым:{' '}
               {r.myVote === 'approved'
                 ? 'Мақұлдадым'
@@ -70,7 +70,7 @@ export function CommitteeReportListPage() {
           </Card>
         ))}
         {rows && rows.length === 0 && (
-          <p className="text-sm text-sand-300/60">Қаралатын рапорт жоқ</p>
+          <p className="text-sm text-sand-300">Қаралатын рапорт жоқ</p>
         )}
       </div>
     </div>

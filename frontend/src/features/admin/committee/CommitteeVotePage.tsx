@@ -60,7 +60,7 @@ export function CommitteeVotePage() {
   }
 
   if (loadError) return <Alert variant="error" message={loadError} />
-  if (!report || !user) return <p className="text-sm text-sand-300/60">Жүктелуде...</p>
+  if (!report || !user) return <p className="text-sm text-sand-300">Жүктелуде...</p>
 
   const myVote = report.votes.find((v) => v.committee_member_id === user.id)
   // Hide the vote panel once the report has left pending_committee (backend
@@ -100,7 +100,7 @@ export function CommitteeVotePage() {
               <textarea
                 rows={3}
                 placeholder="Мақұлдамау себебі (міндетті)"
-                className="rounded-md border border-sand-100/15 bg-navy-950/60 px-3 py-2 text-sand-100 text-sm outline-none focus:border-turquoise-400 focus:ring-2 focus:ring-turquoise-400/30"
+                className="rounded-[14px] border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sand-100 text-sm outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
               />

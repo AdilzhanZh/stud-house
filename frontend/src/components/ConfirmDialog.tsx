@@ -37,7 +37,7 @@ export function ConfirmDialog({
       role="dialog"
       aria-modal="true"
     >
-      <div className="w-full max-w-sm rounded-xl border border-sand-100/10 bg-navy-900 p-6 shadow-xl">
+      <div className="w-full max-w-sm rounded-[20px] bg-navy-900 p-6 shadow-[var(--shadow-card)]">
         <h2 className="font-heading text-lg text-sand-100">{title}</h2>
         <p className="mt-2 text-sm text-sand-300/70">{message}</p>
         {children && <div className="mt-4">{children}</div>}

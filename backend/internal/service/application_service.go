@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,7 +12,6 @@ import (
 	"student-house/internal/repository"
 	"student-house/internal/service/notifier"
 	"student-house/pkg/apperror"
-	"student-house/pkg/mailer"
 )
 
 type DecisionAction string
@@ -30,9 +28,7 @@ type ApplicationService struct {
 	dormitories  repository.DormitoryRepository
 	roomRepo     repository.RoomRepository
 	rooms        *RoomService
-	users        repository.UserRepository
 	notifier     *notifier.Notifier
-	mailer       *mailer.Mailer
 }
 
 func NewApplicationService(
@@ -41,9 +37,7 @@ func NewApplicationService(
 	dormitories repository.DormitoryRepository,
 	roomRepo repository.RoomRepository,
 	rooms *RoomService,
-	users repository.UserRepository,
 	notifier *notifier.Notifier,
-	m *mailer.Mailer,
 ) *ApplicationService {
 	return &ApplicationService{
 		applications: applications,
@@ -51,9 +45,7 @@ func NewApplicationService(
 		dormitories:  dormitories,
 		roomRepo:     roomRepo,
 		rooms:        rooms,
-		users:        users,
 		notifier:     notifier,
-		mailer:       m,
 	}
 }
 
@@ -64,7 +56,25 @@ func statusPtr(s domain.ApplicationStatus) *domain.ApplicationStatus { return &s
 // of some room (an active room_residents row) — settled students must go
 // through a move-out flow, not a new intake application, which is out of
 // scope for this phase.
-func (s *ApplicationService) Create(ctx context.Context, studentID, dormitoryID uuid.UUID, preferredRoomType, notes *string, preferredRoomID *uuid.UUID) (*domain.Application, error) {
+// maxStayMonths returns how many months a student may declare, counted from
+// the current month up to and including June (the academic year's end) —
+// e.g. applying in September allows up to 10 months (Sep..Jun), October
+// allows 9, and June itself allows only 1.
+func maxStayMonths(now time.Time) int {
+	const juneMonth = 6
+	m := int(now.Month())
+	return (juneMonth-m+12)%12 + 1
+}
+
+func validStayMonths(stayMonths *int, now time.Time) bool {
+	return stayMonths != nil && *stayMonths >= 1 && *stayMonths <= maxStayMonths(now)
+}
+
+func (s *ApplicationService) Create(ctx context.Context, studentID, dormitoryID uuid.UUID, preferredRoomType, notes *string, preferredRoomID *uuid.UUID, stayMonths *int) (*domain.Application, error) {
+	if !validStayMonths(stayMonths, time.Now()) {
+		return nil, apperror.BadRequest(fmt.Sprintf("неше айға тұратыныңызды дұрыс көрсетіңіз (1-%d ай, маусымнан аспауы тиіс)", maxStayMonths(time.Now())))
+	}
+
 	if _, err := s.dormitories.GetByID(ctx, dormitoryID); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return nil, apperror.NotFound("жатақхана табылмады")
@@ -121,6 +131,7 @@ func (s *ApplicationService) Create(ctx context.Context, studentID, dormitoryID 
 		PreferredRoomType: preferredRoomType,
 		PreferredRoomID:   preferredRoomID,
 		Notes:             notes,
+		StayMonths:        stayMonths,
 	}
 	if err := s.applications.Create(ctx, app); err != nil {
 		if errors.Is(err, repository.ErrConflict) {
@@ -240,7 +251,10 @@ func (s *ApplicationService) ListDocuments(ctx context.Context, applicationID uu
 
 // Resubmit lets the owning student edit their application while it is in
 // needs_correction, moving it back to pending in the same operation.
-func (s *ApplicationService) Resubmit(ctx context.Context, actorStudentID, applicationID uuid.UUID, preferredRoomType, notes *string) (*domain.Application, error) {
+func (s *ApplicationService) Resubmit(ctx context.Context, actorStudentID, applicationID uuid.UUID, preferredRoomType, notes *string, stayMonths *int) (*domain.Application, error) {
+	if !validStayMonths(stayMonths, time.Now()) {
+		return nil, apperror.BadRequest(fmt.Sprintf("неше айға тұратыныңызды дұрыс көрсетіңіз (1-%d ай, маусымнан аспауы тиіс)", maxStayMonths(time.Now())))
+	}
 	err := s.applications.WithLock(ctx, applicationID, func(ctx context.Context, app *domain.Application, tx repository.ApplicationTx) error {
 		if app.StudentID != actorStudentID {
 			return apperror.Forbidden("тек өз өтінішіңізді өзгерте аласыз")
@@ -248,7 +262,7 @@ func (s *ApplicationService) Resubmit(ctx context.Context, actorStudentID, appli
 		if app.Status != domain.ApplicationNeedsCorrection {
 			return apperror.BadRequest("өтінішті тек түзету қажет болған кезде ғана өзгертуге болады")
 		}
-		if err := tx.UpdateEditableFieldsAndResubmit(ctx, applicationID, preferredRoomType, notes); err != nil {
+		if err := tx.UpdateEditableFieldsAndResubmit(ctx, applicationID, preferredRoomType, notes, stayMonths); err != nil {
 			return err
 		}
 		return tx.AddHistory(ctx, &domain.ApplicationStatusHistory{
@@ -352,14 +366,6 @@ func (s *ApplicationService) notifyDecision(ctx context.Context, studentID, appl
 		notifType = domain.NotificationDocumentRequested
 	}
 	_ = s.notifier.Notify(ctx, studentID, notifType, title, body, &applicationID)
-
-	if student, err := s.users.GetByID(ctx, studentID); err == nil {
-		go func(email, subject, body string) {
-			if err := s.mailer.Send(email, subject, body); err != nil {
-				log.Printf("failed to send application-decision email to %s: %v", email, err)
-			}
-		}(student.Email, title, body)
-	}
 }
 
 func decisionNotificationText(status domain.ApplicationStatus, comment *string) (title, body string) {

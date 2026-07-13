@@ -9,3 +9,11 @@ export async function listNotifications(): Promise<Notification[]> {
 export async function markNotificationRead(id: string): Promise<void> {
   await apiClient.patch(`/notifications/${id}/read`)
 }
+
+export async function deleteNotification(id: string): Promise<void> {
+  await apiClient.delete(`/notifications/${id}`)
+}
+
+export async function clearAllNotifications(): Promise<void> {
+  await apiClient.delete('/notifications')
+}

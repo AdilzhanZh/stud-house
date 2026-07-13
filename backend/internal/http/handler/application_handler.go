@@ -26,6 +26,7 @@ type createApplicationRequest struct {
 	PreferredRoomType *string    `json:"preferred_room_type"`
 	PreferredRoomID   *uuid.UUID `json:"preferred_room_id"`
 	Notes             *string    `json:"notes"`
+	StayMonths        *int       `json:"stay_months"`
 }
 
 // Create is student-only: it always creates the application for the caller.
@@ -36,7 +37,7 @@ func (h *ApplicationHandler) Create(c *gin.Context) {
 		return
 	}
 	studentID, _ := middleware.UserID(c)
-	app, err := h.applications.Create(c.Request.Context(), studentID, req.DormitoryID, req.PreferredRoomType, req.Notes, req.PreferredRoomID)
+	app, err := h.applications.Create(c.Request.Context(), studentID, req.DormitoryID, req.PreferredRoomType, req.Notes, req.PreferredRoomID, req.StayMonths)
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -73,6 +74,7 @@ func (h *ApplicationHandler) ListMine(c *gin.Context) {
 type resubmitApplicationRequest struct {
 	PreferredRoomType *string `json:"preferred_room_type"`
 	Notes             *string `json:"notes"`
+	StayMonths        *int    `json:"stay_months"`
 }
 
 // Resubmit is student-only: editing is only allowed on the caller's own
@@ -89,7 +91,7 @@ func (h *ApplicationHandler) Resubmit(c *gin.Context) {
 		return
 	}
 	studentID, _ := middleware.UserID(c)
-	app, err := h.applications.Resubmit(c.Request.Context(), studentID, id, req.PreferredRoomType, req.Notes)
+	app, err := h.applications.Resubmit(c.Request.Context(), studentID, id, req.PreferredRoomType, req.Notes, req.StayMonths)
 	if err != nil {
 		response.Error(c, err)
 		return

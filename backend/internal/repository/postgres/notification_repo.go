@@ -61,3 +61,21 @@ func (r *NotificationRepo) MarkRead(ctx context.Context, id uuid.UUID, userID uu
 	}
 	return nil
 }
+
+func (r *NotificationRepo) Delete(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {
+	const q = `DELETE FROM notifications WHERE id = $1 AND user_id = $2`
+	tag, err := r.db.Exec(ctx, q, id, userID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return repository.ErrNotFound
+	}
+	return nil
+}
+
+func (r *NotificationRepo) DeleteAllByUser(ctx context.Context, userID uuid.UUID) error {
+	const q = `DELETE FROM notifications WHERE user_id = $1`
+	_, err := r.db.Exec(ctx, q, userID)
+	return err
+}

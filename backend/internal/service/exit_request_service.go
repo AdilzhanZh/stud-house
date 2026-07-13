@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"log"
 
 	"github.com/google/uuid"
 
@@ -11,7 +10,6 @@ import (
 	"student-house/internal/repository"
 	"student-house/internal/service/notifier"
 	"student-house/pkg/apperror"
-	"student-house/pkg/mailer"
 )
 
 type ExitRequestService struct {
@@ -19,7 +17,6 @@ type ExitRequestService struct {
 	rooms        repository.RoomRepository
 	users        repository.UserRepository
 	notifier     *notifier.Notifier
-	mailer       *mailer.Mailer
 }
 
 func NewExitRequestService(
@@ -27,9 +24,8 @@ func NewExitRequestService(
 	rooms repository.RoomRepository,
 	users repository.UserRepository,
 	notifier *notifier.Notifier,
-	m *mailer.Mailer,
 ) *ExitRequestService {
-	return &ExitRequestService{exitRequests: exitRequests, rooms: rooms, users: users, notifier: notifier, mailer: m}
+	return &ExitRequestService{exitRequests: exitRequests, rooms: rooms, users: users, notifier: notifier}
 }
 
 // Create is student-only: it looks up the caller's own active room stay
@@ -130,14 +126,6 @@ func (s *ExitRequestService) notifyStudentDecision(ctx context.Context, e *domai
 		title, body = "Шығу өтінішіңіз қабылданбады", "Сіздің жатақханадан шығу өтінішіңіз қабылданбады."
 	}
 	_ = s.notifier.Notify(ctx, e.StudentID, domain.NotificationExitRequestUpdate, title, body, nil)
-
-	if student, err := s.users.GetByID(ctx, e.StudentID); err == nil {
-		go func(email, subject, body string) {
-			if err := s.mailer.Send(email, subject, body); err != nil {
-				log.Printf("failed to send exit-request-decision email to %s: %v", email, err)
-			}
-		}(student.Email, title, body)
-	}
 }
 
 func (s *ExitRequestService) notifyManagersNewExitRequest(ctx context.Context, e *domain.ExitRequest) {

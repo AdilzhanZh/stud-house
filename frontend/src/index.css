@@ -8,31 +8,37 @@
    day palette lives in the `[data-theme="day"]` block further down. No
    component needs its own day/night variant classes because of this. */
 @theme {
-  --font-heading: 'Fraunces', ui-serif, Georgia, serif;
-  --font-body: 'Inter', system-ui, sans-serif;
+  --font-heading: 'Golos Text', system-ui, sans-serif;
+  --font-body: 'Golos Text', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
-  --color-navy-950: #0a1420;
-  --color-navy-900: #101d2e;
-  --color-navy-800: #182a40;
-  --color-navy-700: #223a54;
-  --color-navy-600: #2d4c6b;
+  /* navy-950 = page background, navy-900 = card surface, navy-800 = a
+     secondary/tinted surface (progress-bar tracks, subtle chips), navy-700
+     = hairline borders, navy-600 = a slightly stronger border/hover tone. */
+  --color-navy-950: #141c26;
+  --color-navy-900: #1c2733;
+  --color-navy-800: #22303c;
+  --color-navy-700: #2b3844;
+  --color-navy-600: #3a4954;
 
   --color-sand-100: #f4ecdd;
-  --color-sand-200: #e7d9bf;
-  --color-sand-300: #d3bf97;
-  --color-sand-400: #b39d6f;
+  --color-sand-200: #d8c9a8;
+  --color-sand-300: #9c8f73;
+  --color-sand-400: #71685a;
 
   --color-turquoise-300: #82e0d3;
   --color-turquoise-400: #45c4b6;
-  --color-turquoise-500: #2aa89a;
-  --color-turquoise-600: #1f8b80;
+  --color-turquoise-500: #45c4b6;
+  --color-turquoise-600: #2f9c8f;
 
-  --color-clay-400: #d9836a;
+  --color-clay-400: #e08a6e;
   --color-clay-500: #c1654c;
 
   --color-mint-400: #7ed7a5;
   --color-mint-500: #55b881;
+
+  --color-amber-400: #e8b05c;
+  --color-amber-500: #c9924a;
 
   /* Fixed — does NOT flip between day/night. Used only as text sitting on
      top of a solid turquoise/clay accent button; dark ink reads correctly
@@ -46,40 +52,48 @@
    are deepened where they're used as small text/icons (needs real contrast
    against a light page), not where they're a button's own fill color. */
 :root[data-theme='day'] {
-  --color-navy-950: #faf6ec;
-  --color-navy-900: #fffaf2;
-  --color-navy-800: #f0e6d2;
-  --color-navy-700: #e3d5b8;
-  --color-navy-600: #d0bd94;
+  --color-navy-950: #fbf7ef;
+  --color-navy-900: #ffffff;
+  --color-navy-800: #f3ecdd;
+  --color-navy-700: #ede4d3;
+  --color-navy-600: #d8cbb0;
 
-  --color-sand-100: #241b10;
-  --color-sand-200: #3a2d1c;
-  --color-sand-300: #5c4b34;
-  --color-sand-400: #8a7355;
+  --color-sand-100: #1f2933;
+  --color-sand-200: #5c4b34;
+  --color-sand-300: #8a7355;
+  --color-sand-400: #a79878;
 
   --color-turquoise-300: #1f8a7f;
-  --color-turquoise-400: #167b70;
+  --color-turquoise-400: #1f8a7f;
   --color-turquoise-500: #2aa89a;
   --color-turquoise-600: #145f58;
 
   --color-clay-400: #b8462b;
   --color-clay-500: #9c3a22;
 
-  --color-mint-400: #2f8f5c;
-  --color-mint-500: #237049;
+  --color-mint-400: #1e6b4f;
+  --color-mint-500: #175a41;
+
+  --color-amber-400: #9c5a22;
+  --color-amber-500: #7a4419;
 
   color-scheme: light;
 }
 
 :root {
   color-scheme: dark;
+  --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+:root[data-theme='day'] {
+  --shadow-card: 0 8px 24px rgba(31, 41, 51, 0.06);
 }
 
 body {
   margin: 0;
   background-color: var(--color-navy-950);
   color: var(--color-sand-100);
-  font-family: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Golos Text', system-ui, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   transition: background-color 0.2s ease, color 0.2s ease;

@@ -12,18 +12,29 @@ import { listUsers } from '../../../api/adminUserApi'
 import { listBenefits, listStudentBenefits } from '../../../api/benefitApi'
 import { downloadApplicationPdf } from '../../../utils/applicationPdf'
 import { markApplicationsSeenNow } from './applicationsSeen'
+import {
+  adminCellClass,
+  adminPageHeading,
+  adminRowClickableClass,
+  adminTableWrapClass,
+  adminTheadClass,
+} from '../adminTable'
 import type { Application, ApplicationStatus } from '../../../types/applications'
 
-const TABS: { status: ApplicationStatus; label: string }[] = [
-  { status: 'pending', label: 'Менеджерді күтуде' },
-  { status: 'needs_correction', label: 'Түзетуде' },
-  { status: 'approved', label: 'Қабылданды' },
-  { status: 'rejected', label: 'Қабылданбады' },
-]
+const STATUSES: ApplicationStatus[] = ['pending', 'needs_correction', 'approved', 'rejected']
+const STATUS_LABELS: Record<ApplicationStatus | 'all', string> = {
+  all: 'Барлығы',
+  pending: 'Жаңа',
+  needs_correction: 'Түзетуде',
+  approved: 'Мақұлданды',
+  rejected: 'Бас тартылды',
+  manager_review: 'Қаралуда',
+  settled: 'Аяқталды',
+}
 
 export function ApplicationQueuePage() {
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState<ApplicationStatus>('pending')
+  const [activeFilter, setActiveFilter] = useState<ApplicationStatus | 'all'>('all')
   const [applications, setApplications] = useState<Application[] | null>(null)
   const [namesById, setNamesById] = useState<Record<string, string>>({})
   const [dormitoryNamesById, setDormitoryNamesById] = useState<Record<string, string>>({})
@@ -33,10 +44,19 @@ export function ApplicationQueuePage() {
 
   useEffect(() => {
     let cancelled = false
-    setApplications(null)
-    Promise.all([listApplications(activeTab), listUsers('student'), listDormitories(), listBenefits()])
-      .then(async ([apps, students, dormitories, benefits]) => {
+    Promise.all([
+      ...STATUSES.map((s) => listApplications(s)),
+      listUsers('student'),
+      listDormitories(),
+      listBenefits(),
+    ])
+      .then(async (results) => {
         if (cancelled) return
+        const apps = (results.slice(0, STATUSES.length) as Application[][]).flat()
+        const students = results[STATUSES.length] as Awaited<ReturnType<typeof listUsers>>
+        const dormitories = results[STATUSES.length + 1] as Awaited<ReturnType<typeof listDormitories>>
+        const benefits = results[STATUSES.length + 2] as Awaited<ReturnType<typeof listBenefits>>
+
         setApplications(apps)
         setNamesById(Object.fromEntries(students.map((s) => [s.id, s.full_name])))
         setDormitoryNamesById(Object.fromEntries(dormitories.map((d) => [d.id, d.name])))
@@ -57,7 +77,7 @@ export function ApplicationQueuePage() {
           }),
         )
         if (!cancelled) setPriorityByStudent(Object.fromEntries(entries))
-        if (!cancelled && activeTab === 'pending') markApplicationsSeenNow()
+        if (!cancelled) markApplicationsSeenNow()
       })
       .catch((err) => {
         if (!cancelled) setError(extractErrorMessage(err, 'Өтініштерді жүктеу сәтсіз аяқталды'))
@@ -65,19 +85,34 @@ export function ApplicationQueuePage() {
     return () => {
       cancelled = true
     }
-  }, [activeTab])
+  }, [])
+
+  const counts = useMemo(() => {
+    const c: Record<ApplicationStatus | 'all', number> = {
+      all: applications?.length ?? 0,
+      pending: 0,
+      needs_correction: 0,
+      approved: 0,
+      rejected: 0,
+      manager_review: 0,
+      settled: 0,
+    }
+    applications?.forEach((a) => {
+      c[a.status] += 1
+    })
+    return c
+  }, [applications])
 
   const visibleApplications = useMemo(() => {
     if (!applications) return null
-    const filtered = dormitoryFilter
-      ? applications.filter((app) => app.dormitory_id === dormitoryFilter)
-      : applications
+    let filtered = activeFilter === 'all' ? applications : applications.filter((a) => a.status === activeFilter)
+    if (dormitoryFilter) filtered = filtered.filter((app) => app.dormitory_id === dormitoryFilter)
     return [...filtered].sort((a, b) => {
       const priorityDiff = (priorityByStudent[b.student_id] ?? 1) - (priorityByStudent[a.student_id] ?? 1)
       if (priorityDiff !== 0) return priorityDiff
       return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     })
-  }, [applications, dormitoryFilter, priorityByStudent])
+  }, [applications, activeFilter, dormitoryFilter, priorityByStudent])
 
   function handleDownload(app: Application) {
     downloadApplicationPdf({
@@ -90,27 +125,27 @@ export function ApplicationQueuePage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="font-heading text-2xl text-sand-100">Өтініш кезегі</h1>
+    <div className="flex flex-col gap-3.5">
+      <h1 className={adminPageHeading}>Өтініштер</h1>
 
-      <div className="flex gap-1 border-b border-sand-100/10">
-        {TABS.map((tab) => (
+      <div className="flex flex-wrap gap-2">
+        {(['all', ...STATUSES] as const).map((status) => (
           <button
-            key={tab.status}
-            className={`px-4 py-2 text-sm font-medium ${
-              activeTab === tab.status
-                ? 'border-b-2 border-turquoise-500 text-turquoise-400'
-                : 'text-sand-300/60 hover:text-sand-100'
+            key={status}
+            onClick={() => setActiveFilter(status)}
+            className={`rounded-full border px-4 py-2 text-sm font-semibold whitespace-nowrap ${
+              activeFilter === status
+                ? 'border-turquoise-500 bg-turquoise-500/10 text-turquoise-400'
+                : 'border-navy-700 bg-navy-900 text-sand-300 hover:text-sand-100'
             }`}
-            onClick={() => setActiveTab(tab.status)}
           >
-            {tab.label}
+            {STATUS_LABELS[status]} ({counts[status]})
           </button>
         ))}
       </div>
 
       {error && <Alert variant="error" message={error} />}
-      {!error && !applications && <p className="text-sm text-sand-300/60">Жүктелуде...</p>}
+      {!error && !applications && <p className="text-sm text-sand-300">Жүктелуде...</p>}
 
       {applications && (
         <>
@@ -129,50 +164,48 @@ export function ApplicationQueuePage() {
             </Select>
           </div>
 
-          <Card className="overflow-x-auto p-0">
+          <Card className={adminTableWrapClass}>
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-sand-100/10 text-xs uppercase text-sand-300/60">
+              <thead className={adminTheadClass}>
                 <tr>
-                  <th className="px-4 py-3">Студент</th>
-                  <th className="px-4 py-3">Жатақхана</th>
-                  <th className="px-4 py-3">Приоритет</th>
-                  <th className="px-4 py-3">Құрылған күні</th>
-                  <th className="px-4 py-3">Статус</th>
-                  <th className="px-4 py-3" />
+                  <th className={adminCellClass}>Студент</th>
+                  <th className={adminCellClass}>Жатақхана</th>
+                  <th className={adminCellClass}>Приоритет</th>
+                  <th className={adminCellClass}>Күні</th>
+                  <th className={adminCellClass}>Статус</th>
+                  <th className={adminCellClass} />
                 </tr>
               </thead>
               <tbody>
                 {visibleApplications?.map((app) => (
                   <tr
                     key={app.id}
-                    className="cursor-pointer border-b border-sand-100/10 last:border-0 hover:bg-navy-950"
+                    className={adminRowClickableClass}
                     onClick={() => navigate(`/admin/applications/${app.id}`)}
                   >
-                    <td className="px-4 py-3 font-medium text-sand-100">
+                    <td className={`${adminCellClass} font-semibold text-sand-100`}>
                       {namesById[app.student_id] ?? app.student_id}
                     </td>
-                    <td className="px-4 py-3 text-sand-300/70">
+                    <td className={`${adminCellClass} text-sand-300`}>
                       {dormitoryNamesById[app.dormitory_id] ?? app.dormitory_id}
                     </td>
-                    <td className="px-4 py-3 text-sand-300/70">
+                    <td className={`${adminCellClass} text-sand-300`}>
                       {priorityByStudent[app.student_id] ?? 1}
                     </td>
-                    <td className="px-4 py-3 text-sand-300/70">
+                    <td className={`${adminCellClass} text-sand-300`}>
                       {new Date(app.created_at).toLocaleDateString('kk-KZ')}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className={adminCellClass}>
                       <StatusBadge status={app.status} />
                     </td>
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      {app.status === 'approved' && (
-                        <DownloadIconButton onClick={() => handleDownload(app)} />
-                      )}
+                    <td className={adminCellClass} onClick={(e) => e.stopPropagation()}>
+                      {app.status === 'approved' && <DownloadIconButton onClick={() => handleDownload(app)} />}
                     </td>
                   </tr>
                 ))}
                 {visibleApplications?.length === 0 && (
                   <tr>
-                    <td className="px-4 py-3 text-sand-300/60" colSpan={6}>
+                    <td className={`${adminCellClass} text-sand-300`} colSpan={6}>
                       Өтініш жоқ
                     </td>
                   </tr>

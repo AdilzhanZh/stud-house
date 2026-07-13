@@ -4,14 +4,11 @@ import { useAuthStore } from '../store/authStore'
 // ProfilePage (student-only: gender/course) errors out for admin/manager —
 // UserService.UpsertStudentProfile/GetStudentProfile only make sense for
 // role=student. So the default landing route differs by role instead of
-// always going to /dashboard/profile.
+// always going to /dashboard/home.
 export function RoleBasedRedirect() {
   const role = useAuthStore((s) => s.user?.role)
-  if (role === 'manager') {
-    return <Navigate to="/admin/applications" replace />
+  if (role === 'manager' || role === 'admin') {
+    return <Navigate to="/admin/dashboard" replace />
   }
-  if (role === 'admin') {
-    return <Navigate to="/admin/dormitories" replace />
-  }
-  return <Navigate to="/dashboard/profile" replace />
+  return <Navigate to="/dashboard/home" replace />
 }

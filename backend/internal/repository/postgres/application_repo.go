@@ -14,7 +14,7 @@ import (
 	"student-house/internal/repository"
 )
 
-const applicationColumns = `id, student_id, dormitory_id, status, preferred_room_type, preferred_room_id, notes, assigned_room_id, handled_by, created_at, updated_at`
+const applicationColumns = `id, student_id, dormitory_id, status, preferred_room_type, preferred_room_id, notes, stay_months, assigned_room_id, handled_by, created_at, updated_at`
 
 type ApplicationRepo struct {
 	db *pgxpool.Pool
@@ -26,10 +26,10 @@ func NewApplicationRepo(db *pgxpool.Pool) *ApplicationRepo {
 
 func (r *ApplicationRepo) Create(ctx context.Context, a *domain.Application) error {
 	const q = `
-		INSERT INTO applications (student_id, dormitory_id, status, preferred_room_type, preferred_room_id, notes)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO applications (student_id, dormitory_id, status, preferred_room_type, preferred_room_id, notes, stay_months)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id, created_at, updated_at`
-	err := r.db.QueryRow(ctx, q, a.StudentID, a.DormitoryID, string(a.Status), a.PreferredRoomType, a.PreferredRoomID, a.Notes).
+	err := r.db.QueryRow(ctx, q, a.StudentID, a.DormitoryID, string(a.Status), a.PreferredRoomType, a.PreferredRoomID, a.Notes, a.StayMonths).
 		Scan(&a.ID, &a.CreatedAt, &a.UpdatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -170,9 +170,9 @@ func (t *applicationTx) SetDecision(ctx context.Context, id uuid.UUID, status do
 	return err
 }
 
-func (t *applicationTx) UpdateEditableFieldsAndResubmit(ctx context.Context, id uuid.UUID, preferredRoomType, notes *string) error {
-	const q = `UPDATE applications SET preferred_room_type = $2, notes = $3, status = 'pending', updated_at = now() WHERE id = $1`
-	_, err := t.tx.Exec(ctx, q, id, preferredRoomType, notes)
+func (t *applicationTx) UpdateEditableFieldsAndResubmit(ctx context.Context, id uuid.UUID, preferredRoomType, notes *string, stayMonths *int) error {
+	const q = `UPDATE applications SET preferred_room_type = $2, notes = $3, stay_months = $4, status = 'pending', updated_at = now() WHERE id = $1`
+	_, err := t.tx.Exec(ctx, q, id, preferredRoomType, notes, stayMonths)
 	return err
 }
 
@@ -222,7 +222,7 @@ func (r *ApplicationRepo) GetReapplyBlock(ctx context.Context, studentID uuid.UU
 func scanApplicationRow(row pgx.Row) (*domain.Application, error) {
 	a := &domain.Application{}
 	var status string
-	err := row.Scan(&a.ID, &a.StudentID, &a.DormitoryID, &status, &a.PreferredRoomType, &a.PreferredRoomID, &a.Notes, &a.AssignedRoomID, &a.HandledBy, &a.CreatedAt, &a.UpdatedAt)
+	err := row.Scan(&a.ID, &a.StudentID, &a.DormitoryID, &status, &a.PreferredRoomType, &a.PreferredRoomID, &a.Notes, &a.StayMonths, &a.AssignedRoomID, &a.HandledBy, &a.CreatedAt, &a.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, repository.ErrNotFound
@@ -238,7 +238,7 @@ func scanApplicationRows(rows pgx.Rows) ([]*domain.Application, error) {
 	for rows.Next() {
 		a := &domain.Application{}
 		var status string
-		if err := rows.Scan(&a.ID, &a.StudentID, &a.DormitoryID, &status, &a.PreferredRoomType, &a.PreferredRoomID, &a.Notes, &a.AssignedRoomID, &a.HandledBy, &a.CreatedAt, &a.UpdatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.StudentID, &a.DormitoryID, &status, &a.PreferredRoomType, &a.PreferredRoomID, &a.Notes, &a.StayMonths, &a.AssignedRoomID, &a.HandledBy, &a.CreatedAt, &a.UpdatedAt); err != nil {
 			return nil, err
 		}
 		a.Status = domain.ApplicationStatus(status)

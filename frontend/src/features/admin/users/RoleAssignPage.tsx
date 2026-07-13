@@ -59,7 +59,7 @@ export function RoleAssignPage() {
   }
 
   if (loadError) return <Alert variant="error" message={loadError} />
-  if (!user) return <p className="text-sm text-sand-300/60">Жүктелуде...</p>
+  if (!user) return <p className="text-sm text-sand-300">Жүктелуде...</p>
 
   return (
     <div className="flex flex-col gap-6">

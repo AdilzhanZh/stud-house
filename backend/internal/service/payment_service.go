@@ -13,7 +13,6 @@ import (
 	"student-house/internal/repository"
 	"student-house/internal/service/notifier"
 	"student-house/pkg/apperror"
-	"student-house/pkg/mailer"
 )
 
 const paymentVoidedComment = "Төлем мерзімде расталмағандықтан менеджер өтінішті жойды"
@@ -24,7 +23,6 @@ type PaymentService struct {
 	applications repository.ApplicationRepository
 	users        repository.UserRepository
 	notifier     *notifier.Notifier
-	mailer       *mailer.Mailer
 	// reminderWindow: managers get reminded about a pending/submitted
 	// payment once its deadline is within this window.
 	reminderWindow time.Duration
@@ -40,7 +38,6 @@ func NewPaymentService(
 	applications repository.ApplicationRepository,
 	users repository.UserRepository,
 	notifier *notifier.Notifier,
-	m *mailer.Mailer,
 	reminderWindow time.Duration,
 	reapplyBlock time.Duration,
 ) *PaymentService {
@@ -50,7 +47,6 @@ func NewPaymentService(
 		applications:   applications,
 		users:          users,
 		notifier:       notifier,
-		mailer:         m,
 		reminderWindow: reminderWindow,
 		reapplyBlock:   reapplyBlock,
 	}
@@ -304,14 +300,6 @@ func (s *PaymentService) notifyManagerDecision(ctx context.Context, studentID, a
 		title, body = "Өтініш жойылды", fmt.Sprintf("Сіз төлемді мерзімде растатпағандықтан, менеджер өтінішіңізді жойды. Сіз %s дейін жаңа өтініш бере алмайсыз.", time.Now().Add(s.reapplyBlock).Format("2006-01-02"))
 	}
 	_ = s.notifier.Notify(ctx, studentID, domain.NotificationPaymentUpdate, title, body, &applicationID)
-
-	if student, err := s.users.GetByID(ctx, studentID); err == nil {
-		go func(email, subject, body string) {
-			if err := s.mailer.Send(email, subject, body); err != nil {
-				log.Printf("failed to send payment-manager-decision email to %s: %v", email, err)
-			}
-		}(student.Email, title, body)
-	}
 }
 
 func (s *PaymentService) notifyManagersNewPayment(ctx context.Context, payment *domain.Payment, applicationID uuid.UUID) {
@@ -333,12 +321,4 @@ func (s *PaymentService) notifyStudentPaymentDecision(ctx context.Context, stude
 		title, body = "Төлем расталмады", "Сіздің төлеміңіз расталмады, чекті қайта жүктеңіз."
 	}
 	_ = s.notifier.Notify(ctx, studentID, domain.NotificationPaymentUpdate, title, body, &applicationID)
-
-	if student, err := s.users.GetByID(ctx, studentID); err == nil {
-		go func(email, subject, body string) {
-			if err := s.mailer.Send(email, subject, body); err != nil {
-				log.Printf("failed to send payment-decision email to %s: %v", email, err)
-			}
-		}(student.Email, title, body)
-	}
 }

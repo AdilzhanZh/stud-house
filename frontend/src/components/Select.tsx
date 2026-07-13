@@ -24,7 +24,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
         id={selectId}
         ref={ref}
         required={required}
-        className={`rounded-lg border bg-navy-950/60 px-3 py-2 text-sm text-sand-100 outline-none transition-colors focus:ring-4 ${
+        className={`rounded-[14px] border bg-navy-900 px-4 py-3 text-sm text-sand-100 outline-none transition-colors focus:ring-4 ${
           error
             ? 'border-clay-400 focus:border-clay-400 focus:ring-clay-500/15'
             : 'border-sand-100/15 focus:border-turquoise-400 focus:ring-turquoise-400/15'

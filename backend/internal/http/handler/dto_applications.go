@@ -16,6 +16,7 @@ type applicationResponse struct {
 	PreferredRoomType *string    `json:"preferred_room_type"`
 	PreferredRoomID   *uuid.UUID `json:"preferred_room_id"`
 	Notes             *string    `json:"notes"`
+	StayMonths        *int       `json:"stay_months"`
 	AssignedRoomID    *uuid.UUID `json:"assigned_room_id"`
 	HandledBy         *uuid.UUID `json:"handled_by"`
 	CreatedAt         time.Time  `json:"created_at"`
@@ -31,6 +32,7 @@ func applicationDTO(a *domain.Application) applicationResponse {
 		PreferredRoomType: a.PreferredRoomType,
 		PreferredRoomID:   a.PreferredRoomID,
 		Notes:             a.Notes,
+		StayMonths:        a.StayMonths,
 		AssignedRoomID:    a.AssignedRoomID,
 		HandledBy:         a.HandledBy,
 		CreatedAt:         a.CreatedAt,

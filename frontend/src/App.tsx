@@ -4,6 +4,7 @@ import { DashboardLayout } from './layouts/DashboardLayout'
 import { AdminLayout } from './layouts/AdminLayout'
 import { LoginPage } from './features/auth/LoginPage'
 import { RegisterPage } from './features/auth/RegisterPage'
+import { HomePage } from './features/home/HomePage'
 import { ProfilePage } from './features/profile/ProfilePage'
 import { DormitoriesPage } from './features/dormitories/DormitoriesPage'
 import { DormitoryInfoPage } from './features/dormitories/DormitoryInfoPage'
@@ -25,14 +26,16 @@ import { UserListPage } from './features/admin/users/UserListPage'
 import { UserRegisterFormPage } from './features/admin/users/UserRegisterFormPage'
 import { RoleAssignPage } from './features/admin/users/RoleAssignPage'
 import { PendingStudentsPage } from './features/admin/users/PendingStudentsPage'
+import { DashboardPage } from './features/admin/dashboard/DashboardPage'
+import { ResidentsPage } from './features/admin/residents/ResidentsPage'
+import { NotificationBroadcastPage } from './features/admin/notifications/NotificationBroadcastPage'
 import { ApplicationQueuePage } from './features/admin/applications/ApplicationQueuePage'
 import { ApplicationAdminDetailPage } from './features/admin/applications/ApplicationAdminDetailPage'
 import { ReportListPage } from './features/admin/reports/ReportListPage'
 import { ReportDetailPage } from './features/admin/reports/ReportDetailPage'
 import { CommitteeReportListPage } from './features/admin/committee/CommitteeReportListPage'
 import { CommitteeVotePage } from './features/admin/committee/CommitteeVotePage'
-import { ContractOversightPage } from './features/admin/contracts/ContractOversightPage'
-import { PaymentReviewPage } from './features/admin/payments/PaymentReviewPage'
+import { ContractsAndPaymentsPage } from './features/admin/contracts/ContractsAndPaymentsPage'
 import { ExitRequestListPage } from './features/admin/requests/ExitRequestListPage'
 import { TransferRequestListPage } from './features/admin/requests/TransferRequestListPage'
 import { ProtectedRoute } from './routes/ProtectedRoute'
@@ -59,6 +62,7 @@ function App() {
 
       <Route element={<ProtectedRoute />}>
         <Route element={<DashboardLayout />}>
+          <Route path="/dashboard/home" element={<HomePage />} />
           <Route path="/dashboard/profile" element={<ProfilePage />} />
           <Route path="/dormitories" element={<DormitoriesPage />} />
         <Route path="/dormitories/:id" element={<DormitoryInfoPage />} />
@@ -74,6 +78,9 @@ function App() {
 
       <Route element={<ProtectedRoute allowedRoles={['admin', 'manager']} />}>
         <Route element={<AdminLayout />}>
+          <Route path="/admin/dashboard" element={<DashboardPage />} />
+          <Route path="/admin/residents" element={<ResidentsPage />} />
+          <Route path="/admin/notifications/broadcast" element={<NotificationBroadcastPage />} />
           <Route path="/admin/dormitories" element={<DormitoryListPage />} />
           <Route path="/admin/dormitories/new" element={<DormitoryFormPage />} />
           <Route path="/admin/dormitories/:id/edit" element={<DormitoryFormPage />} />
@@ -93,8 +100,8 @@ function App() {
           <Route path="/committee/reports" element={<CommitteeReportListPage />} />
           <Route path="/committee/reports/:id" element={<CommitteeVotePage />} />
 
-          <Route path="/admin/contracts" element={<ContractOversightPage />} />
-          <Route path="/admin/payments" element={<PaymentReviewPage />} />
+          <Route path="/admin/contracts" element={<ContractsAndPaymentsPage />} />
+          <Route path="/admin/payments" element={<ContractsAndPaymentsPage />} />
           <Route path="/admin/exit-requests" element={<ExitRequestListPage />} />
           <Route path="/admin/transfer-requests" element={<TransferRequestListPage />} />
 

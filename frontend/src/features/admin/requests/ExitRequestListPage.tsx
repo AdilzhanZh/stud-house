@@ -62,11 +62,11 @@ export function ExitRequestListPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="font-heading text-2xl text-sand-100">Шығу сұраныстары</h1>
+      <h1 className="text-[23px] font-bold text-sand-100">Шығу сұраныстары</h1>
 
       {error && <Alert variant="error" message={error} />}
       {actionError && <Alert variant="error" message={actionError} />}
-      {!error && !rows && <p className="text-sm text-sand-300/60">Жүктелуде...</p>}
+      {!error && !rows && <p className="text-sm text-sand-300">Жүктелуде...</p>}
 
       <div className="flex flex-col gap-3">
         {rows?.map((r) => (
@@ -74,7 +74,7 @@ export function ExitRequestListPage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="font-medium text-sand-100">{r.studentName}</p>
-                {r.reason && <p className="text-sm text-sand-300/60">{r.reason}</p>}
+                {r.reason && <p className="text-sm text-sand-300">{r.reason}</p>}
                 <p className="text-xs text-sand-400">
                   {new Date(r.requested_at).toLocaleDateString('kk-KZ')}
                 </p>
@@ -96,7 +96,7 @@ export function ExitRequestListPage() {
                 <textarea
                   rows={3}
                   placeholder="Себебі (міндетті)"
-                  className="rounded-md border border-sand-100/15 bg-navy-950/60 px-3 py-2 text-sand-100 text-sm outline-none focus:border-turquoise-400 focus:ring-2 focus:ring-turquoise-400/30"
+                  className="rounded-[14px] border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sand-100 text-sm outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                 />
@@ -124,7 +124,7 @@ export function ExitRequestListPage() {
           </Card>
         ))}
         {rows && rows.length === 0 && (
-          <p className="text-sm text-sand-300/60">Қаралатын сұраныс жоқ</p>
+          <p className="text-sm text-sand-300">Қаралатын сұраныс жоқ</p>
         )}
       </div>
     </div>

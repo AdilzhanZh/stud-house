@@ -9,8 +9,8 @@ interface CardProps {
 export function Card({ title, className = '', onClick, children }: PropsWithChildren<CardProps>) {
   return (
     <div
-      className={`w-full rounded-xl border border-sand-100/10 bg-navy-900 p-6 shadow-sm ${
-        onClick ? 'cursor-pointer transition-colors hover:border-sand-100/20' : ''
+      className={`w-full rounded-[20px] bg-navy-900 p-[18px] shadow-[var(--shadow-card)] ${
+        onClick ? 'cursor-pointer transition-transform hover:-translate-y-0.5' : ''
       } ${className}`}
       onClick={onClick}
     >

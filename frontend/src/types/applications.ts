@@ -21,6 +21,7 @@ export interface Application {
   preferred_room_type: string | null
   preferred_room_id: string | null
   notes: string | null
+  stay_months: number | null
   assigned_room_id: string | null
   handled_by: string | null
   created_at: string

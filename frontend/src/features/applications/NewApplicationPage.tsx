@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { ChevronLeft, Check, Upload } from 'lucide-react'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
-import { Select } from '../../components/Select'
+import { Input } from '../../components/Input'
 import { Alert } from '../../components/Alert'
+import { SegmentedProgress } from '../../components/SegmentedProgress'
 import { extractErrorMessage } from '../../api/client'
-import { listDormitories, listDormitoryRequiredDocuments } from '../../api/dormitoryApi'
+import { listDormitoryRequiredDocuments } from '../../api/dormitoryApi'
 import {
   addApplicationDocument,
   createApplication,
@@ -17,10 +19,13 @@ import { listRoomResidents, listRoomsByDormitory } from '../../api/roomApi'
 import { getStudentProfile } from '../../api/profileApi'
 import { uploadFile } from '../../api/uploadApi'
 import { generateApplicationSubmissionPdfBlob } from '../../utils/applicationPdf'
+import { formatTenge } from '../../utils/dormitoryLabels'
+import { maxStayMonths } from '../../utils/stayMonths'
 import { FloorCorridorMap } from '../../components/FloorCorridorMap'
+import { useDormitoriesWithMeta } from '../dormitories/useDormitoriesWithMeta'
 import { useAuth } from '../auth/useAuth'
 import { isActiveApplicationStatus } from './statusHelpers'
-import type { Dormitory, DormitoryRequiredDocument } from '../../types/dormitories'
+import type { DormitoryRequiredDocument } from '../../types/dormitories'
 import type { Benefit, BenefitRequiredDocument } from '../../types/benefits'
 import type { Room } from '../../types/rooms'
 import type { Gender } from '../../types'
@@ -29,18 +34,85 @@ interface RoomWithOccupancy extends Room {
   residentCount: number
 }
 
+const STEP_CAPTIONS: Record<1 | 2 | 3, string> = {
+  1: '1/3 қадам · Жатақхана таңдау',
+  2: '2/3 қадам · Құжаттар',
+  3: '3/3 қадам · Тексеру және жіберу',
+}
+
+function DocumentCard({
+  name,
+  file,
+  onChange,
+}: {
+  name: string
+  file: File | null
+  onChange: (file: File | null) => void
+}) {
+  if (file) {
+    return (
+      <Card className="!p-4">
+        <div className="flex items-center gap-3">
+          <span className="flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-full bg-mint-500/15">
+            <Check className="h-4.5 w-4.5 text-mint-400" strokeWidth={2.5} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-sand-100">{name}</p>
+            <p className="truncate text-sm text-mint-400">{file.name} · жүктелді</p>
+          </div>
+          <label className="shrink-0 cursor-pointer text-sm font-semibold text-sand-300 hover:text-sand-100">
+            Өзгерту
+            <input
+              type="file"
+              accept="application/pdf"
+              className="hidden"
+              onChange={(e) => onChange(e.target.files?.[0] ?? null)}
+            />
+          </label>
+        </div>
+      </Card>
+    )
+  }
+  return (
+    <label className="block cursor-pointer rounded-2xl border-2 border-dashed border-navy-700 bg-navy-900 p-4">
+      <input
+        type="file"
+        accept="application/pdf"
+        className="hidden"
+        onChange={(e) => onChange(e.target.files?.[0] ?? null)}
+      />
+      <div className="flex items-center gap-3">
+        <span className="flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-full bg-navy-800">
+          <Upload className="h-4.5 w-4.5 text-sand-200" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-sand-100">{name}</p>
+          <p className="text-sm text-sand-300">PDF, 10 МБ-қа дейін</p>
+        </div>
+        <span className="shrink-0 rounded-full bg-turquoise-500/10 px-3.5 py-1.5 text-sm font-semibold whitespace-nowrap text-turquoise-400">
+          Жүктеу
+        </span>
+      </div>
+    </label>
+  )
+}
+
 export function NewApplicationPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { user } = useAuth()
 
-  const [dormitories, setDormitories] = useState<Dormitory[] | null>(null)
+  const [step, setStep] = useState<1 | 2 | 3>(1)
+  const [sent, setSent] = useState(false)
+
+  const { dormitories } = useDormitoriesWithMeta()
   const [dormitoriesWithRooms, setDormitoriesWithRooms] = useState<Set<string>>(new Set())
   const [dormitoryId, setDormitoryId] = useState(searchParams.get('dormitory_id') ?? '')
   const [dormitoryRequiredDocs, setDormitoryRequiredDocs] = useState<DormitoryRequiredDocument[]>([])
   const [studentGender, setStudentGender] = useState<Gender | null>(null)
   const [rooms, setRooms] = useState<RoomWithOccupancy[]>([])
   const [roomId, setRoomId] = useState('')
+  const [selectedFloor, setSelectedFloor] = useState<string | null>(null)
   const [hasActiveApplication, setHasActiveApplication] = useState(false)
   const [benefits, setBenefits] = useState<Benefit[]>([])
   const [hasBenefit, setHasBenefit] = useState(false)
@@ -49,26 +121,28 @@ export function NewApplicationPage() {
     Record<string, BenefitRequiredDocument[]>
   >({})
   const [docFiles, setDocFiles] = useState<Record<string, File | null>>({})
+  const [wish, setWish] = useState('')
+  const [stayMonths, setStayMonths] = useState('')
   const [loadError, setLoadError] = useState<string | null>(null)
   const [serverError, setServerError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
-    listDormitories()
-      .then(async (list) => {
-        setDormitories(list)
-        // A dormitory with no rooms entered yet can't be applied to — a
-        // manager must add rooms first (see FloorCorridorMap-based room
-        // creation on the dormitory detail page).
-        const withRooms = await Promise.all(
-          list.map(async (d) => {
-            const rooms = await listRoomsByDormitory(d.id).catch(() => [])
-            return [d.id, rooms.length > 0] as const
-          }),
-        )
-        setDormitoriesWithRooms(new Set(withRooms.filter(([, hasRooms]) => hasRooms).map(([id]) => id)))
-      })
+    if (!dormitories) return
+    // A dormitory with no rooms entered yet can't be applied to — a manager
+    // must add rooms first (see FloorCorridorMap-based room creation on the
+    // dormitory detail page).
+    Promise.all(
+      dormitories.map(async (d) => {
+        const rooms = await listRoomsByDormitory(d.id).catch(() => [])
+        return [d.id, rooms.length > 0] as const
+      }),
+    )
+      .then((withRooms) => setDormitoriesWithRooms(new Set(withRooms.filter(([, has]) => has).map(([id]) => id))))
       .catch((err) => setLoadError(extractErrorMessage(err, 'Жатақханаларды жүктеу сәтсіз аяқталды')))
+  }, [dormitories])
+
+  useEffect(() => {
     listMyApplications()
       .then((list) => setHasActiveApplication(list.some((a) => isActiveApplicationStatus(a.status))))
       .catch(() => {})
@@ -117,7 +191,13 @@ export function NewApplicationPage() {
       return byFloor
     }, {}),
   ).sort(([a], [b]) => Number(a) - Number(b))
+  const activeFloor =
+    selectedFloor && eligibleFloorGroups.some(([floor]) => floor === selectedFloor)
+      ? selectedFloor
+      : eligibleFloorGroups[0]?.[0]
+  const activeFloorRooms = eligibleFloorGroups.find(([floor]) => floor === activeFloor)?.[1] ?? []
   const selectedRoom = eligibleRooms.find((r) => r.id === roomId) ?? null
+  const chosenDormitory = dormitories?.find((d) => d.id === dormitoryId) ?? null
 
   function toggleBenefit(benefitId: string) {
     setSelectedBenefitIds((prev) => {
@@ -138,20 +218,39 @@ export function NewApplicationPage() {
   }
 
   const selectedRequiredDocs = selectedBenefitIds.flatMap((id) => requiredDocsByBenefit[id] ?? [])
+  const allRequiredDocs = [...dormitoryRequiredDocs, ...selectedRequiredDocs]
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!dormitoryId) {
-      setServerError('Жатақхананы таңдаңыз')
-      return
-    }
-    if (!dormitoriesWithRooms.has(dormitoryId)) {
-      setServerError('Бұл жатақханада әлі бөлме енгізілмеген, өтініш беруге болмайды')
-      return
-    }
+  function goNext() {
     setServerError(null)
+    if (step === 1) {
+      if (!dormitoryId) {
+        setServerError('Жатақхананы таңдаңыз')
+        return
+      }
+      if (!dormitoriesWithRooms.has(dormitoryId)) {
+        setServerError('Бұл жатақханада әлі бөлме енгізілмеген, өтініш беруге болмайды')
+        return
+      }
+    }
+    setStep((s) => (s < 3 ? ((s + 1) as 1 | 2 | 3) : s))
+  }
 
-    const allRequiredDocs = [...dormitoryRequiredDocs, ...selectedRequiredDocs]
+  function goBack() {
+    if (step > 1) {
+      setStep((s) => (s - 1) as 1 | 2 | 3)
+    } else {
+      navigate('/dashboard/home')
+    }
+  }
+
+  async function handleSubmit() {
+    setServerError(null)
+    const months = Number(stayMonths)
+    const maxMonths = maxStayMonths()
+    if (!Number.isInteger(months) || months < 1 || months > maxMonths) {
+      setServerError(`Неше айға тұратыныңызды дұрыс көрсетіңіз (1-${maxMonths} ай, маусымнан аспауы тиіс)`)
+      return
+    }
     const missingDoc = allRequiredDocs.find((doc) => !docFiles[doc.id])
     if (missingDoc) {
       setServerError(`"${missingDoc.document_name}" құжатын жүктеңіз`)
@@ -178,8 +277,9 @@ export function NewApplicationPage() {
 
       const application = await createApplication({
         dormitory_id: dormitoryId,
-        notes: null,
+        notes: wish.trim() || null,
         preferred_room_id: roomId || null,
+        stay_months: months,
       })
       createdApplicationId = application.id
 
@@ -229,7 +329,7 @@ export function NewApplicationPage() {
         }
       }
 
-      navigate('/applications/my', { replace: true })
+      setSent(true)
     } catch (err) {
       if (createdApplicationId) {
         await deleteApplication(createdApplicationId).catch(() => {})
@@ -240,60 +340,143 @@ export function NewApplicationPage() {
     }
   }
 
-  return (
-    <Card title="Өтініш беру">
-      {loadError && <Alert variant="error" message={loadError} />}
-      {hasActiveApplication && (
-        <Alert
-          variant="error"
-          message="Сізде белсенді өтінішіңіз бар. Жаңа өтініш беру үшін алдымен ағымдағысын шешу керек."
-        />
-      )}
-      {!loadError && !dormitories && <p className="text-sm text-sand-300/60">Жүктелуде...</p>}
-      {dormitories && !hasActiveApplication && (
-        <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-          {serverError && <Alert variant="error" message={serverError} />}
+  if (sent) {
+    return (
+      <div className="flex flex-col items-center gap-3.5 px-2 py-10 text-center">
+        <span className="flex h-19 w-19 items-center justify-center rounded-full bg-mint-500/15">
+          <Check className="h-8.5 w-8.5 text-mint-400" strokeWidth={2.5} />
+        </span>
+        <p className="text-[22px] font-bold text-sand-100">Өтініш жіберілді!</p>
+        <p className="max-w-[300px] text-sm text-sand-300">
+          Менеджер 2–3 күнде қарайды. Статус өзгергенде хабарлама келеді — күтіп отырудың қажеті жоқ.
+        </p>
+        <SegmentedProgress total={6} filled={2} className="mt-1.5 w-full max-w-[300px]" />
+        <p className="text-xs text-sand-300">2/6 · Қаралуда</p>
+        <Button className="mt-2" onClick={() => navigate('/dashboard/home')}>
+          Бастыға оралу
+        </Button>
+      </div>
+    )
+  }
 
-          <Select
-            label="Жатақхана"
-            required
-            value={dormitoryId}
-            onChange={(e) => setDormitoryId(e.target.value)}
-          >
-            <option value="">Таңдаңыз</option>
-            {dormitories
-              .filter((d) => dormitoriesWithRooms.has(d.id))
-              .map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name} — {d.address}
-                </option>
-              ))}
-          </Select>
-          {dormitories.length > 0 && dormitoriesWithRooms.size === 0 && (
-            <Alert
-              variant="error"
-              message="Қазіргі уақытта бөлмесі енгізілген жатақхана жоқ, өтініш беру мүмкін емес"
-            />
-          )}
+  if (loadError) return <Alert variant="error" message={loadError} />
+  if (!dormitories) return <p className="text-sm text-sand-300">Жүктелуде...</p>
+
+  if (hasActiveApplication) {
+    return (
+      <Alert
+        variant="error"
+        message="Сізде белсенді өтінішіңіз бар. Жаңа өтініш беру үшін алдымен ағымдағысын шешу керек."
+      />
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-3.5">
+      <div className="flex items-center gap-3">
+        <button
+          onClick={goBack}
+          aria-label="Артқа"
+          className="flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-full border border-navy-700 bg-navy-900 text-sand-200"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <span className="text-[19px] font-bold text-sand-100">Өтініш беру</span>
+      </div>
+
+      <SegmentedProgress total={3} filled={step} />
+      <p className="text-sm text-sand-300">{STEP_CAPTIONS[step]}</p>
+
+      {serverError && <Alert variant="error" message={serverError} />}
+
+      {step === 1 && (
+        <>
+          <p className="text-sm text-sand-200">Өзіңе ыңғайлысын таңда — бағасы мен бос орындар осында.</p>
+          <div className="flex max-w-[560px] flex-col gap-3">
+            {dormitories.length === 0 && (
+              <Alert variant="error" message="Қазіргі уақытта тіркелген жатақхана жоқ" />
+            )}
+            {dormitories.map((d) => {
+              const hasRooms = dormitoriesWithRooms.has(d.id)
+              const selected = dormitoryId === d.id
+              if (!hasRooms) {
+                return (
+                  <Card key={d.id} className="!p-4 opacity-50">
+                    <div className="flex items-center gap-2.5">
+                      <span className="h-5 w-5 shrink-0 rounded-full border-2 border-navy-700" />
+                      <div>
+                        <p className="text-[15px] font-semibold text-sand-100">{d.name}</p>
+                        <p className="text-sm text-sand-300">{d.address} · орын жоқ</p>
+                      </div>
+                    </div>
+                  </Card>
+                )
+              }
+              return (
+                <Card
+                  key={d.id}
+                  onClick={() => setDormitoryId(d.id)}
+                  className={`!p-4 ${selected ? '!border-2 !border-turquoise-500' : ''}`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span
+                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
+                        selected ? 'border-turquoise-500' : 'border-navy-700'
+                      }`}
+                    >
+                      {selected && <span className="h-2.5 w-2.5 rounded-full bg-turquoise-500" />}
+                    </span>
+                    <div>
+                      <p className="text-[15px] font-semibold text-sand-100">{d.name}</p>
+                      <p className="text-sm text-sand-300">{d.address}</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span
+                      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
+                        d.vacancy > 0 ? 'bg-turquoise-500/10 text-turquoise-400' : 'bg-clay-500/10 text-clay-400'
+                      }`}
+                    >
+                      {d.vacancy > 0 ? `${d.vacancy} бос орын` : 'орын жоқ'}
+                    </span>
+                    <span className="inline-flex items-center rounded-full bg-navy-800 px-2.5 py-1 text-xs font-semibold text-sand-200">
+                      {formatTenge(d.monthly_payment)}/ай
+                    </span>
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
 
           {dormitoryId && eligibleFloorGroups.length > 0 && (
             <div className="flex flex-col gap-3">
               <label className="text-sm font-medium text-sand-200">
                 Бөлме (қалауыңыз бойынша, міндетті емес)
               </label>
-              <div className="flex flex-col gap-4">
-                {eligibleFloorGroups.map(([floor, floorRooms]) => (
-                  <div key={floor} className="flex flex-col gap-2">
-                    {floor !== '0' && <p className="text-xs text-sand-300/60">{floor}-қабат</p>}
-                    <FloorCorridorMap
-                      rooms={floorRooms}
-                      selectedRoomId={roomId}
-                      onSelectRoom={(id) => setRoomId((prev) => (prev === id ? '' : id))}
-                    />
-                  </div>
-                ))}
-              </div>
-              <p className="text-xs text-sand-300/60">
+              {eligibleFloorGroups.length > 1 && (
+                <div className="flex flex-wrap gap-2">
+                  {eligibleFloorGroups.map(([floor]) => (
+                    <button
+                      key={floor}
+                      type="button"
+                      onClick={() => setSelectedFloor(floor)}
+                      className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                        floor === activeFloor
+                          ? 'bg-turquoise-500 text-white'
+                          : 'bg-navy-800 text-sand-300 hover:bg-navy-700'
+                      }`}
+                    >
+                      {floor === '0' ? 'Қабат көрсетілмеген' : `${floor}-қабат`}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <FloorCorridorMap
+                rooms={activeFloorRooms}
+                selectedRoomId={roomId}
+                onSelectRoom={(id) => setRoomId((prev) => (prev === id ? '' : id))}
+              />
+              <p className="text-xs text-sand-300">
                 {selectedRoom
                   ? `Таңдалды: ${selectedRoom.room_number}-бөлме (${selectedRoom.residentCount}/${selectedRoom.capacity} орын)`
                   : 'Бөлме таңдалмады — оны кейін менеджер тағайындайды'}
@@ -301,101 +484,162 @@ export function NewApplicationPage() {
             </div>
           )}
 
-          {dormitoryRequiredDocs.length > 0 && (
-            <div className="flex flex-col gap-3">
-              <label className="text-sm font-medium text-sand-200">Жатақхана үшін қажетті құжаттар</label>
-              <p className="text-xs text-amber-600">Тек PDF форматындағы файл қабылданады</p>
-              {dormitoryRequiredDocs.map((doc) => (
-                <div key={doc.id} className="flex flex-col gap-1">
-                  <label className="text-base font-semibold text-sand-100">
-                    {doc.document_name}
-                    <span className="text-clay-400"> *</span>
-                  </label>
-                  <input
-                    type="file"
-                    accept="application/pdf"
-                    required
-                    onChange={(e) =>
-                      setDocFiles((prev) => ({
-                        ...prev,
-                        [doc.id]: e.target.files?.[0] ?? null,
-                      }))
-                    }
-                    className="rounded-md border border-sand-100/15 bg-navy-950/60 px-3 py-2 text-sand-100 text-sm outline-none file:mr-3 file:rounded-md file:border-0 file:bg-turquoise-500/10 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-turquoise-300 hover:file:bg-turquoise-500/15"
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-
-          {benefits.length > 0 && (
-            <div className="flex flex-col gap-3">
-              <label className="flex items-center gap-2 text-sm font-medium text-sand-200">
-                <input
-                  type="checkbox"
-                  checked={hasBenefit}
-                  onChange={(e) => toggleHasBenefit(e.target.checked)}
-                />
-                Менде льгота бар
-                <span className="ml-1 text-xs font-normal text-sand-400">(міндетті емес)</span>
-              </label>
-
-              {hasBenefit && (
-              <div className="flex flex-col gap-3">
-                {benefits.map((b) => (
-                  <div key={b.id}>
-                    <label className="flex items-start gap-2 text-sm text-sand-200">
-                      <input
-                        type="checkbox"
-                        className="mt-0.5"
-                        checked={selectedBenefitIds.includes(b.id)}
-                        onChange={() => toggleBenefit(b.id)}
-                      />
-                      <span>
-                        {b.name}
-                        {b.description && (
-                          <span className="block text-xs text-sand-300/60">{b.description}</span>
-                        )}
-                      </span>
-                    </label>
-
-                    {selectedBenefitIds.includes(b.id) && (requiredDocsByBenefit[b.id]?.length ?? 0) > 0 && (
-                      <div className="mt-2 ml-6 flex flex-col gap-2 border-l-2 border-turquoise-400/20 pl-3">
-                        <p className="text-xs text-amber-600">Тек PDF форматындағы файл қабылданады</p>
-                        {requiredDocsByBenefit[b.id].map((doc) => (
-                          <div key={doc.id} className="flex flex-col gap-1">
-                            <label className="text-base font-semibold text-sand-100">
-                              {doc.document_name}
-                              <span className="text-clay-400"> *</span>
-                            </label>
-                            <input
-                              type="file"
-                              accept="application/pdf"
-                              required
-                              onChange={(e) =>
-                                setDocFiles((prev) => ({
-                                  ...prev,
-                                  [doc.id]: e.target.files?.[0] ?? null,
-                                }))
-                              }
-                              className="rounded-md border border-sand-100/15 bg-navy-950/60 px-3 py-2 text-sand-100 text-sm outline-none file:mr-3 file:rounded-md file:border-0 file:bg-turquoise-500/10 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-turquoise-300 hover:file:bg-turquoise-500/15"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              )}
-            </div>
-          )}
-
-          <Button type="submit" isLoading={isSubmitting} className="self-start">
-            Жіберу
-          </Button>
-        </form>
+          <div className="mt-1">
+            <Button className="w-full" onClick={goNext}>
+              Жалғастыру
+            </Button>
+            <p className="mt-2.5 text-center text-xs text-sand-300">Келесі: құжаттар · шамамен 2 минут</p>
+          </div>
+        </>
       )}
-    </Card>
+
+      {step === 2 && (
+        <>
+          <p className="text-sm text-sand-200">
+            {allRequiredDocs.length > 0
+              ? 'Қажетті құжаттарды жүкте, тек PDF. Телефоннан суретке түсіріп жүктесең де болады.'
+              : 'Бұл жатақхана үшін міндетті құжат жоқ. Льготаңыз болса, төменде белгілеңіз.'}
+          </p>
+          <div className="flex max-w-[560px] flex-col gap-3">
+            {dormitoryRequiredDocs.map((doc) => (
+              <DocumentCard
+                key={doc.id}
+                name={doc.document_name}
+                file={docFiles[doc.id] ?? null}
+                onChange={(file) => setDocFiles((prev) => ({ ...prev, [doc.id]: file }))}
+              />
+            ))}
+
+            {benefits.length > 0 && (
+              <Card className="!p-4">
+                <label className="flex cursor-pointer items-center gap-2.5 text-sm font-semibold text-sand-100">
+                  <input
+                    type="checkbox"
+                    checked={hasBenefit}
+                    onChange={(e) => toggleHasBenefit(e.target.checked)}
+                    className="h-4.5 w-4.5 accent-turquoise-500"
+                  />
+                  Менде жеңілдік (льгота) бар
+                </label>
+                <p className="mt-2 ml-7 text-sm text-sand-300">
+                  Жетімдік, мүгедектік немесе көпбалалы отбасы — растайтын құжатпен. Кезекте басымдық береді.
+                </p>
+
+                {hasBenefit && (
+                  <div className="mt-3 ml-7 flex flex-col gap-3">
+                    {benefits.map((b) => (
+                      <div key={b.id}>
+                        <label className="flex items-start gap-2.5 text-sm text-sand-100">
+                          <input
+                            type="checkbox"
+                            className="mt-0.5 h-4 w-4 accent-turquoise-500"
+                            checked={selectedBenefitIds.includes(b.id)}
+                            onChange={() => toggleBenefit(b.id)}
+                          />
+                          <span>
+                            {b.name}
+                            {b.description && <span className="block text-xs text-sand-300">{b.description}</span>}
+                          </span>
+                        </label>
+                        {selectedBenefitIds.includes(b.id) && (requiredDocsByBenefit[b.id]?.length ?? 0) > 0 && (
+                          <div className="mt-2.5 flex flex-col gap-2.5">
+                            {requiredDocsByBenefit[b.id].map((doc) => (
+                              <DocumentCard
+                                key={doc.id}
+                                name={doc.document_name}
+                                file={docFiles[doc.id] ?? null}
+                                onChange={(file) => setDocFiles((prev) => ({ ...prev, [doc.id]: file }))}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            )}
+          </div>
+
+          <div className="mt-1">
+            <Button className="w-full" onClick={goNext}>
+              Жалғастыру
+            </Button>
+            <p className="mt-2.5 text-center text-xs text-sand-300">Флюорографияны кейін де жүктеуге болады</p>
+          </div>
+        </>
+      )}
+
+      {step === 3 && (
+        <>
+          <p className="text-sm text-sand-200">Бәрін тексеріп, жібер. Кейін статусын Бастыдан бақылайсың.</p>
+          <div className="flex max-w-[560px] flex-col gap-3">
+            <Card className="!p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-sand-300">Жатақхана</span>
+                <button onClick={() => setStep(1)} className="text-sm font-semibold text-sand-100">
+                  Өзгерту
+                </button>
+              </div>
+              <p className="mt-1.5 text-[15px] font-semibold text-sand-100">{chosenDormitory?.name}</p>
+              <p className="text-sm text-sand-300">
+                {chosenDormitory?.address} · {formatTenge(chosenDormitory?.monthly_payment)}/ай
+              </p>
+            </Card>
+
+            <Card className="!p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-sand-300">Құжаттар</span>
+                <button onClick={() => setStep(2)} className="text-sm font-semibold text-sand-100">
+                  Өзгерту
+                </button>
+              </div>
+              {allRequiredDocs.length === 0 ? (
+                <p className="mt-1.5 text-sm text-sand-300">Міндетті құжат жоқ</p>
+              ) : (
+                allRequiredDocs.map((doc) => (
+                  <p
+                    key={doc.id}
+                    className={`mt-1.5 text-sm font-semibold ${docFiles[doc.id] ? 'text-mint-400' : 'text-sand-300'}`}
+                  >
+                    {docFiles[doc.id] ? '✓' : '–'} {doc.document_name}
+                  </p>
+                ))
+              )}
+            </Card>
+
+            <Card className="!p-4">
+              <Input
+                label={`Неше айға тұрасыз (ең көбі ${maxStayMonths()} ай, маусымнан аспауы тиіс)`}
+                type="number"
+                min={1}
+                max={maxStayMonths()}
+                value={stayMonths}
+                onChange={(e) => setStayMonths(e.target.value)}
+                required
+              />
+            </Card>
+
+            <Card className="!p-4">
+              <p className="mb-1.5 text-sm text-sand-300">Тілек (міндетті емес)</p>
+              <textarea
+                rows={2}
+                value={wish}
+                onChange={(e) => setWish(e.target.value)}
+                placeholder="Мысалы: курстасыммен бір бөлмеде тұрғым келеді"
+                className="w-full resize-y rounded-xl border border-navy-700 bg-navy-950 px-3 py-2.5 text-sm text-sand-100 outline-none focus:border-turquoise-400"
+              />
+            </Card>
+          </div>
+
+          <div className="mt-1">
+            <Button className="w-full" isLoading={isSubmitting} onClick={handleSubmit}>
+              Өтінішті жіберу
+            </Button>
+            <p className="mt-2.5 text-center text-xs text-sand-300">Жібергеннен кейін де құжат қосуға болады</p>
+          </div>
+        </>
+      )}
+    </div>
   )
 }

@@ -126,7 +126,7 @@ export function BenefitFormPage() {
         <Card title="Қажетті құжаттар">
           {documentError && <Alert variant="error" message={documentError} />}
           {catalog.length === 0 && (
-            <p className="text-sm text-sand-300/60">
+            <p className="text-sm text-sand-300">
               Каталогта құжат жоқ — алдымен "Құжаттар" бетінен құжат қосыңыз.
             </p>
           )}

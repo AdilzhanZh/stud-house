@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"log"
 
 	"github.com/google/uuid"
 
@@ -11,7 +10,6 @@ import (
 	"student-house/internal/repository"
 	"student-house/internal/service/notifier"
 	"student-house/pkg/apperror"
-	"student-house/pkg/mailer"
 )
 
 type TransferRequestService struct {
@@ -21,7 +19,6 @@ type TransferRequestService struct {
 	roomService      *RoomService
 	users            repository.UserRepository
 	notifier         *notifier.Notifier
-	mailer           *mailer.Mailer
 }
 
 func NewTransferRequestService(
@@ -31,7 +28,6 @@ func NewTransferRequestService(
 	roomService *RoomService,
 	users repository.UserRepository,
 	notifier *notifier.Notifier,
-	m *mailer.Mailer,
 ) *TransferRequestService {
 	return &TransferRequestService{
 		transferRequests: transferRequests,
@@ -40,7 +36,6 @@ func NewTransferRequestService(
 		roomService:      roomService,
 		users:            users,
 		notifier:         notifier,
-		mailer:           m,
 	}
 }
 
@@ -181,12 +176,4 @@ func (s *TransferRequestService) notifyStudentDecision(ctx context.Context, stud
 		title, body = "Ауыстыру өтінішіңіз қабылданбады", "Сіздің бөлме ауыстыру өтінішіңіз қабылданбады."
 	}
 	_ = s.notifier.Notify(ctx, studentID, domain.NotificationTransferRequestUpdate, title, body, nil)
-
-	if student, err := s.users.GetByID(ctx, studentID); err == nil {
-		go func(email, subject, body string) {
-			if err := s.mailer.Send(email, subject, body); err != nil {
-				log.Printf("failed to send transfer-request-decision email to %s: %v", email, err)
-			}
-		}(student.Email, title, body)
-	}
 }

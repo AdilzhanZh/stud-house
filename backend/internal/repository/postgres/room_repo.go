@@ -170,6 +170,29 @@ func (r *RoomRepo) MoveOutResident(ctx context.Context, residentRowID uuid.UUID)
 	return nil
 }
 
+func (r *RoomRepo) ListResidentStudentIDsByDormitory(ctx context.Context, dormitoryID uuid.UUID) ([]uuid.UUID, error) {
+	const q = `
+		SELECT DISTINCT rr.student_id
+		FROM room_residents rr
+		JOIN rooms r ON r.id = rr.room_id
+		WHERE r.dormitory_id = $1 AND rr.moved_out_at IS NULL`
+	rows, err := r.db.Query(ctx, q, dormitoryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
+
 func (r *RoomRepo) GetActiveResidentByStudent(ctx context.Context, studentID uuid.UUID) (*domain.RoomResident, error) {
 	const q = `
 		SELECT id, room_id, student_id, moved_in_at, moved_out_at

@@ -74,6 +74,10 @@ type RoomRepository interface {
 	AddResident(ctx context.Context, rr *domain.RoomResident) error
 	MoveOutResident(ctx context.Context, residentRowID uuid.UUID) error
 	GetActiveResidentByStudent(ctx context.Context, studentID uuid.UUID) (*domain.RoomResident, error)
+	// ListResidentStudentIDsByDormitory backs the admin "жатақхана" broadcast
+	// audience — every student currently resident (moved_out_at IS NULL) in
+	// any room of the given dormitory.
+	ListResidentStudentIDsByDormitory(ctx context.Context, dormitoryID uuid.UUID) ([]uuid.UUID, error)
 }
 
 type RequiredDocumentRepository interface {

@@ -68,14 +68,14 @@ func main() {
 	roomService := service.NewRoomService(roomRepo, dormitoryRepo, userRepo, studentProfileRepo, studentBenefitRepo)
 	benefitService := service.NewBenefitService(benefitRepo, userRepo, studentBenefitRepo)
 	documentService := service.NewDocumentService(requiredDocumentRepo)
-	notifierService := notifier.New(notificationRepo)
-	applicationService := service.NewApplicationService(applicationRepo, applicationDocumentRepo, dormitoryRepo, roomRepo, roomService, userRepo, notifierService, mailerService)
-	notificationService := service.NewNotificationService(notificationRepo)
+	notifierService := notifier.New(notificationRepo, userRepo, mailerService)
+	applicationService := service.NewApplicationService(applicationRepo, applicationDocumentRepo, dormitoryRepo, roomRepo, roomService, notifierService)
+	notificationService := service.NewNotificationService(notificationRepo, roomRepo, userRepo, notifierService)
 	reportService := service.NewReportService(reportTemplateRepo, reportRepo, applicationRepo, userRepo, notifierService)
-	contractService := service.NewContractService(contractRepo, applicationRepo, reportRepo, reportTemplateRepo, userRepo, notifierService, mailerService, cfg.ContractResponseDeadline, cfg.ContractReminderWindow, cfg.PaymentDeadline)
-	paymentService := service.NewPaymentService(paymentRepo, contractRepo, applicationRepo, userRepo, notifierService, mailerService, cfg.ContractReminderWindow, cfg.PaymentReapplyBlock)
-	exitRequestService := service.NewExitRequestService(exitRequestRepo, roomRepo, userRepo, notifierService, mailerService)
-	transferRequestService := service.NewTransferRequestService(transferRequestRepo, applicationRepo, roomRepo, roomService, userRepo, notifierService, mailerService)
+	contractService := service.NewContractService(contractRepo, applicationRepo, reportRepo, reportTemplateRepo, userRepo, notifierService, cfg.ContractResponseDeadline, cfg.ContractReminderWindow, cfg.PaymentDeadline)
+	paymentService := service.NewPaymentService(paymentRepo, contractRepo, applicationRepo, userRepo, notifierService, cfg.ContractReminderWindow, cfg.PaymentReapplyBlock)
+	exitRequestService := service.NewExitRequestService(exitRequestRepo, roomRepo, userRepo, notifierService)
+	transferRequestService := service.NewTransferRequestService(transferRequestRepo, applicationRepo, roomRepo, roomService, userRepo, notifierService)
 
 	// Phase 4 hook into phase 3's vote tally: once a report is approved,
 	// auto-generate contracts for its applications.

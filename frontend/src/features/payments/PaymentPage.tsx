@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { ChevronLeft, Clock } from 'lucide-react'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import { extractErrorMessage } from '../../api/client'
 import { listMyContracts } from '../../api/contractApi'
+import { getApplication } from '../../api/applicationApi'
+import { getDormitory } from '../../api/dormitoryApi'
 import { getPaymentByContract, submitPayment } from '../../api/paymentApi'
 import { uploadFile } from '../../api/uploadApi'
+import { formatTenge } from '../../utils/dormitoryLabels'
 import type { Contract } from '../../types/contracts'
 import type { Payment } from '../../types/payments'
 
@@ -21,6 +25,7 @@ export function PaymentPage() {
   const navigate = useNavigate()
 
   const [contract, setContract] = useState<Contract | null>(null)
+  const [dormitoryName, setDormitoryName] = useState<string | null>(null)
   const [payment, setPayment] = useState<Payment | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
@@ -38,6 +43,10 @@ export function PaymentPage() {
           return
         }
         setContract(found)
+        getApplication(found.application_id)
+          .then((app) => getDormitory(app.dormitory_id))
+          .then((d) => setDormitoryName(d.name))
+          .catch(() => setDormitoryName(null))
         if (found.status !== 'accepted') return
 
         setPayment(await getPaymentByContract(found.id))
@@ -65,65 +74,86 @@ export function PaymentPage() {
   }
 
   if (loadError) return <Alert variant="error" message={loadError} />
-  if (!contract) return <p className="text-sm text-sand-300/60">Жүктелуде...</p>
+  if (!contract) return <p className="text-sm text-sand-300">Жүктелуде...</p>
   if (contract.status !== 'accepted') {
-    return (
-      <Alert
-        variant="error"
-        message="Төлем беті тек келісімшарт қабылданғаннан кейін қолжетімді."
-      />
-    )
+    return <Alert variant="error" message="Төлем беті тек келісімшарт қабылданғаннан кейін қолжетімді." />
   }
-  if (!payment) return <p className="text-sm text-sand-300/60">Жүктелуде...</p>
+  if (!payment) return <p className="text-sm text-sand-300">Жүктелуде...</p>
 
   return (
-    <div className="flex flex-col gap-6">
-      <Button variant="secondary" className="self-start" onClick={() => navigate('/contracts/my')}>
-        ← Артқа
-      </Button>
+    <div className="flex flex-col gap-3.5">
+      <button
+        onClick={() => navigate('/contracts/my')}
+        className="inline-flex w-fit items-center gap-1 text-sm font-semibold text-sand-300 hover:text-sand-100"
+      >
+        <ChevronLeft className="h-4 w-4" /> Келісімшарт
+      </button>
+      <h1 className="text-[23px] font-bold text-sand-100">Төлем</h1>
 
-      <Card title="Төлем ақпараты">
-        <p className="text-sm text-sand-300/70">
-          Сомасы: {payment.amount} {payment.currency}
+      <Card>
+        <p className="text-xs font-semibold tracking-wide text-sand-300 uppercase">Төленетін сома</p>
+        <p className="mt-1.5 text-[32px] font-bold text-sand-100">
+          {payment.currency === 'KZT' ? formatTenge(payment.amount) : `${payment.amount} ${payment.currency}`}
         </p>
-        <p className="mt-3 text-sm text-sand-100">
-          Төлемді <strong>бухгалтерияға (212-кабинет)</strong> апарып төлеңіз, содан кейін төлем
-          чегін <strong>315-кабинетке</strong> әкеліп беріңіз.
-        </p>
+        {dormitoryName && <p className="mt-0.5 text-sm text-sand-300">{dormitoryName}</p>}
+      </Card>
+
+      <Card>
+        <p className="mb-3 text-[15px] font-bold text-sand-100">Қалай төлеу керек</p>
+        <div className="flex flex-col gap-3">
+          {[
+            <>
+              Төлемді <strong className="text-sand-100">бухгалтерияға (212-кабинет)</strong> апарып төле
+            </>,
+            <>
+              Чекті <strong className="text-sand-100">315-кабинетке</strong> әкеліп бер
+            </>,
+            'Растауды осы жерден күт — хабарлама келеді',
+          ].map((text, i) => (
+            <div key={i} className="flex gap-3">
+              <span className="flex h-6.5 w-6.5 shrink-0 items-center justify-center rounded-full bg-navy-800 text-sm font-bold text-sand-200">
+                {i + 1}
+              </span>
+              <p className="text-sm text-sand-200">{text}</p>
+            </div>
+          ))}
+        </div>
       </Card>
 
       {payment.status === 'submitted' && (
-        <Alert variant="success" message="Төлеміңіз расталуын күтуде." />
+        <div className="flex items-center gap-3 rounded-2xl bg-mint-500/10 px-4 py-3.5">
+          <Clock className="h-5 w-5 shrink-0 text-mint-400" />
+          <p className="text-sm font-semibold text-mint-400">Төлеміңіз расталуын күтуде</p>
+        </div>
       )}
 
       {payment.status === 'awaiting_manager_decision' && (
         <Alert
-          variant="error"
+          variant="warning"
           message="Төлемнің мерзімі өтті, менеджердің шешімі күтілуде. Тезірек бухгалтерияға хабарласыңыз."
         />
       )}
 
-      {payment.status === 'confirmed' && (
-        <Alert variant="success" message="Төлеміңіз расталды." />
-      )}
+      {payment.status === 'confirmed' && <Alert variant="success" message="Төлеміңіз расталды." />}
 
       {payment.status === 'rejected' && (
         <>
           <Alert variant="error" message={REJECTION_REASON} />
-          <Card title="Чекті қайта жүктеу">
-            <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+          <Card>
+            <p className="mb-3 text-[15px] font-bold text-sand-100">Чекті қайта жүктеу</p>
+            <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
               {submitError && <Alert variant="error" message={submitError} />}
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-sand-200">
-                  Чек файлы <span className="text-clay-400">*</span>
-                </label>
+              <label className="block cursor-pointer rounded-2xl border-2 border-dashed border-navy-700 bg-navy-950 p-4">
                 <input
                   type="file"
                   required
+                  className="hidden"
                   onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)}
-                  className="rounded-md border border-sand-100/15 bg-navy-950/60 px-3 py-2 text-sand-100 text-sm outline-none file:mr-3 file:rounded-md file:border-0 file:bg-turquoise-500/10 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-turquoise-400 hover:file:bg-turquoise-500/15"
                 />
-              </div>
+                <p className="text-sm font-semibold text-sand-100">
+                  {receiptFile ? receiptFile.name : 'Чек файлын таңдау'}
+                </p>
+              </label>
               <Button type="submit" isLoading={isSubmitting} disabled={!receiptFile} className="self-start">
                 Қайта жіберу
               </Button>

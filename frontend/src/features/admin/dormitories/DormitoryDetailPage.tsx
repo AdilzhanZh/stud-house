@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { ChevronLeft } from 'lucide-react'
 import { Card } from '../../../components/Card'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
@@ -7,6 +8,7 @@ import { FloorCorridorMap } from '../../../components/FloorCorridorMap'
 import { extractErrorMessage } from '../../../api/client'
 import { getDormitory, getDormitoryCapacity } from '../../../api/dormitoryApi'
 import { listRoomResidents, listRoomsByDormitory } from '../../../api/roomApi'
+import { adminCellClass, adminPageHeading, adminRowClass, adminTableWrapClass, adminTheadClass } from '../adminTable'
 import type { Dormitory, DormitoryCapacity } from '../../../types/dormitories'
 import type { Room } from '../../../types/rooms'
 
@@ -56,7 +58,7 @@ export function DormitoryDetailPage() {
   }, [id])
 
   if (error) return <Alert variant="error" message={error} />
-  if (!dormitory || !capacity || !rooms) return <p className="text-sm text-sand-300/60">Жүктелуде...</p>
+  if (!dormitory || !capacity || !rooms) return <p className="text-sm text-sand-300">Жүктелуде...</p>
 
   const floorGroups = Object.entries(
     rooms.reduce<Record<number, RoomRow[]>>((byFloor, room) => {
@@ -79,15 +81,19 @@ export function DormitoryDetailPage() {
     : 0
 
   return (
-    <div className="flex flex-col gap-6">
-      <Button variant="secondary" className="self-start" onClick={() => navigate('/admin/dormitories')}>
-        ← Артқа
-      </Button>
+    <div className="flex flex-col gap-4">
+      <button
+        onClick={() => navigate('/admin/dormitories')}
+        className="inline-flex w-fit items-center gap-1 text-sm font-semibold text-sand-300 hover:text-sand-100"
+      >
+        <ChevronLeft className="h-4 w-4" /> Жатақханалар
+      </button>
+      <h1 className={adminPageHeading}>{dormitory.name} · бөлмелер</h1>
 
-      <Card title={dormitory.name}>
-        <p className="text-sm text-sand-300/60">{dormitory.address}</p>
+      <Card>
+        <p className="text-sm text-sand-300">{dormitory.address}</p>
         <div className="mt-4">
-          <div className="mb-1 flex justify-between text-sm text-sand-300/70">
+          <div className="mb-1 flex justify-between text-sm text-sand-300">
             <span>Жалпы орын саны / құрылған орын саны</span>
             <span>
               {capacity.total_capacity}/{capacity.allocated_beds}
@@ -101,7 +107,7 @@ export function DormitoryDetailPage() {
           </div>
         </div>
         <div className="mt-4">
-          <div className="mb-1 flex justify-between text-sm text-sand-300/70">
+          <div className="mb-1 flex justify-between text-sm text-sand-300">
             <span>Жалпы бөлме саны / құрылған бөлме саны</span>
             <span>
               {capacity.total_rooms_target ?? '—'}/{capacity.rooms_created}
@@ -132,7 +138,7 @@ export function DormitoryDetailPage() {
                 className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                   floor === activeFloor
                     ? 'bg-turquoise-500 text-navy-950'
-                    : 'bg-navy-800 text-sand-300/70 hover:bg-navy-700'
+                    : 'bg-navy-800 text-sand-300 hover:bg-navy-700'
                 }`}
               >
                 {floor}-қабат
@@ -143,7 +149,7 @@ export function DormitoryDetailPage() {
             rooms={activeFloorRooms}
             onSelectRoom={(roomId) => navigate(`/admin/rooms/${roomId}/residents`)}
           />
-          <div className="flex flex-wrap gap-4 text-xs text-sand-300/60">
+          <div className="flex flex-wrap gap-4 text-xs text-sand-300">
             <span className="flex items-center gap-1.5">
               <span className="h-3 w-3 rounded ring-1 ring-inset ring-mint-500/30 bg-mint-500/10" /> Бос
             </span>
@@ -158,40 +164,40 @@ export function DormitoryDetailPage() {
         </div>
       )}
 
-      <Card className="overflow-x-auto p-0">
+      <Card className={adminTableWrapClass}>
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-sand-100/10 text-xs uppercase text-sand-300/60">
+          <thead className={adminTheadClass}>
             <tr>
-              <th className="px-4 py-3">Бөлме №</th>
-              <th className="px-4 py-3">Қабат</th>
-              <th className="px-4 py-3">Сыйымдылық</th>
-              <th className="px-4 py-3">Ауданы</th>
-              <th className="px-4 py-3">Жабдықтаулар</th>
-              <th className="px-4 py-3">Тұрғындар</th>
-              <th className="px-4 py-3">Шектеулер</th>
-              <th className="px-4 py-3">Әрекеттер</th>
+              <th className={adminCellClass}>Бөлме №</th>
+              <th className={adminCellClass}>Қабат</th>
+              <th className={adminCellClass}>Сыйымдылық</th>
+              <th className={adminCellClass}>Ауданы</th>
+              <th className={adminCellClass}>Жабдықтаулар</th>
+              <th className={adminCellClass}>Тұрғындар</th>
+              <th className={adminCellClass}>Шектеулер</th>
+              <th className={adminCellClass}>Әрекеттер</th>
             </tr>
           </thead>
           <tbody>
             {rooms.map((room) => (
-              <tr key={room.id} className="border-b border-sand-100/10 last:border-0">
-                <td className="px-4 py-3 font-medium text-sand-100">{room.room_number}</td>
-                <td className="px-4 py-3 text-sand-300/70">{room.floor ?? '—'}</td>
-                <td className="px-4 py-3 text-sand-300/70">{room.capacity}</td>
-                <td className="px-4 py-3 text-sand-300/70">{room.area_sq_m ?? '—'}</td>
-                <td className="px-4 py-3 text-sand-300/70">{room.equipment ?? '—'}</td>
-                <td className="px-4 py-3 text-sand-300/70">{room.residentCount}</td>
-                <td className="px-4 py-3 text-sand-300/70">{restrictionsSummary(room)}</td>
-                <td className="px-4 py-3">
+              <tr key={room.id} className={adminRowClass}>
+                <td className={`${adminCellClass} font-semibold text-sand-100`}>{room.room_number}</td>
+                <td className={`${adminCellClass} text-sand-300`}>{room.floor ?? '—'}</td>
+                <td className={`${adminCellClass} text-sand-300`}>{room.capacity}</td>
+                <td className={`${adminCellClass} text-sand-300`}>{room.area_sq_m ?? '—'}</td>
+                <td className={`${adminCellClass} text-sand-300`}>{room.equipment ?? '—'}</td>
+                <td className={`${adminCellClass} text-sand-300`}>{room.residentCount}</td>
+                <td className={`${adminCellClass} text-sand-300`}>{restrictionsSummary(room)}</td>
+                <td className={adminCellClass}>
                   <div className="flex gap-3">
                     <button
-                      className="text-turquoise-400 hover:underline"
+                      className="font-semibold text-turquoise-400 hover:text-turquoise-300"
                       onClick={() => navigate(`/admin/rooms/${room.id}/edit`)}
                     >
                       Өзгерту
                     </button>
                     <button
-                      className="text-turquoise-400 hover:underline"
+                      className="font-semibold text-turquoise-400 hover:text-turquoise-300"
                       onClick={() => navigate(`/admin/rooms/${room.id}/residents`)}
                     >
                       Тұрғындар
@@ -202,7 +208,7 @@ export function DormitoryDetailPage() {
             ))}
             {rooms.length === 0 && (
               <tr>
-                <td className="px-4 py-3 text-sand-300/60" colSpan={8}>
+                <td className={`${adminCellClass} text-sand-300`} colSpan={8}>
                   Бөлме жоқ
                 </td>
               </tr>

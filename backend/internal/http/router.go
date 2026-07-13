@@ -89,6 +89,8 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 			// Any authenticated user: their own in-app notifications.
 			protected.GET("/notifications", h.Notification.ListMine)
 			protected.PATCH("/notifications/:id/read", h.Notification.MarkRead)
+			protected.DELETE("/notifications/:id", h.Notification.Delete)
+			protected.DELETE("/notifications", h.Notification.ClearAll)
 
 			// Any authenticated user: students upload application/payment
 			// documents, admins/managers upload dormitory images and report
@@ -175,6 +177,8 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 
 				mgmt.GET("/applications", h.Application.List)
 				mgmt.PATCH("/applications/:id/decision", h.Application.Decide)
+
+				mgmt.POST("/notifications/broadcast", h.Notification.Broadcast)
 
 				mgmt.POST("/report-templates", h.Report.CreateTemplate)
 				mgmt.GET("/report-templates", h.Report.ListTemplates)

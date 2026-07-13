@@ -8,6 +8,13 @@ import { ReportStatusBadge } from '../../../components/ReportStatusBadge'
 import { extractErrorMessage } from '../../../api/client'
 import { deleteReport, getReportDetail, listReports } from '../../../api/reportApi'
 import { listReportTemplates } from '../../../api/reportTemplateApi'
+import {
+  adminCellClass,
+  adminPageHeading,
+  adminRowClickableClass,
+  adminTableWrapClass,
+  adminTheadClass,
+} from '../adminTable'
 import type { Report } from '../../../types/reports'
 
 interface Row extends Report {
@@ -63,48 +70,44 @@ export function ReportListPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="font-heading text-2xl text-sand-100">Рапорттар</h1>
+    <div className="flex flex-col gap-3.5">
+      <h1 className={adminPageHeading}>Рапорттар</h1>
 
       {error && <Alert variant="error" message={error} />}
       {deleteError && <Alert variant="error" message={deleteError} />}
-      {!error && !rows && <p className="text-sm text-sand-300/60">Жүктелуде...</p>}
+      {!error && !rows && <p className="text-sm text-sand-300">Жүктелуде...</p>}
 
       {rows && (
-        <Card className="overflow-x-auto p-0">
+        <Card className={adminTableWrapClass}>
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-sand-100/10 text-xs uppercase text-sand-300/60">
+            <thead className={adminTheadClass}>
               <tr>
-                <th className="px-4 py-3">Құрылған күні</th>
-                <th className="px-4 py-3">Шаблон</th>
-                <th className="px-4 py-3">Студенттер саны</th>
-                <th className="px-4 py-3">Статус</th>
-                <th className="px-4 py-3" />
+                <th className={adminCellClass}>Құрылған күні</th>
+                <th className={adminCellClass}>Шаблон</th>
+                <th className={adminCellClass}>Студенттер саны</th>
+                <th className={adminCellClass}>Статус</th>
+                <th className={adminCellClass} />
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr
-                  key={r.id}
-                  className="cursor-pointer border-b border-sand-100/10 last:border-0 hover:bg-navy-950"
-                  onClick={() => navigate(`/admin/reports/${r.id}`)}
-                >
-                  <td className="px-4 py-3 text-sand-300/70">
+                <tr key={r.id} className={adminRowClickableClass} onClick={() => navigate(`/admin/reports/${r.id}`)}>
+                  <td className={`${adminCellClass} text-sand-300`}>
                     {new Date(r.created_at).toLocaleDateString('kk-KZ')}
                   </td>
-                  <td className="px-4 py-3 font-medium text-sand-100">{r.templateName}</td>
-                  <td className="px-4 py-3 text-sand-300/70">{r.studentCount}</td>
-                  <td className="px-4 py-3">
+                  <td className={`${adminCellClass} font-semibold text-sand-100`}>{r.templateName}</td>
+                  <td className={`${adminCellClass} text-sand-300`}>{r.studentCount}</td>
+                  <td className={adminCellClass}>
                     <ReportStatusBadge status={r.status} />
                   </td>
-                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                  <td className={adminCellClass} onClick={(e) => e.stopPropagation()}>
                     <DeleteIconButton onClick={() => setDeleteTarget(r)} />
                   </td>
                 </tr>
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td className="px-4 py-3 text-sand-300/60" colSpan={5}>
+                  <td className={`${adminCellClass} text-sand-300`} colSpan={5}>
                     Рапорт жоқ
                   </td>
                 </tr>

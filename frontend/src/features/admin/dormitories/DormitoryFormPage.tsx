@@ -331,7 +331,7 @@ export function DormitoryFormPage() {
                 </button>
               </li>
             ))}
-            {images.length === 0 && <p className="text-sm text-sand-300/60">Сурет қосылмаған</p>}
+            {images.length === 0 && <p className="text-sm text-sand-300">Сурет қосылмаған</p>}
           </ul>
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-sand-200">
@@ -348,7 +348,7 @@ export function DormitoryFormPage() {
                 accept="image/*"
                 required={images.length === 0}
                 onChange={(e) => setNewImageFile(e.target.files?.[0] ?? null)}
-                className="flex-1 rounded-md border border-sand-100/15 bg-navy-950/60 px-3 py-2 text-sand-100 text-sm outline-none file:mr-3 file:rounded-md file:border-0 file:bg-turquoise-500/10 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-turquoise-300 hover:file:bg-turquoise-500/15 focus:border-turquoise-400 focus:ring-2 focus:ring-turquoise-400/30"
+                className="flex-1 rounded-[14px] border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sand-100 text-sm outline-none file:mr-3 file:rounded-lg file:border-0 file:bg-turquoise-500/10 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-turquoise-400 hover:file:bg-turquoise-500/15 focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
               />
               <Button
                 type="button"
@@ -368,7 +368,7 @@ export function DormitoryFormPage() {
         <Card title="Қажетті құжаттар">
           {documentError && <Alert variant="error" message={documentError} />}
           {catalog.length === 0 && (
-            <p className="text-sm text-sand-300/60">
+            <p className="text-sm text-sand-300">
               Каталогта құжат жоқ — алдымен "Құжаттар" бетінен құжат қосыңыз.
             </p>
           )}

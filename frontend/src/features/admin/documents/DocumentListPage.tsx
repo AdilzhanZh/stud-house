@@ -90,7 +90,7 @@ export function DocumentListPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="font-heading text-2xl text-sand-100">Құжаттар</h1>
+      <h1 className="text-[23px] font-bold text-sand-100">Құжаттар</h1>
 
       <Card title="Құжаттар каталогы">
         {documentError && <Alert variant="error" message={documentError} />}
@@ -102,14 +102,14 @@ export function DocumentListPage() {
             </li>
           ))}
           {documents && documents.length === 0 && (
-            <p className="text-sm text-sand-300/60">Құжат қосылмаған</p>
+            <p className="text-sm text-sand-300">Құжат қосылмаған</p>
           )}
-          {!documents && !documentError && <p className="text-sm text-sand-300/60">Жүктелуде...</p>}
+          {!documents && !documentError && <p className="text-sm text-sand-300">Жүктелуде...</p>}
         </ul>
         <div className="flex gap-2">
           <input
             placeholder="Құжат атауы"
-            className="flex-1 rounded-md border border-sand-100/15 bg-navy-950/60 px-3 py-2 text-sand-100 text-sm outline-none focus:border-turquoise-400 focus:ring-2 focus:ring-turquoise-400/30"
+            className="flex-1 rounded-[14px] border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sand-100 text-sm outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
             value={newDocumentName}
             onChange={(e) => setNewDocumentName(e.target.value)}
           />
@@ -126,7 +126,7 @@ export function DocumentListPage() {
         </div>
 
         {benefitError && <Alert variant="error" message={benefitError} />}
-        {!benefitError && !benefits && <p className="text-sm text-sand-300/60">Жүктелуде...</p>}
+        {!benefitError && !benefits && <p className="text-sm text-sand-300">Жүктелуде...</p>}
 
         <div className="flex flex-col gap-3">
           {benefits?.map((b) => (
@@ -138,14 +138,14 @@ export function DocumentListPage() {
                 </span>
                 <div>
                   <p className="font-medium text-sand-100">{b.name}</p>
-                  <p className="text-sm text-sand-300/60">{b.description}</p>
+                  <p className="text-sm text-sand-300">{b.description}</p>
                 </div>
               </div>
               <DeleteIconButton onClick={() => setDeleteBenefitTarget(b)} />
             </Card>
           ))}
           {benefits && benefits.length === 0 && (
-            <p className="text-sm text-sand-300/60">Льгота жоқ</p>
+            <p className="text-sm text-sand-300">Льгота жоқ</p>
           )}
         </div>
       </div>

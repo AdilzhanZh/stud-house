@@ -5,6 +5,7 @@ export interface CreateApplicationPayload {
   dormitory_id: string
   notes: string | null
   preferred_room_id?: string | null
+  stay_months: number
 }
 
 export async function createApplication(payload: CreateApplicationPayload): Promise<Application> {
@@ -30,6 +31,7 @@ export async function deleteApplication(id: string): Promise<void> {
 
 export interface ResubmitApplicationPayload {
   notes: string | null
+  stay_months: number
 }
 
 export async function resubmitApplication(

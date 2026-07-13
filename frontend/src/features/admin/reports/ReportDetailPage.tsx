@@ -71,7 +71,7 @@ export function ReportDetailPage() {
   }
 
   if (loadError) return <Alert variant="error" message={loadError} />
-  if (!report) return <p className="text-sm text-sand-300/60">Жүктелуде...</p>
+  if (!report) return <p className="text-sm text-sand-300">Жүктелуде...</p>
 
   return (
     <div className="flex flex-col gap-6">

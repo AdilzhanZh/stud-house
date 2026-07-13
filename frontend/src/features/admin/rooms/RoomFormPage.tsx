@@ -184,7 +184,7 @@ export function RoomFormPage() {
               </label>
             ))}
           </div>
-          <p className="text-xs text-sand-300/60">Кемінде біреуін таңдау керек</p>
+          <p className="text-xs text-sand-300">Кемінде біреуін таңдау керек</p>
         </div>
         <Button type="submit" isLoading={isSubmitting} className="self-start">
           Сақтау

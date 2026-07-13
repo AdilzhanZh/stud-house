@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { KeyRound, ShieldCheck } from 'lucide-react'
 import { Card } from '../../../components/Card'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
 import { ConfirmDialog } from '../../../components/ConfirmDialog'
 import { DeleteIconButton } from '../../../components/DeleteIconButton'
 import { Input } from '../../../components/Input'
+import { Select } from '../../../components/Select'
 import { extractErrorMessage } from '../../../api/client'
 import { deleteUser, listUsers, setUserPassword } from '../../../api/adminUserApi'
 import { useAuth } from '../../auth/useAuth'
 import { roleLabels } from '../../../constants/roles'
+import { adminCellClass, adminPageHeading, adminRowClass, adminTableWrapClass, adminTheadClass } from '../adminTable'
 import type { Role, User } from '../../../types'
 
 export function UserListPage() {
@@ -72,52 +75,54 @@ export function UserListPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3.5">
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-2xl text-sand-100">Пайдаланушылар</h1>
+        <h1 className={adminPageHeading}>Пайдаланушылар</h1>
         {currentUser?.role === 'admin' && (
           <Button onClick={() => navigate('/admin/users/new')}>Жаңа менеджер тіркеу</Button>
         )}
       </div>
 
-      <select
-        className="w-56 rounded-md border border-sand-100/15 bg-navy-950/60 px-3 py-2 text-sand-100 text-sm outline-none focus:border-turquoise-400 focus:ring-2 focus:ring-turquoise-400/30"
-        value={roleFilter}
-        onChange={(e) => setRoleFilter(e.target.value as Role | '')}
-      >
-        <option value="">Барлық рөлдер</option>
-        <option value="admin">{roleLabels.admin}</option>
-        <option value="manager">{roleLabels.manager}</option>
-        <option value="student">{roleLabels.student}</option>
-      </select>
+      <div className="max-w-xs">
+        <Select
+          label="Рөлі бойынша сүзгі"
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value as Role | '')}
+        >
+          <option value="">Барлық рөлдер</option>
+          <option value="admin">{roleLabels.admin}</option>
+          <option value="manager">{roleLabels.manager}</option>
+          <option value="student">{roleLabels.student}</option>
+        </Select>
+      </div>
 
       {error && <Alert variant="error" message={error} />}
       {deleteError && <Alert variant="error" message={deleteError} />}
-      {!error && !users && <p className="text-sm text-sand-300/60">Жүктелуде...</p>}
+      {!error && !users && <p className="text-sm text-sand-300">Жүктелуде...</p>}
 
       {users && (
-        <Card className="overflow-x-auto p-0">
+        <Card className={adminTableWrapClass}>
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-sand-100/10 text-xs uppercase text-sand-300/60">
+            <thead className={adminTheadClass}>
               <tr>
-                <th className="px-4 py-3">Аты-жөні</th>
-                <th className="px-4 py-3">Email</th>
-                <th className="px-4 py-3">Рөлі</th>
-                <th className="px-4 py-3">Комиссия мүшесі</th>
-                <th className="px-4 py-3">Төраға</th>
-                {currentUser?.role === 'admin' && <th className="px-4 py-3">Әрекеттер</th>}
+                <th className={adminCellClass}>Аты-жөні</th>
+                <th className={adminCellClass}>Email</th>
+                <th className={adminCellClass}>Рөлі</th>
+                <th className={adminCellClass}>Комиссия мүшесі</th>
+                <th className={adminCellClass}>Төраға</th>
+                {currentUser?.role === 'admin' && <th className={adminCellClass}>Әрекеттер</th>}
               </tr>
             </thead>
             <tbody>
               {users.map((u) => (
-                <tr key={u.id} className="border-b border-sand-100/10 last:border-0">
-                  <td className="px-4 py-3 font-medium text-sand-100">{u.full_name}</td>
-                  <td className="px-4 py-3 text-sand-300/70">{u.email}</td>
-                  <td className="px-4 py-3 text-sand-300/70">{roleLabels[u.role]}</td>
-                  <td className="px-4 py-3 text-sand-300/70">{u.is_committee_member ? 'Иә' : '—'}</td>
-                  <td className="px-4 py-3 text-sand-300/70">{u.is_chairperson ? 'Иә' : '—'}</td>
+                <tr key={u.id} className={adminRowClass}>
+                  <td className={`${adminCellClass} font-semibold text-sand-100`}>{u.full_name}</td>
+                  <td className={`${adminCellClass} text-sand-300`}>{u.email}</td>
+                  <td className={`${adminCellClass} text-sand-300`}>{roleLabels[u.role]}</td>
+                  <td className={`${adminCellClass} text-sand-300`}>{u.is_committee_member ? 'Иә' : '—'}</td>
+                  <td className={`${adminCellClass} text-sand-300`}>{u.is_chairperson ? 'Иә' : '—'}</td>
                   {currentUser?.role === 'admin' && (
-                    <td className="px-4 py-3">
+                    <td className={adminCellClass}>
                       <div className="flex items-center gap-1">
                         <div className="flex h-8 w-8 shrink-0 items-center justify-center">
                           {u.role === 'manager' && (
@@ -125,22 +130,10 @@ export function UserListPage() {
                               type="button"
                               aria-label="Рөл/комиссия тағайындау"
                               title="Рөл/комиссия тағайындау"
-                              className="shrink-0 rounded-md p-1.5 text-turquoise-400 transition-colors hover:bg-turquoise-500/10"
+                              className="shrink-0 rounded-lg p-1.5 text-turquoise-400 transition-colors hover:bg-turquoise-500/10"
                               onClick={() => navigate(`/admin/users/${u.id}/role`)}
                             >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className="h-5 w-5"
-                              >
-                                <path d="M12 2 4 5v6c0 5 3.5 9 8 11 4.5-2 8-6 8-11V5z" />
-                                <path d="m9 12 2 2 4-4" />
-                              </svg>
+                              <ShieldCheck className="h-4.5 w-4.5" />
                             </button>
                           )}
                         </div>
@@ -149,23 +142,10 @@ export function UserListPage() {
                             type="button"
                             aria-label="Құпия сөзді өзгерту"
                             title="Құпия сөзді өзгерту"
-                            className="shrink-0 rounded-md p-1.5 text-turquoise-400 transition-colors hover:bg-turquoise-500/10"
+                            className="shrink-0 rounded-lg p-1.5 text-turquoise-400 transition-colors hover:bg-turquoise-500/10"
                             onClick={() => openPasswordDialog(u)}
                           >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth={2}
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="h-5 w-5"
-                            >
-                              <circle cx="7.5" cy="15.5" r="5.5" />
-                              <path d="m21 2-9.6 9.6" />
-                              <path d="m15.5 7.5 3 3L22 7l-3-3" />
-                            </svg>
+                            <KeyRound className="h-4.5 w-4.5" />
                           </button>
                         </div>
                         <div className="flex h-8 w-8 shrink-0 items-center justify-center">
@@ -180,7 +160,7 @@ export function UserListPage() {
               ))}
               {users.length === 0 && (
                 <tr>
-                  <td className="px-4 py-3 text-sand-300/60" colSpan={6}>
+                  <td className={`${adminCellClass} text-sand-300`} colSpan={6}>
                     Пайдаланушы жоқ
                   </td>
                 </tr>

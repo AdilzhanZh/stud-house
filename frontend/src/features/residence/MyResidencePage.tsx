@@ -8,12 +8,14 @@ import { extractErrorMessage } from '../../api/client'
 import { useAuth } from '../auth/useAuth'
 import { getMyResidence } from '../../api/residenceApi'
 import { getDormitory, listDormitories } from '../../api/dormitoryApi'
+import { listRoomResidents } from '../../api/roomApi'
 import { createExitRequest, listMyExitRequests } from '../../api/exitRequestApi'
 import { createTransferRequest, listMyTransferRequests } from '../../api/transferRequestApi'
 import type { Residence } from '../../types/residence'
 import type { Dormitory } from '../../types/dormitories'
 import type { ExitRequest } from '../../types/exitRequests'
 import type { TransferRequest } from '../../types/transferRequests'
+import type { RoomResident } from '../../types/rooms'
 
 const exitStatusLabels: Record<ExitRequest['status'], string> = {
   pending: 'Қаралуда',
@@ -33,6 +35,7 @@ export function MyResidencePage() {
   const [residence, setResidence] = useState<Residence | null>(null)
   const [dormitory, setDormitory] = useState<Dormitory | null>(null)
   const [dormitories, setDormitories] = useState<Dormitory[]>([])
+  const [roommates, setRoommates] = useState<RoomResident[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
 
   const [latestExit, setLatestExit] = useState<ExitRequest | null>(null)
@@ -51,18 +54,15 @@ export function MyResidencePage() {
 
   function load() {
     if (!user) return
-    Promise.all([
-      getMyResidence(user.id),
-      listDormitories(),
-      listMyExitRequests(),
-      listMyTransferRequests(),
-    ])
+    Promise.all([getMyResidence(user.id), listDormitories(), listMyExitRequests(), listMyTransferRequests()])
       .then(async ([res, allDormitories, exitRequests, transferRequests]) => {
         setResidence(res)
         setDormitories(allDormitories)
         setDormitory(await getDormitory(res.dormitory_id))
         setLatestExit(exitRequests[0] ?? null)
         setLatestTransfer(transferRequests[0] ?? null)
+        const residents = await listRoomResidents(res.room_id).catch(() => [])
+        setRoommates(residents.filter((r) => r.student_id !== user.id && !r.moved_out_at))
       })
       .catch((err) => setLoadError(extractErrorMessage(err, 'Жүктеу сәтсіз аяқталды')))
   }
@@ -105,16 +105,44 @@ export function MyResidencePage() {
   }
 
   if (loadError) return <Alert variant="error" message={loadError} />
-  if (!residence || !dormitory) return <p className="text-sm text-sand-300/60">Жүктелуде...</p>
+  if (!residence || !dormitory) return <p className="text-sm text-sand-300">Жүктелуде...</p>
 
   const hasPendingRequest = latestExit?.status === 'pending' || latestTransfer?.status === 'pending'
 
   return (
-    <div className="flex flex-col gap-6">
-      <Card title="Қазіргі орналасуым">
-        <p className="text-sm text-sand-100">{dormitory.name}</p>
-        <p className="text-sm text-sand-300/60">{dormitory.address}</p>
-        <p className="mt-2 text-sm text-sand-200">Бөлме: {residence.room_number}</p>
+    <div className="flex flex-col gap-3.5">
+      <h1 className="text-[23px] font-bold text-sand-100">Менің орным</h1>
+
+      <Card>
+        <div className="flex items-center gap-3.5">
+          <span className="flex h-13.5 w-13.5 shrink-0 items-center justify-center rounded-2xl bg-turquoise-500/15 text-lg font-bold text-turquoise-400">
+            {residence.room_number}
+          </span>
+          <div>
+            <p className="text-base font-semibold text-sand-100">
+              {dormitory.name} · {residence.room_number}-бөлме
+            </p>
+            <p className="mt-0.5 text-sm text-sand-300">
+              {dormitory.address} · {residence.capacity} орындық
+            </p>
+          </div>
+        </div>
+
+        {roommates.length > 0 && (
+          <div className="mt-3.5 rounded-2xl border border-navy-700 bg-navy-950 p-3.5">
+            <p className="mb-2 text-xs font-semibold tracking-wide text-sand-300 uppercase">Бөлмелестер</p>
+            <div className="flex flex-col gap-2">
+              {roommates.map((r, i) => (
+                <div key={r.id} className="flex items-center gap-2.5 text-sm text-sand-100">
+                  <span className="flex h-7.5 w-7.5 shrink-0 items-center justify-center rounded-full bg-navy-800 text-xs font-bold text-sand-200">
+                    {i + 1}
+                  </span>
+                  Бөлмелес — {new Date(r.moved_in_at).toLocaleDateString('kk-KZ')} бастап
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </Card>
 
       {latestExit && (
@@ -129,60 +157,28 @@ export function MyResidencePage() {
         <Alert
           variant={latestTransfer.status === 'rejected' ? 'error' : 'success'}
           message={`Соңғы ауыстыру сұрауыңыз: ${transferStatusLabels[latestTransfer.status]}${
-            latestTransfer.status === 'rejected' && latestTransfer.comment
-              ? ` — ${latestTransfer.comment}`
-              : ''
+            latestTransfer.status === 'rejected' && latestTransfer.comment ? ` — ${latestTransfer.comment}` : ''
           }`}
         />
       )}
-
       {hasPendingRequest && (
-        <Alert variant="success" message="Сұранысыңыз қаралуда. Жаңа сұраныс беру үшін алдымен ағымдағысы шешілуі керек." />
+        <Alert variant="warning" message="Сұранысыңыз қаралуда. Жаңа сұраныс беру үшін алдымен ағымдағысы шешілуі керек." />
       )}
 
       {!hasPendingRequest && (
-        <>
-          <Card title="Шығу өтінішін беру">
+        <div className="flex flex-col gap-3.5 md:grid md:grid-cols-2">
+          <Card>
+            <p className="text-[15px] font-bold text-sand-100">Ауысу сұрауы</p>
+            <p className="mt-1.5 mb-3.5 text-sm text-sand-300">Басқа бөлме немесе жатақханаға ауысқың келсе</p>
             <form
-              className="flex flex-col gap-4"
-              onSubmit={(e) => {
-                e.preventDefault()
-                setConfirmExitOpen(true)
-              }}
-            >
-              {exitError && <Alert variant="error" message={exitError} />}
-              <div className="flex flex-col gap-1">
-                <label htmlFor="exit-reason" className="text-sm font-medium text-sand-200">
-                  Себебі
-                </label>
-                <textarea
-                  id="exit-reason"
-                  rows={3}
-                  className="rounded-md border border-sand-100/15 bg-navy-950/60 px-3 py-2 text-sand-100 text-sm outline-none focus:border-turquoise-400 focus:ring-2 focus:ring-turquoise-400/30"
-                  value={exitReason}
-                  onChange={(e) => setExitReason(e.target.value)}
-                />
-              </div>
-              <Button type="submit" className="self-start">
-                Шығу өтінішін беру
-              </Button>
-            </form>
-          </Card>
-
-          <Card title="Ауыстыру сұрауы">
-            <form
-              className="flex flex-col gap-4"
+              className="flex flex-col gap-3"
               onSubmit={(e) => {
                 e.preventDefault()
                 setConfirmTransferOpen(true)
               }}
             >
               {transferError && <Alert variant="error" message={transferError} />}
-              <Select
-                label="Жаңа жатақхана"
-                value={transferDormitoryId}
-                onChange={(e) => setTransferDormitoryId(e.target.value)}
-              >
+              <Select label="Жаңа жатақхана" value={transferDormitoryId} onChange={(e) => setTransferDormitoryId(e.target.value)}>
                 <option value="">Таңдалмаған</option>
                 {dormitories.map((d) => (
                   <option key={d.id} value={d.id}>
@@ -190,24 +186,43 @@ export function MyResidencePage() {
                   </option>
                 ))}
               </Select>
-              <div className="flex flex-col gap-1">
-                <label htmlFor="transfer-reason" className="text-sm font-medium text-sand-200">
-                  Себебі
-                </label>
-                <textarea
-                  id="transfer-reason"
-                  rows={3}
-                  className="rounded-md border border-sand-100/15 bg-navy-950/60 px-3 py-2 text-sand-100 text-sm outline-none focus:border-turquoise-400 focus:ring-2 focus:ring-turquoise-400/30"
-                  value={transferReason}
-                  onChange={(e) => setTransferReason(e.target.value)}
-                />
-              </div>
-              <Button type="submit" className="self-start">
-                Ауыстыру сұрауын беру
+              <textarea
+                rows={2}
+                placeholder="Себебі (міндетті емес)"
+                className="w-full resize-y rounded-xl border border-navy-700 bg-navy-950 px-3 py-2.5 text-sm text-sand-100 outline-none placeholder:text-sand-400 focus:border-turquoise-400"
+                value={transferReason}
+                onChange={(e) => setTransferReason(e.target.value)}
+              />
+              <Button type="submit" variant="secondary" className="self-start">
+                Сұрау жіберу
               </Button>
             </form>
           </Card>
-        </>
+
+          <Card>
+            <p className="text-[15px] font-bold text-sand-100">Шығу өтініші</p>
+            <p className="mt-1.5 mb-3.5 text-sm text-sand-300">Жатақханадан біржола шығатын болсаң</p>
+            <form
+              className="flex flex-col gap-3"
+              onSubmit={(e) => {
+                e.preventDefault()
+                setConfirmExitOpen(true)
+              }}
+            >
+              {exitError && <Alert variant="error" message={exitError} />}
+              <textarea
+                rows={2}
+                placeholder="Себебі (міндетті емес)"
+                className="w-full resize-y rounded-xl border border-navy-700 bg-navy-950 px-3 py-2.5 text-sm text-sand-100 outline-none placeholder:text-sand-400 focus:border-turquoise-400"
+                value={exitReason}
+                onChange={(e) => setExitReason(e.target.value)}
+              />
+              <Button type="submit" variant="secondary" className="self-start !text-clay-400">
+                Өтініш беру
+              </Button>
+            </form>
+          </Card>
+        </div>
       )}
 
       <ConfirmDialog
@@ -215,6 +230,7 @@ export function MyResidencePage() {
         title="Шығу өтінішін растау"
         message="Шығу өтінішін жібергеннен кейін бұл процесті бастайсыз. Жалғастырасыз ба?"
         isLoading={exitSubmitting}
+        danger
         onConfirm={handleExitConfirm}
         onCancel={() => setConfirmExitOpen(false)}
       />

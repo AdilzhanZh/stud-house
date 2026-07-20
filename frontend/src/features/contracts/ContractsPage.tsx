@@ -13,6 +13,7 @@ import { getApplication } from '../../api/applicationApi'
 import { getDormitory } from '../../api/dormitoryApi'
 import { formatTenge } from '../../utils/dormitoryLabels'
 import { formatTimeRemaining } from './deadline'
+import { useIsSettled } from '../residence/useIsSettled'
 import type { Contract } from '../../types/contracts'
 import type { Dormitory } from '../../types/dormitories'
 
@@ -21,6 +22,11 @@ type PendingAction = { contractId: string; action: 'accept' | 'decline' } | null
 export function ContractsPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  // Contract.status stays 'accepted' forever, even after the student later
+  // exits the room (an exit request only touches room_residents, not the
+  // contract) — so the "you're settled, here's how to pay" block must also
+  // check the student's live residence, not just the contract's status.
+  const isSettled = useIsSettled()
   const [contracts, setContracts] = useState<Contract[] | null>(null)
   const [dormitoryByContract, setDormitoryByContract] = useState<Record<string, Dormitory>>({})
   const [error, setError] = useState<string | null>(null)
@@ -144,13 +150,16 @@ export function ContractsPage() {
                 <p className="mt-3.5 text-sm text-sand-200">{t('contracts.awaitingManagerText')}</p>
               )}
 
-              {contract.status === 'accepted' && (
-                <div className="mt-3.5 flex items-center gap-3 rounded-2xl bg-mint-500/10 px-4 py-3.5">
-                  <Check className="h-5 w-5 shrink-0 text-mint-400" />
-                  <p className="flex-1 text-sm font-semibold text-mint-400">{t('contracts.settledText')}</p>
-                  <Button variant="secondary" onClick={() => navigate('/my-residence')}>
-                    {t('contracts.goToResidence')}
-                  </Button>
+              {contract.status === 'accepted' && isSettled && (
+                <div className="mt-3.5 flex flex-col gap-2.5 rounded-2xl bg-mint-500/10 px-4 py-3.5">
+                  <div className="flex items-center gap-3">
+                    <Check className="h-5 w-5 shrink-0 text-mint-400" />
+                    <p className="flex-1 text-sm font-semibold text-mint-400">{t('contracts.settledText')}</p>
+                    <Button variant="secondary" onClick={() => navigate('/my-residence')}>
+                      {t('contracts.goToResidence')}
+                    </Button>
+                  </div>
+                  <p className="text-sm text-sand-200">{t('contracts.paymentInfoHint')}</p>
                 </div>
               )}
             </Card>

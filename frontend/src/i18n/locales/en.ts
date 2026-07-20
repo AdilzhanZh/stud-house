@@ -316,6 +316,7 @@ export const en: typeof kk = {
     acknowledgeAccept: 'I have read it, I accept',
     awaitingManagerText: 'Deadline passed, awaiting manager decision.',
     settledText: "You've successfully moved into the dormitory.",
+    paymentInfoHint: 'Pay at the accounting office on the 2nd floor of the main building.',
     goToResidence: 'My residence',
     footerHint:
       "After accepting you're considered moved in. If you don't respond in time, the spot goes to another student.",

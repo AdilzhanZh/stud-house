@@ -7,8 +7,10 @@ import type {
   DormitoryType,
 } from '../types/dormitories'
 
-export async function listDormitories(): Promise<Dormitory[]> {
-  const { data } = await apiClient.get<{ data: Dormitory[] }>('/dormitories')
+export async function listDormitories(openOnly = false): Promise<Dormitory[]> {
+  const { data } = await apiClient.get<{ data: Dormitory[] }>('/dormitories', {
+    params: openOnly ? { open_only: 'true' } : undefined,
+  })
   return data.data
 }
 
@@ -45,6 +47,8 @@ export interface DormitoryPayload {
   built_year: string | null
   commissioned_year: string | null
   ownership_form: string | null
+  closed_for_applications: boolean
+  default_report_template_id: string | null
 }
 
 export async function createDormitory(payload: DormitoryPayload): Promise<Dormitory> {

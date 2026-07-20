@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Card } from '../../../components/Card'
 import { Select } from '../../../components/Select'
 import { Button } from '../../../components/Button'
@@ -20,6 +21,7 @@ interface Row extends TransferRequest {
 }
 
 export function TransferRequestListPage() {
+  const { t } = useTranslation()
   const [rows, setRows] = useState<Row[] | null>(null)
   const [dormitories, setDormitories] = useState<Dormitory[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -62,7 +64,7 @@ export function TransferRequestListPage() {
         )
         setRows(withDetails)
       })
-      .catch((err) => setError(extractErrorMessage(err, 'Жүктеу сәтсіз аяқталды')))
+      .catch((err) => setError(extractErrorMessage(err, t('admin.common.loadError'))))
   }
 
   useEffect(load, [])
@@ -91,7 +93,7 @@ export function TransferRequestListPage() {
       setApproveTarget(null)
       load()
     } catch (err) {
-      setActionError(extractErrorMessage(err, 'Әрекет сәтсіз аяқталды'))
+      setActionError(extractErrorMessage(err, t('admin.common.actionFailed')))
     } finally {
       setSubmittingId(null)
     }
@@ -107,7 +109,7 @@ export function TransferRequestListPage() {
       setComment('')
       load()
     } catch (err) {
-      setActionError(extractErrorMessage(err, 'Әрекет сәтсіз аяқталды'))
+      setActionError(extractErrorMessage(err, t('admin.common.actionFailed')))
     } finally {
       setSubmittingId(null)
     }
@@ -115,11 +117,11 @@ export function TransferRequestListPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-[23px] font-bold text-sand-100">Ауыстыру сұраныстары</h1>
+      <h1 className="text-[23px] font-bold text-sand-100">{t('admin.layout.transferRequests')}</h1>
 
       {error && <Alert variant="error" message={error} />}
       {actionError && <Alert variant="error" message={actionError} />}
-      {!error && !rows && <p className="text-sm text-sand-300">Жүктелуде...</p>}
+      {!error && !rows && <p className="text-sm text-sand-300">{t('admin.common.loading')}</p>}
 
       <div className="flex flex-col gap-3">
         {rows?.map((r) => (
@@ -127,10 +129,10 @@ export function TransferRequestListPage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="font-medium text-sand-100">{r.studentName}</p>
-                <p className="text-sm text-sand-300">Қазіргі бөлме: {r.currentRoomLabel}</p>
+                <p className="text-sm text-sand-300">{t('admin.requests.currentRoom')} {r.currentRoomLabel}</p>
                 {(r.requestedDormitoryName || r.requestedRoomLabel) && (
                   <p className="text-sm text-sand-300">
-                    Сұралған: {r.requestedDormitoryName ?? '—'}
+                    {t('admin.requests.requested')} {r.requestedDormitoryName ?? '—'}
                     {r.requestedRoomLabel ? ` — ${r.requestedRoomLabel}` : ''}
                   </p>
                 )}
@@ -138,9 +140,9 @@ export function TransferRequestListPage() {
               </div>
               {rejectTarget !== r.id && approveTarget !== r.id && (
                 <div className="flex gap-3">
-                  <Button onClick={() => openApprove(r)}>Мақұлдау</Button>
+                  <Button onClick={() => openApprove(r)}>{t('admin.applications.approve')}</Button>
                   <Button variant="danger" onClick={() => setRejectTarget(r.id)}>
-                    Қабылдамау
+                    {t('admin.committee.disapprove')}
                   </Button>
                 </div>
               )}
@@ -149,14 +151,14 @@ export function TransferRequestListPage() {
             {approveTarget === r.id && (
               <div className="mt-4 flex flex-col gap-3">
                 <Select
-                  label="Жатақхана"
+                  label={t('admin.layout.dormitories')}
                   value={approveDormitoryId}
                   onChange={(e) => {
                     setApproveDormitoryId(e.target.value)
                     setApproveRoomId('')
                   }}
                 >
-                  <option value="">Таңдаңыз</option>
+                  <option value="">{t('admin.common.select')}</option>
                   {dormitories.map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.name}
@@ -164,15 +166,15 @@ export function TransferRequestListPage() {
                   ))}
                 </Select>
                 <Select
-                  label="Бөлме"
+                  label={t('admin.dormitories.roomNumber')}
                   value={approveRoomId}
                   onChange={(e) => setApproveRoomId(e.target.value)}
                   disabled={!approveDormitoryId}
                 >
-                  <option value="">Таңдаңыз</option>
+                  <option value="">{t('admin.common.select')}</option>
                   {roomsForDormitory.map((room) => (
                     <option key={room.id} value={room.id}>
-                      {room.room_number} ({room.capacity} орын)
+                      {room.room_number} ({t('admin.requests.bedsCount', { count: room.capacity })})
                     </option>
                   ))}
                 </Select>
@@ -182,10 +184,10 @@ export function TransferRequestListPage() {
                     isLoading={submittingId === r.id}
                     disabled={!approveRoomId}
                   >
-                    Растау
+                    {t('common.confirm')}
                   </Button>
                   <Button variant="secondary" onClick={() => setApproveTarget(null)}>
-                    Бас тарту
+                    {t('common.cancel')}
                   </Button>
                 </div>
               </div>
@@ -195,7 +197,7 @@ export function TransferRequestListPage() {
               <div className="mt-4 flex flex-col gap-3">
                 <textarea
                   rows={3}
-                  placeholder="Себебі (міндетті)"
+                  placeholder={t('admin.requests.reasonRequired')}
                   className="rounded-[14px] border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sand-100 text-sm outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
@@ -207,7 +209,7 @@ export function TransferRequestListPage() {
                     isLoading={submittingId === r.id}
                     disabled={!comment.trim()}
                   >
-                    Растау
+                    {t('common.confirm')}
                   </Button>
                   <Button
                     variant="secondary"
@@ -216,7 +218,7 @@ export function TransferRequestListPage() {
                       setComment('')
                     }}
                   >
-                    Бас тарту
+                    {t('common.cancel')}
                   </Button>
                 </div>
               </div>
@@ -224,7 +226,7 @@ export function TransferRequestListPage() {
           </Card>
         ))}
         {rows && rows.length === 0 && (
-          <p className="text-sm text-sand-300">Қаралатын сұраныс жоқ</p>
+          <p className="text-sm text-sand-300">{t('admin.requests.noRequestsToReview')}</p>
         )}
       </div>
     </div>

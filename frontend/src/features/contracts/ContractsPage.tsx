@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, Check } from 'lucide-react'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
@@ -56,9 +56,6 @@ export function ContractsPage() {
       await respondContract(pendingAction.contractId, pendingAction.action)
       setPendingAction(null)
       load()
-      if (pendingAction.action === 'accept') {
-        navigate(`/contracts/${pendingAction.contractId}/payment`)
-      }
     } catch (err) {
       setActionError(extractErrorMessage(err, t('contracts.actionFailed')))
     } finally {
@@ -109,11 +106,13 @@ export function ContractsPage() {
 
               {contract.status === 'sent' && (
                 <div className="mt-3.5 flex flex-wrap gap-2.5">
-                  <a href={contract.file_url} target="_blank" rel="noopener noreferrer" className="flex-1">
-                    <Button variant="secondary" className="w-full min-w-35">
-                      {t('contracts.openPdf')}
-                    </Button>
-                  </a>
+                  {contract.file_url && (
+                    <a href={contract.file_url} target="_blank" rel="noopener noreferrer" className="flex-1">
+                      <Button variant="secondary" className="w-full min-w-35">
+                        {t('contracts.openPdf')}
+                      </Button>
+                    </a>
+                  )}
                   {acknowledged.has(contract.id) ? (
                     <>
                       <Button
@@ -146,9 +145,13 @@ export function ContractsPage() {
               )}
 
               {contract.status === 'accepted' && (
-                <Button variant="secondary" className="mt-3.5" onClick={() => navigate(`/contracts/${contract.id}/payment`)}>
-                  {t('contracts.goToPayment')}
-                </Button>
+                <div className="mt-3.5 flex items-center gap-3 rounded-2xl bg-mint-500/10 px-4 py-3.5">
+                  <Check className="h-5 w-5 shrink-0 text-mint-400" />
+                  <p className="flex-1 text-sm font-semibold text-mint-400">{t('contracts.settledText')}</p>
+                  <Button variant="secondary" onClick={() => navigate('/my-residence')}>
+                    {t('contracts.goToResidence')}
+                  </Button>
+                </div>
               )}
             </Card>
           )

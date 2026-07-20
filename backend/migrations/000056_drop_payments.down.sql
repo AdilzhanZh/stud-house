@@ -1,0 +1,19 @@
+CREATE TYPE payment_status AS ENUM ('pending', 'submitted', 'confirmed', 'rejected', 'awaiting_manager_decision');
+
+CREATE TABLE payments (
+    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    contract_id       UUID NOT NULL UNIQUE REFERENCES contracts(id),
+    amount            NUMERIC(12, 2) NOT NULL,
+    currency          VARCHAR(3) NOT NULL DEFAULT 'KZT',
+    receipt_file_url  TEXT,
+    status            payment_status NOT NULL DEFAULT 'pending',
+    submitted_at      TIMESTAMPTZ,
+    confirmed_by      UUID REFERENCES users(id),
+    confirmed_at      TIMESTAMPTZ,
+    deadline          TIMESTAMPTZ NOT NULL DEFAULT (now() + INTERVAL '7 days'),
+    reminder_sent_at  TIMESTAMPTZ,
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_payments_status ON payments(status);
+CREATE INDEX idx_payments_deadline ON payments(deadline);

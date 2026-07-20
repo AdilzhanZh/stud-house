@@ -34,38 +34,6 @@ func contractDTO(c *domain.Contract) contractResponse {
 	}
 }
 
-type paymentResponse struct {
-	ID             uuid.UUID  `json:"id"`
-	ContractID     uuid.UUID  `json:"contract_id"`
-	Amount         float64    `json:"amount"`
-	Currency       string     `json:"currency"`
-	ReceiptFileURL *string    `json:"receipt_file_url"`
-	Status         string     `json:"status"`
-	SubmittedAt    *time.Time `json:"submitted_at"`
-	ConfirmedBy    *uuid.UUID `json:"confirmed_by"`
-	ConfirmedAt    *time.Time `json:"confirmed_at"`
-	Deadline       time.Time  `json:"deadline"`
-	ReminderSentAt *time.Time `json:"reminder_sent_at"`
-	CreatedAt      time.Time  `json:"created_at"`
-}
-
-func paymentDTO(p *domain.Payment) paymentResponse {
-	return paymentResponse{
-		ID:             p.ID,
-		ContractID:     p.ContractID,
-		Amount:         p.Amount,
-		Currency:       p.Currency,
-		ReceiptFileURL: p.ReceiptFileURL,
-		Status:         string(p.Status),
-		SubmittedAt:    p.SubmittedAt,
-		ConfirmedBy:    p.ConfirmedBy,
-		ConfirmedAt:    p.ConfirmedAt,
-		Deadline:       p.Deadline,
-		ReminderSentAt: p.ReminderSentAt,
-		CreatedAt:      p.CreatedAt,
-	}
-}
-
 type exitRequestResponse struct {
 	ID             uuid.UUID  `json:"id"`
 	RoomResidentID uuid.UUID  `json:"room_resident_id"`

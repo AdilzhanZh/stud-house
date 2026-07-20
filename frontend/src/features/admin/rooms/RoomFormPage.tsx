@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Card } from '../../../components/Card'
 import { Input } from '../../../components/Input'
 import { Select } from '../../../components/Select'
@@ -12,6 +13,7 @@ import type { Gender } from '../../../types/rooms'
 const ALL_COURSES = [1, 2, 3, 4, 5, 6]
 
 export function RoomFormPage() {
+  const { t } = useTranslation()
   const { dormitoryId, roomId } = useParams<{ dormitoryId?: string; roomId?: string }>()
   const isEdit = Boolean(roomId)
   const navigate = useNavigate()
@@ -44,7 +46,7 @@ export function RoomFormPage() {
         setCourses(room.restrictions.courses ?? [])
         setOwnerDormitoryId(room.dormitory_id)
       })
-      .catch((err) => setLoadError(extractErrorMessage(err, 'Жүктеу сәтсіз аяқталды')))
+      .catch((err) => setLoadError(extractErrorMessage(err, t('admin.common.loadError'))))
   }, [roomId])
 
   function toggleCourse(course: number) {
@@ -60,11 +62,11 @@ export function RoomFormPage() {
     const bottomBedsNum = Number(bottomBeds || 0)
     const capacityNum = topBedsNum + bottomBedsNum
     if (capacityNum <= 0) {
-      setSubmitError('Үстіңгі немесе астыңғы орын саны оң сан болуы керек')
+      setSubmitError(t('admin.rooms.bedsPositiveError'))
       return
     }
     if (courses.length === 0) {
-      setSubmitError('Курс бойынша шектеуді таңдаңыз')
+      setSubmitError(t('admin.rooms.courseRequiredError'))
       return
     }
     setIsSubmitting(true)
@@ -87,7 +89,7 @@ export function RoomFormPage() {
       })
       navigate(`/admin/dormitories/${ownerDormitoryId ?? dormitoryId}`)
     } catch (err) {
-      setSubmitError(extractErrorMessage(err, 'Сақтау сәтсіз аяқталды'))
+      setSubmitError(extractErrorMessage(err, t('admin.common.saveFailed')))
     } finally {
       setIsSubmitting(false)
     }
@@ -102,20 +104,20 @@ export function RoomFormPage() {
         className="self-start"
         onClick={() => navigate(`/admin/dormitories/${ownerDormitoryId ?? dormitoryId}`)}
       >
-        ← Артқа
+        ← {t('admin.common.back')}
       </Button>
 
-      <Card title={isEdit ? 'Бөлмені өзгерту' : 'Жаңа бөлме'}>
+      <Card title={isEdit ? t('admin.rooms.editTitle') : t('admin.rooms.newTitle')}>
       <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
         {submitError && <Alert variant="error" message={submitError} />}
         <Input
-          label="Бөлме №"
+          label={t('admin.dormitories.roomNumber')}
           value={roomNumber}
           onChange={(e) => setRoomNumber(e.target.value)}
           required
         />
         <Input
-          label="Үстіңгі орын саны"
+          label={t('admin.rooms.topBeds')}
           type="number"
           min={0}
           value={topBeds}
@@ -123,7 +125,7 @@ export function RoomFormPage() {
           required
         />
         <Input
-          label="Астыңғы орын саны"
+          label={t('admin.rooms.bottomBeds')}
           type="number"
           min={0}
           value={bottomBeds}
@@ -131,7 +133,7 @@ export function RoomFormPage() {
           required
         />
         <Input
-          label="Қабат (Floor)"
+          label={t('admin.rooms.floorLabel')}
           type="number"
           min={0}
           value={floor}
@@ -139,7 +141,7 @@ export function RoomFormPage() {
           required
         />
         <Input
-          label="Бөлме ауданы (м²)"
+          label={t('admin.rooms.areaLabel')}
           type="number"
           min={0}
           step="0.1"
@@ -148,28 +150,28 @@ export function RoomFormPage() {
           required
         />
         <Input
-          label="Жабдықталуы (Equipment)"
+          label={t('admin.rooms.equipmentLabel')}
           value={equipment}
           onChange={(e) => setEquipment(e.target.value)}
-          placeholder="мысалы: Кереуеттер, столы, шкаф"
+          placeholder={t('admin.rooms.equipmentPlaceholder')}
           required
         />
         <Select
-          label="Жынысы бойынша шектеу"
+          label={t('admin.rooms.genderRestriction')}
           value={gender}
           onChange={(e) => setGender(e.target.value as Gender | 'any' | '')}
           required
         >
           <option value="" disabled>
-            Таңдаңыз
+            {t('admin.common.select')}
           </option>
-          <option value="any">Кез келген</option>
-          <option value="male">Ер</option>
-          <option value="female">Әйел</option>
+          <option value="any">{t('admin.rooms.anyGender')}</option>
+          <option value="male">{t('admin.dormitories.male')}</option>
+          <option value="female">{t('admin.dormitories.female')}</option>
         </Select>
         <div className="flex flex-col gap-1">
           <span className="text-sm font-medium text-sand-200">
-            Курс бойынша шектеу
+            {t('admin.rooms.courseRestriction')}
             <span className="text-clay-400"> *</span>
           </span>
           <div className="flex flex-wrap gap-3">
@@ -184,10 +186,10 @@ export function RoomFormPage() {
               </label>
             ))}
           </div>
-          <p className="text-xs text-sand-300">Кемінде біреуін таңдау керек</p>
+          <p className="text-xs text-sand-300">{t('admin.rooms.selectAtLeastOne')}</p>
         </div>
         <Button type="submit" isLoading={isSubmitting} className="self-start">
-          Сақтау
+          {t('admin.common.save')}
         </Button>
       </form>
       </Card>

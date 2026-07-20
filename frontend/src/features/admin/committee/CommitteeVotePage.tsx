@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Card } from '../../../components/Card'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
@@ -10,6 +11,7 @@ import { useAuth } from '../../auth/useAuth'
 import type { ReportDetail } from '../../../types/reports'
 
 export function CommitteeVotePage() {
+  const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -26,7 +28,7 @@ export function CommitteeVotePage() {
     if (!id) return
     getReportDetail(id)
       .then(setReport)
-      .catch((err) => setLoadError(extractErrorMessage(err, 'Жүктеу сәтсіз аяқталды')))
+      .catch((err) => setLoadError(extractErrorMessage(err, t('admin.common.loadError'))))
   }
 
   useEffect(load, [id])
@@ -39,7 +41,7 @@ export function CommitteeVotePage() {
       await voteReport(id, 'approved')
       load()
     } catch (err) {
-      setVoteError(extractErrorMessage(err, 'Дауыс беру сәтсіз аяқталды'))
+      setVoteError(extractErrorMessage(err, t('admin.committee.voteFailed')))
     } finally {
       setIsSubmitting(false)
     }
@@ -53,14 +55,14 @@ export function CommitteeVotePage() {
       await voteReport(id, 'rejected', reason.trim())
       load()
     } catch (err) {
-      setVoteError(extractErrorMessage(err, 'Дауыс беру сәтсіз аяқталды'))
+      setVoteError(extractErrorMessage(err, t('admin.committee.voteFailed')))
     } finally {
       setIsSubmitting(false)
     }
   }
 
   if (loadError) return <Alert variant="error" message={loadError} />
-  if (!report || !user) return <p className="text-sm text-sand-300">Жүктелуде...</p>
+  if (!report || !user) return <p className="text-sm text-sand-300">{t('admin.common.loading')}</p>
 
   const myVote = report.votes.find((v) => v.committee_member_id === user.id)
   // Hide the vote panel once the report has left pending_committee (backend
@@ -71,7 +73,7 @@ export function CommitteeVotePage() {
   return (
     <div className="flex flex-col gap-6">
       <Button variant="secondary" className="self-start" onClick={() => navigate('/committee/reports')}>
-        ← Артқа
+        ← {t('admin.common.back')}
       </Button>
 
       <ReportSummaryCards report={report} />
@@ -79,27 +81,29 @@ export function CommitteeVotePage() {
       {myVote?.decision && (
         <Alert
           variant={myVote.decision === 'approved' ? 'success' : 'error'}
-          message={`Сіздің дауысыңыз: ${myVote.decision === 'approved' ? 'approved' : 'rejected'}`}
+          message={t('admin.committee.yourVote', {
+            decision: myVote.decision === 'approved' ? t('admin.reports.voteApproved') : t('admin.reports.voteRejected'),
+          })}
         />
       )}
 
       {canVote && (
-        <Card title="Дауыс беру">
+        <Card title={t('admin.committee.castVote')}>
           {voteError && <Alert variant="error" message={voteError} />}
           {!showRejectForm ? (
             <div className="flex gap-3">
               <Button onClick={handleApprove} isLoading={isSubmitting}>
-                Мақұлдау
+                {t('admin.applications.approve')}
               </Button>
               <Button variant="danger" onClick={() => setShowRejectForm(true)}>
-                Мақұлдамау
+                {t('admin.committee.disapprove')}
               </Button>
             </div>
           ) : (
             <div className="flex flex-col gap-4">
               <textarea
                 rows={3}
-                placeholder="Мақұлдамау себебі (міндетті)"
+                placeholder={t('admin.committee.disapproveReasonPlaceholder')}
                 className="rounded-[14px] border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sand-100 text-sm outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
@@ -111,10 +115,10 @@ export function CommitteeVotePage() {
                   isLoading={isSubmitting}
                   disabled={!reason.trim()}
                 >
-                  Растау
+                  {t('common.confirm')}
                 </Button>
                 <Button variant="secondary" onClick={() => setShowRejectForm(false)}>
-                  Бас тарту
+                  {t('common.cancel')}
                 </Button>
               </div>
             </div>

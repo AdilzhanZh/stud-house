@@ -23,16 +23,16 @@ func NewReportTemplateRepo(db *pgxpool.Pool) *ReportTemplateRepo {
 
 func (r *ReportTemplateRepo) Create(ctx context.Context, t *domain.ReportTemplate) error {
 	const q = `
-		INSERT INTO report_templates (name, file_url, created_by)
-		VALUES ($1, $2, $3)
+		INSERT INTO report_templates (name, intro_text, student_columns, file_url, created_by)
+		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id, created_at`
-	return r.db.QueryRow(ctx, q, t.Name, t.FileURL, t.CreatedBy).Scan(&t.ID, &t.CreatedAt)
+	return r.db.QueryRow(ctx, q, t.Name, t.IntroText, t.StudentColumns, t.FileURL, t.CreatedBy).Scan(&t.ID, &t.CreatedAt)
 }
 
 func (r *ReportTemplateRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.ReportTemplate, error) {
-	const q = `SELECT id, name, file_url, created_by, created_at FROM report_templates WHERE id = $1`
+	const q = `SELECT id, name, intro_text, student_columns, file_url, created_by, created_at FROM report_templates WHERE id = $1`
 	t := &domain.ReportTemplate{}
-	err := r.db.QueryRow(ctx, q, id).Scan(&t.ID, &t.Name, &t.FileURL, &t.CreatedBy, &t.CreatedAt)
+	err := r.db.QueryRow(ctx, q, id).Scan(&t.ID, &t.Name, &t.IntroText, &t.StudentColumns, &t.FileURL, &t.CreatedBy, &t.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, repository.ErrNotFound
@@ -43,7 +43,7 @@ func (r *ReportTemplateRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain
 }
 
 func (r *ReportTemplateRepo) List(ctx context.Context) ([]*domain.ReportTemplate, error) {
-	const q = `SELECT id, name, file_url, created_by, created_at FROM report_templates ORDER BY created_at DESC`
+	const q = `SELECT id, name, intro_text, student_columns, file_url, created_by, created_at FROM report_templates ORDER BY created_at DESC`
 	rows, err := r.db.Query(ctx, q)
 	if err != nil {
 		return nil, err
@@ -53,7 +53,7 @@ func (r *ReportTemplateRepo) List(ctx context.Context) ([]*domain.ReportTemplate
 	var out []*domain.ReportTemplate
 	for rows.Next() {
 		t := &domain.ReportTemplate{}
-		if err := rows.Scan(&t.ID, &t.Name, &t.FileURL, &t.CreatedBy, &t.CreatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.Name, &t.IntroText, &t.StudentColumns, &t.FileURL, &t.CreatedBy, &t.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, t)

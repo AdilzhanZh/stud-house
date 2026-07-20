@@ -37,14 +37,6 @@ type Config struct {
 	// ContractReminderWindow: managers get reminded about a 'sent' contract
 	// once its deadline is within this window (phase 5).
 	ContractReminderWindow time.Duration
-
-	// PaymentDeadline is how long a manager has to confirm/reject a payment
-	// before it's eligible to be flagged awaiting_manager_decision (mirrors
-	// ContractResponseDeadline's "never auto-reject" fix).
-	PaymentDeadline time.Duration
-	// PaymentReapplyBlock is how long a student is barred from submitting a
-	// new application after a manager voids one of their overdue payments.
-	PaymentReapplyBlock time.Duration
 }
 
 func Load() (*Config, error) {
@@ -92,18 +84,6 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	cfg.ContractReminderWindow = time.Duration(reminderHours) * time.Hour
-
-	paymentDeadlineDays, err := strconv.Atoi(getEnv("PAYMENT_DEADLINE_DAYS", "7"))
-	if err != nil {
-		return nil, err
-	}
-	cfg.PaymentDeadline = time.Duration(paymentDeadlineDays) * 24 * time.Hour
-
-	paymentReapplyBlockDays, err := strconv.Atoi(getEnv("PAYMENT_REAPPLY_BLOCK_DAYS", "7"))
-	if err != nil {
-		return nil, err
-	}
-	cfg.PaymentReapplyBlock = time.Duration(paymentReapplyBlockDays) * 24 * time.Hour
 
 	return cfg, nil
 }

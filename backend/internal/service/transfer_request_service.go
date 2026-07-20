@@ -14,7 +14,6 @@ import (
 
 type TransferRequestService struct {
 	transferRequests repository.TransferRequestRepository
-	applications     repository.ApplicationRepository
 	rooms            repository.RoomRepository
 	roomService      *RoomService
 	users            repository.UserRepository
@@ -23,7 +22,6 @@ type TransferRequestService struct {
 
 func NewTransferRequestService(
 	transferRequests repository.TransferRequestRepository,
-	applications repository.ApplicationRepository,
 	rooms repository.RoomRepository,
 	roomService *RoomService,
 	users repository.UserRepository,
@@ -31,7 +29,6 @@ func NewTransferRequestService(
 ) *TransferRequestService {
 	return &TransferRequestService{
 		transferRequests: transferRequests,
-		applications:     applications,
 		rooms:            rooms,
 		roomService:      roomService,
 		users:            users,
@@ -40,20 +37,16 @@ func NewTransferRequestService(
 }
 
 // Create is student-only: it resolves the caller's own active room stay and
-// blocks the request if they have any unresolved application or transfer
-// request in flight (same "one active thing" invariant as phases 2/4).
+// blocks the request if they have another transfer request in flight (same
+// "one active thing" invariant as phases 2/4). A student's dormitory
+// application can't itself still be in flight here — GetActiveResidentByStudent
+// only succeeds once that application resolved into an actual room stay.
 func (s *TransferRequestService) Create(ctx context.Context, studentID uuid.UUID, requestedDormitoryID, requestedRoomID *uuid.UUID, reason *string) (*domain.TransferRequest, error) {
 	resident, err := s.rooms.GetActiveResidentByStudent(ctx, studentID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return nil, apperror.BadRequest("сізде белсенді бөлмеге орналасу жоқ")
 		}
-		return nil, err
-	}
-
-	if _, err := s.applications.GetActiveByStudent(ctx, studentID); err == nil {
-		return nil, apperror.Conflict("сізде шешілмеген өтінішіңіз бар, ауыстыру өтінішін бермес бұрын соны реттеңіз")
-	} else if !errors.Is(err, repository.ErrNotFound) {
 		return nil, err
 	}
 

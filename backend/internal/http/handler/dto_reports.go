@@ -10,15 +10,25 @@ import (
 )
 
 type reportTemplateResponse struct {
-	ID        uuid.UUID `json:"id"`
-	Name      string    `json:"name"`
-	FileURL   string    `json:"file_url"`
-	CreatedBy uuid.UUID `json:"created_by"`
-	CreatedAt time.Time `json:"created_at"`
+	ID             uuid.UUID `json:"id"`
+	Name           string    `json:"name"`
+	IntroText      string    `json:"intro_text"`
+	StudentColumns []string  `json:"student_columns"`
+	FileURL        *string   `json:"file_url"`
+	CreatedBy      uuid.UUID `json:"created_by"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 func reportTemplateDTO(t *domain.ReportTemplate) reportTemplateResponse {
-	return reportTemplateResponse{ID: t.ID, Name: t.Name, FileURL: t.FileURL, CreatedBy: t.CreatedBy, CreatedAt: t.CreatedAt}
+	return reportTemplateResponse{
+		ID:             t.ID,
+		Name:           t.Name,
+		IntroText:      t.IntroText,
+		StudentColumns: t.StudentColumns,
+		FileURL:        t.FileURL,
+		CreatedBy:      t.CreatedBy,
+		CreatedAt:      t.CreatedAt,
+	}
 }
 
 func reportTemplatesDTO(list []*domain.ReportTemplate) []reportTemplateResponse {
@@ -67,7 +77,9 @@ type reportStudentResponse struct {
 	StudentEmail      string     `json:"student_email"`
 	StudentPhone      string     `json:"student_phone"`
 	DormitoryID       uuid.UUID  `json:"dormitory_id"`
+	DormitoryName     string     `json:"dormitory_name"`
 	AssignedRoomID    *uuid.UUID `json:"assigned_room_id"`
+	RoomNumber        *string    `json:"room_number"`
 }
 
 type committeeVoteResponse struct {
@@ -100,6 +112,14 @@ func reportDetailDTO(d *service.ReportDetail) reportDetailResponse {
 			row.StudentFullName = student.FullName
 			row.StudentEmail = student.Email
 			row.StudentPhone = student.Phone
+		}
+		if dormitory := d.Dormitories[app.DormitoryID]; dormitory != nil {
+			row.DormitoryName = dormitory.Name
+		}
+		if app.AssignedRoomID != nil {
+			if room := d.Rooms[*app.AssignedRoomID]; room != nil {
+				row.RoomNumber = &room.RoomNumber
+			}
 		}
 		students = append(students, row)
 	}

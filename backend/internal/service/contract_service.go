@@ -27,11 +27,6 @@ type ContractService struct {
 	notifier         *notifier.Notifier
 	responseDeadline time.Duration
 	reminderWindow   time.Duration
-	// paymentDeadline is how long a manager has to confirm/reject a payment
-	// (see PaymentService.FlagOverduePayments) before it's flagged
-	// awaiting_manager_decision — set on the Payment row created here, in
-	// Respond's "accept" branch.
-	paymentDeadline time.Duration
 }
 
 func NewContractService(
@@ -43,7 +38,6 @@ func NewContractService(
 	notifier *notifier.Notifier,
 	responseDeadline time.Duration,
 	reminderWindow time.Duration,
-	paymentDeadline time.Duration,
 ) *ContractService {
 	return &ContractService{
 		contracts:        contracts,
@@ -54,7 +48,6 @@ func NewContractService(
 		notifier:         notifier,
 		responseDeadline: responseDeadline,
 		reminderWindow:   reminderWindow,
-		paymentDeadline:  paymentDeadline,
 	}
 }
 
@@ -75,11 +68,20 @@ func (s *ContractService) OnReportApproved(ctx context.Context, reportID uuid.UU
 		return err
 	}
 
+	// FileURL is optional on ReportTemplate now (the in-app builder never
+	// requires an uploaded document) — a template with none attached still
+	// produces a contract, just with an empty "Open PDF" link (hidden by the
+	// frontend when file_url is empty).
+	var contractFileURL string
+	if template.FileURL != nil {
+		contractFileURL = *template.FileURL
+	}
+
 	now := time.Now()
 	for _, appID := range appIDs {
 		contract := &domain.Contract{
 			ApplicationID:    appID,
-			FileURL:          template.FileURL,
+			FileURL:          contractFileURL,
 			Status:           domain.ContractSent,
 			SentAt:           now,
 			ResponseDeadline: now.Add(s.responseDeadline),
@@ -127,9 +129,9 @@ func (s *ContractService) GetByApplicationID(ctx context.Context, applicationID 
 }
 
 // Respond lets the owning student accept or decline a contract while it is
-// still 'sent' and before its deadline. accept creates the payment row
-// (amount from the dormitory's price_per_semester); decline rejects the
-// underlying application and frees the student's room.
+// still 'sent' and before its deadline. accept settles the underlying
+// application immediately — there is no separate payment-confirmation step;
+// decline rejects the underlying application and frees the student's room.
 func (s *ContractService) Respond(ctx context.Context, actorStudentID, contractID uuid.UUID, action string) (*domain.Contract, error) {
 	err := s.contracts.WithLock(ctx, contractID, func(ctx context.Context, contract *domain.Contract, tx repository.ContractTx) error {
 		app, err := s.applications.GetByID(ctx, contract.ApplicationID)
@@ -156,21 +158,7 @@ func (s *ContractService) Respond(ctx context.Context, actorStudentID, contractI
 			if err := tx.SetStatus(ctx, contractID, domain.ContractAccepted, &now); err != nil {
 				return err
 			}
-			price, err := s.contracts.GetDormitoryPrice(ctx, app.DormitoryID)
-			if err != nil {
-				return err
-			}
-			if price == nil {
-				return apperror.BadRequest("жатақхана бағасы белгіленбеген, әкімшіге хабарласыңыз")
-			}
-			payment := &domain.Payment{
-				ContractID: contractID,
-				Amount:     *price,
-				Currency:   "KZT",
-				Status:     domain.PaymentPending,
-				Deadline:   time.Now().Add(s.paymentDeadline),
-			}
-			return tx.CreatePayment(ctx, payment)
+			return tx.MarkApplicationSettled(ctx, contract.ApplicationID, actorStudentID)
 		case "decline":
 			if err := tx.SetStatus(ctx, contractID, domain.ContractDeclined, &now); err != nil {
 				return err

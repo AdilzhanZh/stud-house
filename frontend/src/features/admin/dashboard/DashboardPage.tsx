@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Card } from '../../../components/Card'
 import { Alert } from '../../../components/Alert'
 import { StatusBadge } from '../../../components/StatusBadge'
@@ -7,6 +8,7 @@ import { extractErrorMessage } from '../../../api/client'
 import { listApplications } from '../../../api/applicationAdminApi'
 import { getDormitoryCapacity, listDormitories } from '../../../api/dormitoryApi'
 import { listUsers } from '../../../api/adminUserApi'
+import { formatDate } from '../../../utils/dateFormat'
 import type { Application } from '../../../types/applications'
 import type { Dormitory, DormitoryCapacity } from '../../../types/dormitories'
 
@@ -29,6 +31,7 @@ interface Stats {
 }
 
 export function DashboardPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [stats, setStats] = useState<Stats | null>(null)
   const [recentApps, setRecentApps] = useState<Application[] | null>(null)
@@ -81,7 +84,7 @@ export function DashboardPage() {
           .slice(0, 5)
         setRecentApps(allRecent)
       } catch (err) {
-        if (!cancelled) setError(extractErrorMessage(err, 'Дашбордты жүктеу сәтсіз аяқталды'))
+        if (!cancelled) setError(extractErrorMessage(err, t('admin.dashboard.loadError')))
       }
     }
 
@@ -95,27 +98,27 @@ export function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <h1 className="text-[23px] font-bold text-sand-100">Дашборд</h1>
+      <h1 className="text-[23px] font-bold text-sand-100">{t('admin.layout.dashboard')}</h1>
 
       <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-5">
         <Card className="!p-4">
-          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">Жаңа</p>
+          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('admin.dashboard.brandNew')}</p>
           <p className="mt-1.5 text-2xl font-bold text-sand-100">{stats?.brandNew ?? '—'}</p>
         </Card>
         <Card className="!p-4">
-          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">Қаралуда</p>
+          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('admin.dashboard.pending')}</p>
           <p className="mt-1.5 text-2xl font-bold text-turquoise-400">{stats?.pending ?? '—'}</p>
         </Card>
         <Card className="!p-4">
-          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">Құжат жетіспейді</p>
+          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('admin.dashboard.missingDoc')}</p>
           <p className="mt-1.5 text-2xl font-bold text-amber-400">{stats?.missingDoc ?? '—'}</p>
         </Card>
         <Card className="!p-4">
-          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">Бүгін мақұлданды</p>
+          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('admin.dashboard.approvedToday')}</p>
           <p className="mt-1.5 text-2xl font-bold text-mint-400">{stats?.approvedToday ?? '—'}</p>
         </Card>
         <Card className="!p-4">
-          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">Бос орындар</p>
+          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('admin.dashboard.freeBeds')}</p>
           <p className="mt-1.5 text-2xl font-bold text-sand-100">{stats?.freeBeds ?? '—'}</p>
         </Card>
       </div>
@@ -123,12 +126,12 @@ export function DashboardPage() {
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.6fr_1fr]">
         <Card>
           <div className="mb-3 flex items-baseline justify-between">
-            <p className="text-[15px] font-bold text-sand-100">Соңғы өтініштер</p>
+            <p className="text-[15px] font-bold text-sand-100">{t('admin.dashboard.recentApplications')}</p>
             <button
               onClick={() => navigate('/admin/applications')}
               className="text-sm font-semibold text-sand-100 hover:text-turquoise-400"
             >
-              Барлығы →
+              {t('admin.dashboard.seeAll')}
             </button>
           </div>
           <div className="flex flex-col">
@@ -143,19 +146,18 @@ export function DashboardPage() {
                     {studentNamesById[app.student_id] ?? app.student_id}
                   </p>
                   <p className="mt-0.5 text-xs text-sand-300">
-                    {dormitoryNamesById[app.dormitory_id] ?? app.dormitory_id} ·{' '}
-                    {new Date(app.created_at).toLocaleDateString('kk-KZ')}
+                    {dormitoryNamesById[app.dormitory_id] ?? app.dormitory_id} · {formatDate(app.created_at)}
                   </p>
                 </div>
                 <StatusBadge status={app.status} />
               </div>
             ))}
-            {recentApps?.length === 0 && <p className="py-3 text-sm text-sand-300">Өтініш жоқ</p>}
+            {recentApps?.length === 0 && <p className="py-3 text-sm text-sand-300">{t('admin.dashboard.noApplications')}</p>}
           </div>
         </Card>
 
         <Card>
-          <p className="mb-3.5 text-[15px] font-bold text-sand-100">Жатақханалар толуы</p>
+          <p className="mb-3.5 text-[15px] font-bold text-sand-100">{t('admin.dashboard.occupancy')}</p>
           <div className="flex flex-col gap-3.5">
             {dormOccupancy?.map(({ dorm, capacity }) => {
               const pct =

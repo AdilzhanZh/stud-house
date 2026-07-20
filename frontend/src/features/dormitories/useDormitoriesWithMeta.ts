@@ -22,7 +22,7 @@ export function useDormitoriesWithMeta() {
 
     async function load() {
       try {
-        const list = await listDormitories()
+        const list = await listDormitories(true)
         if (cancelled) return
 
         const withMeta = await Promise.all(

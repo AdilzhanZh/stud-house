@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next'
 import { ChevronLeft, Check, Upload } from 'lucide-react'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
-import { Input } from '../../components/Input'
 import { Alert } from '../../components/Alert'
 import { SegmentedProgress } from '../../components/SegmentedProgress'
 import { extractErrorMessage } from '../../api/client'
@@ -21,10 +20,11 @@ import { getStudentProfile } from '../../api/profileApi'
 import { uploadFile } from '../../api/uploadApi'
 import { generateApplicationSubmissionPdfBlob } from '../../utils/applicationPdf'
 import { formatTenge } from '../../utils/dormitoryLabels'
-import { maxStayMonths } from '../../utils/stayMonths'
 import { FloorCorridorMap } from '../../components/FloorCorridorMap'
 import { useDormitoriesWithMeta } from '../dormitories/useDormitoriesWithMeta'
 import { useAuth } from '../auth/useAuth'
+import { useIsSettled } from '../residence/useIsSettled'
+import { ResidenceRequestsSection } from '../residence/ResidenceRequestsSection'
 import { isActiveApplicationStatus } from './statusHelpers'
 import type { TFunction } from 'i18next'
 import type { DormitoryRequiredDocument } from '../../types/dormitories'
@@ -102,6 +102,7 @@ export function NewApplicationPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const isSettled = useIsSettled()
 
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [sent, setSent] = useState(false)
@@ -123,7 +124,6 @@ export function NewApplicationPage() {
   >({})
   const [docFiles, setDocFiles] = useState<Record<string, File | null>>({})
   const [wish, setWish] = useState('')
-  const [stayMonths, setStayMonths] = useState('')
   const [loadError, setLoadError] = useState<string | null>(null)
   const [serverError, setServerError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -252,12 +252,6 @@ export function NewApplicationPage() {
 
   async function handleSubmit() {
     setServerError(null)
-    const months = Number(stayMonths)
-    const maxMonths = maxStayMonths()
-    if (!Number.isInteger(months) || months < 1 || months > maxMonths) {
-      setServerError(t('wizard.stayMonthsError', { max: maxMonths }))
-      return
-    }
     const missingDoc = allRequiredDocs.find((doc) => !docFiles[doc.id])
     if (missingDoc) {
       setServerError(t('wizard.missingDocError', { doc: missingDoc.document_name }))
@@ -286,7 +280,6 @@ export function NewApplicationPage() {
         dormitory_id: dormitoryId,
         notes: wish.trim() || null,
         preferred_room_id: roomId || null,
-        stay_months: months,
       })
       createdApplicationId = application.id
 
@@ -355,11 +348,21 @@ export function NewApplicationPage() {
         </span>
         <p className="text-[22px] font-bold text-sand-100">{t('wizard.sentTitle')}</p>
         <p className="max-w-[300px] text-sm text-sand-300">{t('wizard.sentBody')}</p>
-        <SegmentedProgress total={6} filled={2} className="mt-1.5 w-full max-w-[300px]" />
+        <SegmentedProgress total={5} filled={2} className="mt-1.5 w-full max-w-[300px]" />
         <p className="text-xs text-sand-300">{t('wizard.sentStepCaption')}</p>
         <Button className="mt-2" onClick={() => navigate('/dashboard/home')}>
           {t('wizard.backToHome')}
         </Button>
+      </div>
+    )
+  }
+
+  if (isSettled) {
+    return (
+      <div className="flex flex-col gap-3.5">
+        <span className="text-[19px] font-bold text-sand-100">{t('wizard.alreadySettledTitle')}</span>
+        <p className="text-sm text-sand-300">{t('wizard.alreadySettledHint')}</p>
+        <ResidenceRequestsSection />
       </div>
     )
   }
@@ -613,18 +616,6 @@ export function NewApplicationPage() {
             </Card>
 
             <Card className="!p-4">
-              <Input
-                label={t('wizard.stayMonthsLabel', { max: maxStayMonths() })}
-                type="number"
-                min={1}
-                max={maxStayMonths()}
-                value={stayMonths}
-                onChange={(e) => setStayMonths(e.target.value)}
-                required
-              />
-            </Card>
-
-            <Card className="!p-4">
               <p className="mb-1.5 text-sm text-sand-300">{t('wizard.wishLabel')}</p>
               <textarea
                 rows={2}
@@ -640,7 +631,6 @@ export function NewApplicationPage() {
             <Button className="w-full" isLoading={isSubmitting} onClick={handleSubmit}>
               {t('wizard.submitButton')}
             </Button>
-            <p className="mt-2.5 text-center text-xs text-sand-300">{t('wizard.afterSubmitHint')}</p>
           </div>
         </>
       )}

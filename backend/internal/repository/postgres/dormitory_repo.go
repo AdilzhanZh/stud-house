@@ -25,8 +25,8 @@ const dormitoryColumns = `
 	id, name, address, phone, dorm_type, floor_count, total_rooms_target,
 	total_capacity, rooms_male, rooms_female, rooms_mixed,
 	monthly_payment, yearly_payment, built_year,
-	commissioned_year, ownership_form, created_by, created_at,
-	updated_at`
+	commissioned_year, ownership_form, closed_for_applications, default_report_template_id,
+	created_by, created_at, updated_at`
 
 // dormTypeToText/textToDormType convert domain.DormitoryType (a named string
 // type) to/from a plain *string at the pgx boundary — mirrors the
@@ -55,8 +55,8 @@ func scanDormitory(row pgx.Row) (*domain.Dormitory, error) {
 		&d.ID, &d.Name, &d.Address, &d.Phone, &dormType, &d.FloorCount, &d.TotalRoomsTarget,
 		&d.TotalCapacity, &d.RoomsMale, &d.RoomsFemale, &d.RoomsMixed,
 		&d.MonthlyPayment, &d.YearlyPayment, &d.BuiltYear,
-		&d.CommissionedYear, &d.OwnershipForm, &d.CreatedBy, &d.CreatedAt,
-		&d.UpdatedAt,
+		&d.CommissionedYear, &d.OwnershipForm, &d.ClosedForApplications, &d.DefaultReportTemplateID,
+		&d.CreatedBy, &d.CreatedAt, &d.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -65,22 +65,32 @@ func scanDormitory(row pgx.Row) (*domain.Dormitory, error) {
 	return d, nil
 }
 
+// Create returns repository.ErrInvalidReference if DefaultReportTemplateID
+// points at a report template that doesn't exist (Postgres FK violation, 23503).
 func (r *DormitoryRepo) Create(ctx context.Context, d *domain.Dormitory) error {
 	const q = `
 		INSERT INTO dormitories (
 			name, address, phone, dorm_type, floor_count, total_rooms_target,
 			total_capacity, rooms_male, rooms_female, rooms_mixed,
 			monthly_payment, yearly_payment, built_year,
-			commissioned_year, ownership_form, created_by
+			commissioned_year, ownership_form, closed_for_applications, default_report_template_id, created_by
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 		RETURNING id, created_at, updated_at`
-	return r.db.QueryRow(ctx, q,
+	err := r.db.QueryRow(ctx, q,
 		d.Name, d.Address, d.Phone, dormTypeToText(d.Type), d.FloorCount, d.TotalRoomsTarget,
 		d.TotalCapacity, d.RoomsMale, d.RoomsFemale, d.RoomsMixed,
 		d.MonthlyPayment, d.YearlyPayment, d.BuiltYear,
-		d.CommissionedYear, d.OwnershipForm, d.CreatedBy,
+		d.CommissionedYear, d.OwnershipForm, d.ClosedForApplications, d.DefaultReportTemplateID, d.CreatedBy,
 	).Scan(&d.ID, &d.CreatedAt, &d.UpdatedAt)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+			return repository.ErrInvalidReference
+		}
+		return err
+	}
+	return nil
 }
 
 func (r *DormitoryRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Dormitory, error) {
@@ -95,8 +105,16 @@ func (r *DormitoryRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Dorm
 	return d, nil
 }
 
-func (r *DormitoryRepo) List(ctx context.Context) ([]*domain.Dormitory, error) {
-	q := `SELECT ` + dormitoryColumns + ` FROM dormitories ORDER BY name`
+// List returns every dormitory when openOnly is false (admin management,
+// and any lookup that must still resolve a closed dormitory's name for
+// existing residents/applications). When openOnly is true it excludes
+// dormitories closed for applications — used by the student browse/apply list.
+func (r *DormitoryRepo) List(ctx context.Context, openOnly bool) ([]*domain.Dormitory, error) {
+	q := `SELECT ` + dormitoryColumns + ` FROM dormitories`
+	if openOnly {
+		q += ` WHERE closed_for_applications = false`
+	}
+	q += ` ORDER BY name`
 	rows, err := r.db.Query(ctx, q)
 	if err != nil {
 		return nil, err
@@ -114,6 +132,9 @@ func (r *DormitoryRepo) List(ctx context.Context) ([]*domain.Dormitory, error) {
 	return out, rows.Err()
 }
 
+// Update returns repository.ErrNotFound if the dormitory itself doesn't
+// exist, or repository.ErrInvalidReference if DefaultReportTemplateID points
+// at a report template that doesn't exist (Postgres FK violation, 23503).
 func (r *DormitoryRepo) Update(ctx context.Context, d *domain.Dormitory) error {
 	const q = `
 		UPDATE dormitories
@@ -121,7 +142,7 @@ func (r *DormitoryRepo) Update(ctx context.Context, d *domain.Dormitory) error {
 			total_rooms_target = $7, total_capacity = $8, rooms_male = $9,
 			rooms_female = $10, rooms_mixed = $11, monthly_payment = $12,
 			yearly_payment = $13, built_year = $14, commissioned_year = $15,
-			ownership_form = $16,
+			ownership_form = $16, closed_for_applications = $17, default_report_template_id = $18,
 			updated_at = now()
 		WHERE id = $1
 		RETURNING updated_at`
@@ -129,11 +150,15 @@ func (r *DormitoryRepo) Update(ctx context.Context, d *domain.Dormitory) error {
 		d.ID, d.Name, d.Address, d.Phone, dormTypeToText(d.Type), d.FloorCount,
 		d.TotalRoomsTarget, d.TotalCapacity, d.RoomsMale, d.RoomsFemale, d.RoomsMixed,
 		d.MonthlyPayment, d.YearlyPayment,
-		d.BuiltYear, d.CommissionedYear, d.OwnershipForm,
+		d.BuiltYear, d.CommissionedYear, d.OwnershipForm, d.ClosedForApplications, d.DefaultReportTemplateID,
 	).Scan(&d.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return repository.ErrNotFound
+		}
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+			return repository.ErrInvalidReference
 		}
 		return err
 	}

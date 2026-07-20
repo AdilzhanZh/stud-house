@@ -54,3 +54,18 @@ export async function voteReport(
   })
   return data.data
 }
+
+// Which application ids are already bundled into a non-rejected report (a
+// rejected report's applications are free to be re-bundled). Shared by the
+// auto-register-on-approval flow and the manual "create report" flow so an
+// application is never claimed by two reports at once.
+export async function listClaimedApplicationIds(): Promise<Set<string>> {
+  const reports = await listReports()
+  const activeReports = reports.filter((r) => r.status !== 'rejected')
+  const details = await Promise.all(activeReports.map((r) => getReportDetail(r.id)))
+  const claimed = new Set<string>()
+  for (const detail of details) {
+    for (const s of detail.students) claimed.add(s.application_id)
+  }
+  return claimed
+}

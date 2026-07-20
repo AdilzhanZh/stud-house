@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Card } from '../../../components/Card'
 import { Alert } from '../../../components/Alert'
 import { extractErrorMessage } from '../../../api/client'
@@ -13,6 +14,7 @@ interface Row {
 }
 
 export function CommitteeReportListPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { user } = useAuth()
   const [rows, setRows] = useState<Row[] | null>(null)
@@ -37,7 +39,7 @@ export function CommitteeReportListPage() {
         if (!cancelled) setRows(withDetail)
       })
       .catch((err) => {
-        if (!cancelled) setError(extractErrorMessage(err, 'Рапорттарды жүктеу сәтсіз аяқталды'))
+        if (!cancelled) setError(extractErrorMessage(err, t('admin.reports.loadError')))
       })
     return () => {
       cancelled = true
@@ -46,10 +48,10 @@ export function CommitteeReportListPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-[23px] font-bold text-sand-100">Комиссия рапорттары</h1>
+      <h1 className="text-[23px] font-bold text-sand-100">{t('admin.layout.committeeReports')}</h1>
 
       {error && <Alert variant="error" message={error} />}
-      {!error && !rows && <p className="text-sm text-sand-300">Жүктелуде...</p>}
+      {!error && !rows && <p className="text-sm text-sand-300">{t('admin.common.loading')}</p>}
 
       <div className="flex flex-col gap-2">
         {rows?.map((r) => (
@@ -60,17 +62,17 @@ export function CommitteeReportListPage() {
           >
             <span className="font-medium text-sand-100">{r.templateName}</span>
             <span className="text-sm text-sand-300">
-              Менің дауысым:{' '}
+              {t('admin.committee.myVote')}{' '}
               {r.myVote === 'approved'
-                ? 'Мақұлдадым'
+                ? t('admin.committee.iApproved')
                 : r.myVote === 'rejected'
-                  ? 'Қабылдамадым'
-                  : 'Әлі бермедім'}
+                  ? t('admin.committee.iRejected')
+                  : t('admin.committee.notVotedYet')}
             </span>
           </Card>
         ))}
         {rows && rows.length === 0 && (
-          <p className="text-sm text-sand-300">Қаралатын рапорт жоқ</p>
+          <p className="text-sm text-sand-300">{t('admin.committee.noReportsToReview')}</p>
         )}
       </div>
     </div>

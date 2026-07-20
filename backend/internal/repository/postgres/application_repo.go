@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -14,7 +13,7 @@ import (
 	"student-house/internal/repository"
 )
 
-const applicationColumns = `id, student_id, dormitory_id, status, preferred_room_type, preferred_room_id, notes, stay_months, assigned_room_id, handled_by, created_at, updated_at`
+const applicationColumns = `id, student_id, dormitory_id, status, preferred_room_type, preferred_room_id, notes, assigned_room_id, handled_by, created_at, updated_at`
 
 type ApplicationRepo struct {
 	db *pgxpool.Pool
@@ -26,10 +25,10 @@ func NewApplicationRepo(db *pgxpool.Pool) *ApplicationRepo {
 
 func (r *ApplicationRepo) Create(ctx context.Context, a *domain.Application) error {
 	const q = `
-		INSERT INTO applications (student_id, dormitory_id, status, preferred_room_type, preferred_room_id, notes, stay_months)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO applications (student_id, dormitory_id, status, preferred_room_type, preferred_room_id, notes)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, created_at, updated_at`
-	err := r.db.QueryRow(ctx, q, a.StudentID, a.DormitoryID, string(a.Status), a.PreferredRoomType, a.PreferredRoomID, a.Notes, a.StayMonths).
+	err := r.db.QueryRow(ctx, q, a.StudentID, a.DormitoryID, string(a.Status), a.PreferredRoomType, a.PreferredRoomID, a.Notes).
 		Scan(&a.ID, &a.CreatedAt, &a.UpdatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -46,11 +45,14 @@ func (r *ApplicationRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Ap
 	return scanApplicationRow(row)
 }
 
+// GetActiveByStudent mirrors the uniq_applications_active_student partial
+// index: an 'approved' application still blocks a new one (only rejection,
+// or a needs_correction resubmit, frees the student up again).
 func (r *ApplicationRepo) GetActiveByStudent(ctx context.Context, studentID uuid.UUID) (*domain.Application, error) {
 	const q = `
 		SELECT ` + applicationColumns + `
 		FROM applications
-		WHERE student_id = $1 AND status IN ('pending', 'manager_review', 'needs_correction')
+		WHERE student_id = $1 AND status IN ('pending', 'manager_review', 'needs_correction', 'approved')
 		LIMIT 1`
 	return scanApplicationRow(r.db.QueryRow(ctx, q, studentID))
 }
@@ -170,9 +172,9 @@ func (t *applicationTx) SetDecision(ctx context.Context, id uuid.UUID, status do
 	return err
 }
 
-func (t *applicationTx) UpdateEditableFieldsAndResubmit(ctx context.Context, id uuid.UUID, preferredRoomType, notes *string, stayMonths *int) error {
-	const q = `UPDATE applications SET preferred_room_type = $2, notes = $3, stay_months = $4, status = 'pending', updated_at = now() WHERE id = $1`
-	_, err := t.tx.Exec(ctx, q, id, preferredRoomType, notes, stayMonths)
+func (t *applicationTx) UpdateEditableFieldsAndResubmit(ctx context.Context, id uuid.UUID, preferredRoomType, notes *string) error {
+	const q = `UPDATE applications SET preferred_room_type = $2, notes = $3, status = 'pending', updated_at = now() WHERE id = $1`
+	_, err := t.tx.Exec(ctx, q, id, preferredRoomType, notes)
 	return err
 }
 
@@ -198,31 +200,10 @@ func insertApplicationHistory(ctx context.Context, db historyExecer, h *domain.A
 	return db.QueryRow(ctx, q, h.ApplicationID, fromStatus, string(h.ToStatus), h.Comment, h.ChangedBy).Scan(&h.ID, &h.CreatedAt)
 }
 
-func (r *ApplicationRepo) SetReapplyBlock(ctx context.Context, studentID uuid.UUID, blockedUntil time.Time) error {
-	const q = `
-		INSERT INTO application_reapply_blocks (student_id, blocked_until)
-		VALUES ($1, $2)
-		ON CONFLICT (student_id) DO UPDATE SET blocked_until = $2`
-	_, err := r.db.Exec(ctx, q, studentID, blockedUntil)
-	return err
-}
-
-func (r *ApplicationRepo) GetReapplyBlock(ctx context.Context, studentID uuid.UUID) (time.Time, error) {
-	var blockedUntil time.Time
-	err := r.db.QueryRow(ctx, `SELECT blocked_until FROM application_reapply_blocks WHERE student_id = $1`, studentID).Scan(&blockedUntil)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return time.Time{}, repository.ErrNotFound
-		}
-		return time.Time{}, err
-	}
-	return blockedUntil, nil
-}
-
 func scanApplicationRow(row pgx.Row) (*domain.Application, error) {
 	a := &domain.Application{}
 	var status string
-	err := row.Scan(&a.ID, &a.StudentID, &a.DormitoryID, &status, &a.PreferredRoomType, &a.PreferredRoomID, &a.Notes, &a.StayMonths, &a.AssignedRoomID, &a.HandledBy, &a.CreatedAt, &a.UpdatedAt)
+	err := row.Scan(&a.ID, &a.StudentID, &a.DormitoryID, &status, &a.PreferredRoomType, &a.PreferredRoomID, &a.Notes, &a.AssignedRoomID, &a.HandledBy, &a.CreatedAt, &a.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, repository.ErrNotFound
@@ -238,7 +219,7 @@ func scanApplicationRows(rows pgx.Rows) ([]*domain.Application, error) {
 	for rows.Next() {
 		a := &domain.Application{}
 		var status string
-		if err := rows.Scan(&a.ID, &a.StudentID, &a.DormitoryID, &status, &a.PreferredRoomType, &a.PreferredRoomID, &a.Notes, &a.StayMonths, &a.AssignedRoomID, &a.HandledBy, &a.CreatedAt, &a.UpdatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.StudentID, &a.DormitoryID, &status, &a.PreferredRoomType, &a.PreferredRoomID, &a.Notes, &a.AssignedRoomID, &a.HandledBy, &a.CreatedAt, &a.UpdatedAt); err != nil {
 			return nil, err
 		}
 		a.Status = domain.ApplicationStatus(status)

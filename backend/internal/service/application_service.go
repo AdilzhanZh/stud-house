@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 
@@ -56,30 +55,16 @@ func statusPtr(s domain.ApplicationStatus) *domain.ApplicationStatus { return &s
 // of some room (an active room_residents row) — settled students must go
 // through a move-out flow, not a new intake application, which is out of
 // scope for this phase.
-// maxStayMonths returns how many months a student may declare, counted from
-// the current month up to and including June (the academic year's end) —
-// e.g. applying in September allows up to 10 months (Sep..Jun), October
-// allows 9, and June itself allows only 1.
-func maxStayMonths(now time.Time) int {
-	const juneMonth = 6
-	m := int(now.Month())
-	return (juneMonth-m+12)%12 + 1
-}
-
-func validStayMonths(stayMonths *int, now time.Time) bool {
-	return stayMonths != nil && *stayMonths >= 1 && *stayMonths <= maxStayMonths(now)
-}
-
-func (s *ApplicationService) Create(ctx context.Context, studentID, dormitoryID uuid.UUID, preferredRoomType, notes *string, preferredRoomID *uuid.UUID, stayMonths *int) (*domain.Application, error) {
-	if !validStayMonths(stayMonths, time.Now()) {
-		return nil, apperror.BadRequest(fmt.Sprintf("неше айға тұратыныңызды дұрыс көрсетіңіз (1-%d ай, маусымнан аспауы тиіс)", maxStayMonths(time.Now())))
-	}
-
-	if _, err := s.dormitories.GetByID(ctx, dormitoryID); err != nil {
+func (s *ApplicationService) Create(ctx context.Context, studentID, dormitoryID uuid.UUID, preferredRoomType, notes *string, preferredRoomID *uuid.UUID) (*domain.Application, error) {
+	dormitory, err := s.dormitories.GetByID(ctx, dormitoryID)
+	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return nil, apperror.NotFound("жатақхана табылмады")
 		}
 		return nil, err
+	}
+	if dormitory.ClosedForApplications {
+		return nil, apperror.BadRequest("бұл жатақхана қазір өтініш қабылдамайды")
 	}
 
 	if rooms, err := s.roomRepo.ListByDormitory(ctx, dormitoryID); err != nil {
@@ -90,14 +75,6 @@ func (s *ApplicationService) Create(ctx context.Context, studentID, dormitoryID 
 
 	if _, err := s.applications.GetActiveByStudent(ctx, studentID); err == nil {
 		return nil, apperror.Conflict("сізде белсенді өтінішіңіз бар")
-	} else if !errors.Is(err, repository.ErrNotFound) {
-		return nil, err
-	}
-
-	if blockedUntil, err := s.applications.GetReapplyBlock(ctx, studentID); err == nil {
-		if blockedUntil.After(time.Now()) {
-			return nil, apperror.Conflict(fmt.Sprintf("төлем мерзімде расталмағандықтан, сіз %s дейін жаңа өтініш бере алмайсыз", blockedUntil.Format("2006-01-02")))
-		}
 	} else if !errors.Is(err, repository.ErrNotFound) {
 		return nil, err
 	}
@@ -131,7 +108,6 @@ func (s *ApplicationService) Create(ctx context.Context, studentID, dormitoryID 
 		PreferredRoomType: preferredRoomType,
 		PreferredRoomID:   preferredRoomID,
 		Notes:             notes,
-		StayMonths:        stayMonths,
 	}
 	if err := s.applications.Create(ctx, app); err != nil {
 		if errors.Is(err, repository.ErrConflict) {
@@ -152,11 +128,13 @@ func (s *ApplicationService) Create(ctx context.Context, studentID, dormitoryID 
 }
 
 // CancelOwn lets a student delete their own application while it is still
-// pending — used to roll back a submission whose document/benefit
-// attachment failed partway through (NewApplicationPage uploads files and
-// creates the application, then attaches document metadata; if that last
-// step fails, it calls this to undo the create rather than leaving a
-// half-submitted application behind).
+// pending, or after it has been rejected. The pending case rolls back a
+// submission whose document/benefit attachment failed partway through
+// (NewApplicationPage uploads files and creates the application, then
+// attaches document metadata; if that last step fails, it calls this to
+// undo the create rather than leaving a half-submitted application behind).
+// The rejected case lets a student clear a dead-end application out of
+// their list once GetActiveByStudent no longer counts it against them.
 func (s *ApplicationService) CancelOwn(ctx context.Context, studentID, applicationID uuid.UUID) error {
 	app, err := s.GetByID(ctx, applicationID)
 	if err != nil {
@@ -165,8 +143,8 @@ func (s *ApplicationService) CancelOwn(ctx context.Context, studentID, applicati
 	if app.StudentID != studentID {
 		return apperror.Forbidden("тек өз өтінішіңізді өшіре аласыз")
 	}
-	if app.Status != domain.ApplicationPending {
-		return apperror.Conflict("тек шешім қабылдауды күтіп тұрған өтінішті өшіруге болады")
+	if app.Status != domain.ApplicationPending && app.Status != domain.ApplicationRejected {
+		return apperror.Conflict("тек шешім қабылдауды күтіп тұрған немесе қабылданбаған өтінішті өшіруге болады")
 	}
 	if err := s.applications.Delete(ctx, applicationID); err != nil {
 		if errors.Is(err, repository.ErrConflict) {
@@ -251,10 +229,7 @@ func (s *ApplicationService) ListDocuments(ctx context.Context, applicationID uu
 
 // Resubmit lets the owning student edit their application while it is in
 // needs_correction, moving it back to pending in the same operation.
-func (s *ApplicationService) Resubmit(ctx context.Context, actorStudentID, applicationID uuid.UUID, preferredRoomType, notes *string, stayMonths *int) (*domain.Application, error) {
-	if !validStayMonths(stayMonths, time.Now()) {
-		return nil, apperror.BadRequest(fmt.Sprintf("неше айға тұратыныңызды дұрыс көрсетіңіз (1-%d ай, маусымнан аспауы тиіс)", maxStayMonths(time.Now())))
-	}
+func (s *ApplicationService) Resubmit(ctx context.Context, actorStudentID, applicationID uuid.UUID, preferredRoomType, notes *string) (*domain.Application, error) {
 	err := s.applications.WithLock(ctx, applicationID, func(ctx context.Context, app *domain.Application, tx repository.ApplicationTx) error {
 		if app.StudentID != actorStudentID {
 			return apperror.Forbidden("тек өз өтінішіңізді өзгерте аласыз")
@@ -262,7 +237,7 @@ func (s *ApplicationService) Resubmit(ctx context.Context, actorStudentID, appli
 		if app.Status != domain.ApplicationNeedsCorrection {
 			return apperror.BadRequest("өтінішті тек түзету қажет болған кезде ғана өзгертуге болады")
 		}
-		if err := tx.UpdateEditableFieldsAndResubmit(ctx, applicationID, preferredRoomType, notes, stayMonths); err != nil {
+		if err := tx.UpdateEditableFieldsAndResubmit(ctx, applicationID, preferredRoomType, notes); err != nil {
 			return err
 		}
 		return tx.AddHistory(ctx, &domain.ApplicationStatusHistory{
@@ -287,8 +262,12 @@ func (s *ApplicationService) Resubmit(ctx context.Context, actorStudentID, appli
 // On approve, roomID is optional: a manager may assign a room immediately
 // (reusing RoomService.AddResident's capacity + restriction validation from
 // phase 1) before the application's own status is committed — if that room
-// assignment fails, nothing about the application is changed — or leave the
-// student unassigned for now and place them in a room later.
+// assignment fails, nothing about the application is changed. If the manager
+// leaves roomID unset, this falls back to the student's own PreferredRoomID
+// (chosen at application time): a manager with no objection to that choice
+// can approve without picking anything themselves, rather than the student
+// silently ending up unassigned. Only a student who never expressed a room
+// preference is left unassigned for now, to be placed in a room later.
 func (s *ApplicationService) Decide(ctx context.Context, actorID, applicationID uuid.UUID, action DecisionAction, roomID *uuid.UUID, comment *string) (*domain.Application, error) {
 	var finalStatus domain.ApplicationStatus
 	var studentID uuid.UUID
@@ -310,6 +289,9 @@ func (s *ApplicationService) Decide(ctx context.Context, actorID, applicationID 
 
 		switch action {
 		case ActionApprove:
+			if roomID == nil {
+				roomID = app.PreferredRoomID
+			}
 			if roomID != nil {
 				if _, err := s.rooms.AddResident(ctx, *roomID, app.StudentID); err != nil {
 					return err

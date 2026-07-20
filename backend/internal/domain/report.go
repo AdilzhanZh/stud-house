@@ -6,15 +6,41 @@ import (
 	"github.com/google/uuid"
 )
 
-// ReportTemplate is a manager-uploaded template file. Filling it in with
-// student data (placeholder substitution into an actual document) is out of
-// scope this phase; only the template's own metadata + file_url are stored.
+// ReportTemplate is a manager-authored, structured report definition: an
+// optional intro paragraph plus a chosen subset of StudentColumns that
+// controls both the on-screen summary and the PDF export layout. FileURL is
+// an optional legacy/attached document — no longer required by the in-app
+// builder, but still honored by ContractService.OnReportApproved as the
+// student-facing contract "Open PDF" link when a manager attaches one.
 type ReportTemplate struct {
-	ID        uuid.UUID
-	Name      string
-	FileURL   string
-	CreatedBy uuid.UUID
-	CreatedAt time.Time
+	ID             uuid.UUID
+	Name           string
+	IntroText      string
+	StudentColumns []string
+	FileURL        *string
+	CreatedBy      uuid.UUID
+	CreatedAt      time.Time
+}
+
+// ReportStudentColumn enumerates the student-data fields a template can
+// choose to display in the generated report table.
+type ReportStudentColumn string
+
+const (
+	ReportColumnFullName      ReportStudentColumn = "full_name"
+	ReportColumnEmail         ReportStudentColumn = "email"
+	ReportColumnPhone         ReportStudentColumn = "phone"
+	ReportColumnDormitoryName ReportStudentColumn = "dormitory_name"
+	ReportColumnRoomNumber    ReportStudentColumn = "room_number"
+)
+
+func (c ReportStudentColumn) Valid() bool {
+	switch c {
+	case ReportColumnFullName, ReportColumnEmail, ReportColumnPhone, ReportColumnDormitoryName, ReportColumnRoomNumber:
+		return true
+	default:
+		return false
+	}
 }
 
 type ReportStatus string

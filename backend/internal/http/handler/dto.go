@@ -75,48 +75,52 @@ func studentProfileDTO(p *domain.StudentProfile) studentProfileResponse {
 }
 
 type dormitoryResponse struct {
-	ID               uuid.UUID             `json:"id"`
-	Name             string                `json:"name"`
-	Address          string                `json:"address"`
-	Phone            *string               `json:"phone"`
-	Type             *domain.DormitoryType `json:"dorm_type"`
-	FloorCount       *int                  `json:"floor_count"`
-	TotalRoomsTarget *int                  `json:"total_rooms_target"`
-	TotalCapacity    int                   `json:"total_capacity"`
-	RoomsMale        *int                  `json:"rooms_male"`
-	RoomsFemale      *int                  `json:"rooms_female"`
-	RoomsMixed       *int                  `json:"rooms_mixed"`
-	MonthlyPayment   *float64              `json:"monthly_payment"`
-	YearlyPayment    *float64              `json:"yearly_payment"`
-	BuiltYear        *time.Time            `json:"built_year"`
-	CommissionedYear *time.Time            `json:"commissioned_year"`
-	OwnershipForm    *string               `json:"ownership_form"`
-	CreatedBy        uuid.UUID             `json:"created_by"`
-	CreatedAt        time.Time             `json:"created_at"`
-	UpdatedAt        time.Time             `json:"updated_at"`
+	ID                      uuid.UUID             `json:"id"`
+	Name                    string                `json:"name"`
+	Address                 string                `json:"address"`
+	Phone                   *string               `json:"phone"`
+	Type                    *domain.DormitoryType `json:"dorm_type"`
+	FloorCount              *int                  `json:"floor_count"`
+	TotalRoomsTarget        *int                  `json:"total_rooms_target"`
+	TotalCapacity           int                   `json:"total_capacity"`
+	RoomsMale               *int                  `json:"rooms_male"`
+	RoomsFemale             *int                  `json:"rooms_female"`
+	RoomsMixed              *int                  `json:"rooms_mixed"`
+	MonthlyPayment          *float64              `json:"monthly_payment"`
+	YearlyPayment           *float64              `json:"yearly_payment"`
+	BuiltYear               *time.Time            `json:"built_year"`
+	CommissionedYear        *time.Time            `json:"commissioned_year"`
+	OwnershipForm           *string               `json:"ownership_form"`
+	ClosedForApplications   bool                  `json:"closed_for_applications"`
+	DefaultReportTemplateID *uuid.UUID            `json:"default_report_template_id"`
+	CreatedBy               uuid.UUID             `json:"created_by"`
+	CreatedAt               time.Time             `json:"created_at"`
+	UpdatedAt               time.Time             `json:"updated_at"`
 }
 
 func dormitoryDTO(d *domain.Dormitory) dormitoryResponse {
 	return dormitoryResponse{
-		ID:               d.ID,
-		Name:             d.Name,
-		Address:          d.Address,
-		Phone:            d.Phone,
-		Type:             d.Type,
-		FloorCount:       d.FloorCount,
-		TotalRoomsTarget: d.TotalRoomsTarget,
-		TotalCapacity:    d.TotalCapacity,
-		RoomsMale:        d.RoomsMale,
-		RoomsFemale:      d.RoomsFemale,
-		RoomsMixed:       d.RoomsMixed,
-		MonthlyPayment:   d.MonthlyPayment,
-		YearlyPayment:    d.YearlyPayment,
-		BuiltYear:        d.BuiltYear,
-		CommissionedYear: d.CommissionedYear,
-		OwnershipForm:    d.OwnershipForm,
-		CreatedBy:        d.CreatedBy,
-		CreatedAt:        d.CreatedAt,
-		UpdatedAt:        d.UpdatedAt,
+		ID:                      d.ID,
+		Name:                    d.Name,
+		Address:                 d.Address,
+		Phone:                   d.Phone,
+		Type:                    d.Type,
+		FloorCount:              d.FloorCount,
+		TotalRoomsTarget:        d.TotalRoomsTarget,
+		TotalCapacity:           d.TotalCapacity,
+		RoomsMale:               d.RoomsMale,
+		RoomsFemale:             d.RoomsFemale,
+		RoomsMixed:              d.RoomsMixed,
+		MonthlyPayment:          d.MonthlyPayment,
+		YearlyPayment:           d.YearlyPayment,
+		BuiltYear:               d.BuiltYear,
+		CommissionedYear:        d.CommissionedYear,
+		OwnershipForm:           d.OwnershipForm,
+		ClosedForApplications:   d.ClosedForApplications,
+		DefaultReportTemplateID: d.DefaultReportTemplateID,
+		CreatedBy:               d.CreatedBy,
+		CreatedAt:               d.CreatedAt,
+		UpdatedAt:               d.UpdatedAt,
 	}
 }
 

@@ -6,6 +6,7 @@ import { LoginPage } from './features/auth/LoginPage'
 import { RegisterPage } from './features/auth/RegisterPage'
 import { HomePage } from './features/home/HomePage'
 import { ProfilePage } from './features/profile/ProfilePage'
+import { EditProfilePage } from './features/profile/EditProfilePage'
 import { DormitoriesPage } from './features/dormitories/DormitoriesPage'
 import { DormitoryInfoPage } from './features/dormitories/DormitoryInfoPage'
 import { NewApplicationPage } from './features/applications/NewApplicationPage'
@@ -13,7 +14,6 @@ import { MyApplicationsPage } from './features/applications/MyApplicationsPage'
 import { ApplicationDetailPage } from './features/applications/ApplicationDetailPage'
 import { NotificationsPage } from './features/notifications/NotificationsPage'
 import { ContractsPage } from './features/contracts/ContractsPage'
-import { PaymentPage } from './features/payments/PaymentPage'
 import { MyResidencePage } from './features/residence/MyResidencePage'
 import { DormitoryListPage } from './features/admin/dormitories/DormitoryListPage'
 import { DormitoryFormPage } from './features/admin/dormitories/DormitoryFormPage'
@@ -33,6 +33,8 @@ import { ApplicationQueuePage } from './features/admin/applications/ApplicationQ
 import { ApplicationAdminDetailPage } from './features/admin/applications/ApplicationAdminDetailPage'
 import { ReportListPage } from './features/admin/reports/ReportListPage'
 import { ReportDetailPage } from './features/admin/reports/ReportDetailPage'
+import { ReportTemplateListPage } from './features/admin/reports/ReportTemplateListPage'
+import { ReportCreatePage } from './features/admin/reports/ReportCreatePage'
 import { CommitteeReportListPage } from './features/admin/committee/CommitteeReportListPage'
 import { CommitteeVotePage } from './features/admin/committee/CommitteeVotePage'
 import { ContractsAndPaymentsPage } from './features/admin/contracts/ContractsAndPaymentsPage'
@@ -64,6 +66,7 @@ function App() {
         <Route element={<DashboardLayout />}>
           <Route path="/dashboard/home" element={<HomePage />} />
           <Route path="/dashboard/profile" element={<ProfilePage />} />
+          <Route path="/dashboard/profile/edit" element={<EditProfilePage />} />
           <Route path="/dormitories" element={<DormitoriesPage />} />
         <Route path="/dormitories/:id" element={<DormitoryInfoPage />} />
           <Route path="/applications/new" element={<NewApplicationPage />} />
@@ -71,7 +74,6 @@ function App() {
           <Route path="/applications/:id" element={<ApplicationDetailPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/contracts/my" element={<ContractsPage />} />
-          <Route path="/contracts/:id/payment" element={<PaymentPage />} />
           <Route path="/my-residence" element={<MyResidencePage />} />
         </Route>
       </Route>
@@ -96,12 +98,13 @@ function App() {
           <Route path="/admin/applications" element={<ApplicationQueuePage />} />
           <Route path="/admin/applications/:id" element={<ApplicationAdminDetailPage />} />
           <Route path="/admin/reports" element={<ReportListPage />} />
+          <Route path="/admin/reports/templates" element={<ReportTemplateListPage />} />
+          <Route path="/admin/reports/new" element={<ReportCreatePage />} />
           <Route path="/admin/reports/:id" element={<ReportDetailPage />} />
           <Route path="/committee/reports" element={<CommitteeReportListPage />} />
           <Route path="/committee/reports/:id" element={<CommitteeVotePage />} />
 
           <Route path="/admin/contracts" element={<ContractsAndPaymentsPage />} />
-          <Route path="/admin/payments" element={<ContractsAndPaymentsPage />} />
           <Route path="/admin/exit-requests" element={<ExitRequestListPage />} />
           <Route path="/admin/transfer-requests" element={<TransferRequestListPage />} />
 

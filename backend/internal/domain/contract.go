@@ -8,9 +8,9 @@ import (
 
 // ApplicationSettled is a new application_status value (added via migration,
 // same pattern as NotificationReportReview in phase 3) marking that the
-// student has fully completed contract + payment. Not added to the
-// phase-2 ApplicationStatus.Valid() switch — nothing in this phase needs to
-// validate it as raw user input, since it's only ever set by the system.
+// student has accepted their contract. Not added to the phase-2
+// ApplicationStatus.Valid() switch — nothing in this phase needs to validate
+// it as raw user input, since it's only ever set by the system.
 const ApplicationSettled ApplicationStatus = "settled"
 
 // NotificationContractSent is a new notification_type enum value (added by

@@ -1,9 +1,11 @@
+import { useTranslation } from 'react-i18next'
 import { useThemeStore } from '../store/themeStore'
 
 // Sun/moon switch shown in every layout's header — icon shows the theme a
 // click will switch TO, not the current one (moon while it's day, sun while
 // it's night), matching the common convention for this kind of toggle.
 export function ThemeToggle() {
+  const { t } = useTranslation()
   const theme = useThemeStore((s) => s.theme)
   const toggle = useThemeStore((s) => s.toggle)
   const isDay = theme === 'day'
@@ -12,8 +14,8 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={toggle}
-      aria-label={isDay ? 'Түнгі көріністі қосу' : 'Күндізгі көріністі қосу'}
-      title={isDay ? 'Түнгі көрініс' : 'Күндізгі көрініс'}
+      aria-label={isDay ? t('common.enableNightView') : t('common.enableDayView')}
+      title={isDay ? t('common.nightView') : t('common.dayView')}
       className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sand-300 transition-colors hover:bg-sand-100/10 hover:text-sand-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-turquoise-400 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-950"
     >
       {isDay ? (

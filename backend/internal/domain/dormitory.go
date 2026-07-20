@@ -31,9 +31,19 @@ type Dormitory struct {
 	BuiltYear        *time.Time
 	CommissionedYear *time.Time
 	OwnershipForm    *string
-	CreatedBy        uuid.UUID
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	// ClosedForApplications hides this dormitory from the student-facing
+	// browse/apply list and blocks new applications to it, without
+	// affecting existing residents, applications, or admin management.
+	ClosedForApplications bool
+	// DefaultReportTemplateID, when set, is the ReportTemplate automatically
+	// used when applications approved in this dormitory are auto-bundled
+	// into a committee report (see ApplicationAdminDetailPage's
+	// autoRegisterInReport on the frontend). Nil means no auto-report is
+	// generated for this dormitory — a manager can still create one manually.
+	DefaultReportTemplateID *uuid.UUID
+	CreatedBy               uuid.UUID
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
 }
 
 // DormitoryCapacity reports how many beds have been allocated across a

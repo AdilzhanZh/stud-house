@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { KeyRound, ShieldCheck } from 'lucide-react'
 import { Card } from '../../../components/Card'
 import { Button } from '../../../components/Button'
@@ -16,6 +17,7 @@ import { adminCellClass, adminPageHeading, adminRowClass, adminTableWrapClass, a
 import type { Role, User } from '../../../types'
 
 export function UserListPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { user: currentUser } = useAuth()
   const [users, setUsers] = useState<User[] | null>(null)
@@ -34,7 +36,7 @@ export function UserListPage() {
   function load() {
     listUsers(roleFilter || undefined)
       .then(setUsers)
-      .catch((err) => setError(extractErrorMessage(err, 'Пайдаланушыларды жүктеу сәтсіз аяқталды')))
+      .catch((err) => setError(extractErrorMessage(err, t('admin.users.loadError'))))
   }
 
   useEffect(load, [roleFilter])
@@ -48,7 +50,7 @@ export function UserListPage() {
       setDeleteTarget(null)
       load()
     } catch (err) {
-      setDeleteError(extractErrorMessage(err, 'Пайдаланушыны өшіру сәтсіз аяқталды'))
+      setDeleteError(extractErrorMessage(err, t('admin.users.deleteFailed')))
     } finally {
       setIsDeleting(false)
     }
@@ -68,7 +70,7 @@ export function UserListPage() {
       await setUserPassword(passwordTarget.id, newPassword)
       setPasswordTarget(null)
     } catch (err) {
-      setPasswordError(extractErrorMessage(err, 'Құпия сөзді өзгерту сәтсіз аяқталды'))
+      setPasswordError(extractErrorMessage(err, t('admin.users.changePasswordFailed')))
     } finally {
       setIsSavingPassword(false)
     }
@@ -77,19 +79,19 @@ export function UserListPage() {
   return (
     <div className="flex flex-col gap-3.5">
       <div className="flex items-center justify-between">
-        <h1 className={adminPageHeading}>Пайдаланушылар</h1>
+        <h1 className={adminPageHeading}>{t('admin.layout.users')}</h1>
         {currentUser?.role === 'admin' && (
-          <Button onClick={() => navigate('/admin/users/new')}>Жаңа менеджер тіркеу</Button>
+          <Button onClick={() => navigate('/admin/users/new')}>{t('admin.users.registerManager')}</Button>
         )}
       </div>
 
       <div className="max-w-xs">
         <Select
-          label="Рөлі бойынша сүзгі"
+          label={t('admin.users.roleFilter')}
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value as Role | '')}
         >
-          <option value="">Барлық рөлдер</option>
+          <option value="">{t('admin.users.allRoles')}</option>
           <option value="admin">{roleLabels.admin}</option>
           <option value="manager">{roleLabels.manager}</option>
           <option value="student">{roleLabels.student}</option>
@@ -98,19 +100,19 @@ export function UserListPage() {
 
       {error && <Alert variant="error" message={error} />}
       {deleteError && <Alert variant="error" message={deleteError} />}
-      {!error && !users && <p className="text-sm text-sand-300">Жүктелуде...</p>}
+      {!error && !users && <p className="text-sm text-sand-300">{t('admin.common.loading')}</p>}
 
       {users && (
         <Card className={adminTableWrapClass}>
           <table className="w-full text-left text-sm">
             <thead className={adminTheadClass}>
               <tr>
-                <th className={adminCellClass}>Аты-жөні</th>
+                <th className={adminCellClass}>{t('admin.users.fullName')}</th>
                 <th className={adminCellClass}>Email</th>
-                <th className={adminCellClass}>Рөлі</th>
-                <th className={adminCellClass}>Комиссия мүшесі</th>
-                <th className={adminCellClass}>Төраға</th>
-                {currentUser?.role === 'admin' && <th className={adminCellClass}>Әрекеттер</th>}
+                <th className={adminCellClass}>{t('admin.users.role')}</th>
+                <th className={adminCellClass}>{t('admin.users.committeeMember')}</th>
+                <th className={adminCellClass}>{t('admin.users.chairperson')}</th>
+                {currentUser?.role === 'admin' && <th className={adminCellClass}>{t('admin.dormitories.actions')}</th>}
               </tr>
             </thead>
             <tbody>
@@ -119,8 +121,8 @@ export function UserListPage() {
                   <td className={`${adminCellClass} font-semibold text-sand-100`}>{u.full_name}</td>
                   <td className={`${adminCellClass} text-sand-300`}>{u.email}</td>
                   <td className={`${adminCellClass} text-sand-300`}>{roleLabels[u.role]}</td>
-                  <td className={`${adminCellClass} text-sand-300`}>{u.is_committee_member ? 'Иә' : '—'}</td>
-                  <td className={`${adminCellClass} text-sand-300`}>{u.is_chairperson ? 'Иә' : '—'}</td>
+                  <td className={`${adminCellClass} text-sand-300`}>{u.is_committee_member ? t('admin.users.yes') : '—'}</td>
+                  <td className={`${adminCellClass} text-sand-300`}>{u.is_chairperson ? t('admin.users.yes') : '—'}</td>
                   {currentUser?.role === 'admin' && (
                     <td className={adminCellClass}>
                       <div className="flex items-center gap-1">
@@ -128,8 +130,8 @@ export function UserListPage() {
                           {u.role === 'manager' && (
                             <button
                               type="button"
-                              aria-label="Рөл/комиссия тағайындау"
-                              title="Рөл/комиссия тағайындау"
+                              aria-label={t('admin.users.assignRoleCommittee')}
+                              title={t('admin.users.assignRoleCommittee')}
                               className="shrink-0 rounded-lg p-1.5 text-turquoise-400 transition-colors hover:bg-turquoise-500/10"
                               onClick={() => navigate(`/admin/users/${u.id}/role`)}
                             >
@@ -140,8 +142,8 @@ export function UserListPage() {
                         <div className="flex h-8 w-8 shrink-0 items-center justify-center">
                           <button
                             type="button"
-                            aria-label="Құпия сөзді өзгерту"
-                            title="Құпия сөзді өзгерту"
+                            aria-label={t('admin.users.changePassword')}
+                            title={t('admin.users.changePassword')}
                             className="shrink-0 rounded-lg p-1.5 text-turquoise-400 transition-colors hover:bg-turquoise-500/10"
                             onClick={() => openPasswordDialog(u)}
                           >
@@ -161,7 +163,7 @@ export function UserListPage() {
               {users.length === 0 && (
                 <tr>
                   <td className={`${adminCellClass} text-sand-300`} colSpan={6}>
-                    Пайдаланушы жоқ
+                    {t('admin.users.empty')}
                   </td>
                 </tr>
               )}
@@ -172,8 +174,8 @@ export function UserListPage() {
 
       <ConfirmDialog
         open={deleteTarget != null}
-        title="Пайдаланушыны өшіру"
-        message={`"${deleteTarget?.full_name}" пайдаланушысын өшіргіңіз келе ме? Бұл әрекетті қайтару мүмкін емес.`}
+        title={t('admin.users.deleteTitle')}
+        message={t('admin.users.deleteConfirm', { name: deleteTarget?.full_name })}
         danger
         isLoading={isDeleting}
         onConfirm={handleDelete}
@@ -182,15 +184,15 @@ export function UserListPage() {
 
       <ConfirmDialog
         open={passwordTarget != null}
-        title="Құпия сөзді өзгерту"
-        message={`"${passwordTarget?.full_name}" пайдаланушысына жаңа құпия сөз орнатыңыз. Ескі құпия сөз көрсетілмейді — тек ауыстыруға болады.`}
-        confirmLabel="Сақтау"
+        title={t('admin.users.changePassword')}
+        message={t('admin.users.changePasswordHint', { name: passwordTarget?.full_name })}
+        confirmLabel={t('admin.common.save')}
         isLoading={isSavingPassword}
         onConfirm={handleSetPassword}
         onCancel={() => setPasswordTarget(null)}
       >
         <Input
-          label="Жаңа құпия сөз"
+          label={t('admin.users.newPassword')}
           type="password"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}

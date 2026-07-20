@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { Search } from 'lucide-react'
 import { Card } from '../../../components/Card'
 import { Alert } from '../../../components/Alert'
@@ -7,6 +9,7 @@ import { listDormitories } from '../../../api/dormitoryApi'
 import { listRoomResidents, listRoomsByDormitory } from '../../../api/roomApi'
 import { listUsers } from '../../../api/adminUserApi'
 import { getStudentProfile } from '../../../api/profileApi'
+import { formatDate } from '../../../utils/dateFormat'
 import { adminCellClass, adminPageHeading, adminRowClass, adminTableWrapClass, adminTheadClass } from '../adminTable'
 
 interface ResidentRow {
@@ -20,9 +23,11 @@ interface ResidentRow {
   movedInAt: string
 }
 
-const courseLabel = (course: number | null) => (course != null ? `${course}-курс` : '—')
+const courseLabel = (course: number | null, t: TFunction) =>
+  course != null ? t('admin.residents.courseValue', { course }) : '—'
 
 export function ResidentsPage() {
+  const { t } = useTranslation()
   const [rows, setRows] = useState<ResidentRow[] | null>(null)
   const [search, setSearch] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -80,7 +85,7 @@ export function ResidentsPage() {
           })),
         )
       } catch (err) {
-        if (!cancelled) setError(extractErrorMessage(err, 'Тұрғындарды жүктеу сәтсіз аяқталды'))
+        if (!cancelled) setError(extractErrorMessage(err, t('admin.residents.loadError')))
       }
     }
 
@@ -99,7 +104,7 @@ export function ResidentsPage() {
 
   return (
     <div className="flex flex-col gap-3.5">
-      <h1 className={adminPageHeading}>Тұрғындар</h1>
+      <h1 className={adminPageHeading}>{t('admin.layout.residents')}</h1>
 
       {error && <Alert variant="error" message={error} />}
 
@@ -108,24 +113,24 @@ export function ResidentsPage() {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Тұрғынды іздеу..."
+          placeholder={t('admin.residents.searchPlaceholder')}
           className="w-full bg-transparent text-sm text-sand-100 outline-none placeholder:text-sand-400"
         />
       </div>
 
       {!rows ? (
-        <p className="text-sm text-sand-300">Жүктелуде...</p>
+        <p className="text-sm text-sand-300">{t('admin.common.loading')}</p>
       ) : (
         <Card className={adminTableWrapClass}>
           <table className="w-full text-left text-sm">
             <thead className={adminTheadClass}>
               <tr>
-                <th className={adminCellClass}>Студент</th>
-                <th className={adminCellClass}>Жатақхана</th>
-                <th className={adminCellClass}>Бөлме</th>
-                <th className={adminCellClass}>Курс</th>
-                <th className={adminCellClass}>Телефон</th>
-                <th className={adminCellClass}>Орналасқан күні</th>
+                <th className={adminCellClass}>{t('admin.applications.student')}</th>
+                <th className={adminCellClass}>{t('admin.layout.dormitories')}</th>
+                <th className={adminCellClass}>{t('admin.dormitories.roomNumber')}</th>
+                <th className={adminCellClass}>{t('admin.residents.course')}</th>
+                <th className={adminCellClass}>{t('admin.applications.phone')}</th>
+                <th className={adminCellClass}>{t('admin.residents.movedInAt')}</th>
               </tr>
             </thead>
             <tbody>
@@ -134,17 +139,15 @@ export function ResidentsPage() {
                   <td className={`${adminCellClass} font-semibold text-sand-100`}>{r.name}</td>
                   <td className={`${adminCellClass} text-sand-300`}>{r.dormitoryName}</td>
                   <td className={`${adminCellClass} text-sand-300`}>{r.roomNumber}</td>
-                  <td className={`${adminCellClass} text-sand-300`}>{courseLabel(r.course)}</td>
+                  <td className={`${adminCellClass} text-sand-300`}>{courseLabel(r.course, t)}</td>
                   <td className={`${adminCellClass} text-sand-300`}>{r.phone}</td>
-                  <td className={`${adminCellClass} text-sand-300`}>
-                    {new Date(r.movedInAt).toLocaleDateString('kk-KZ')}
-                  </td>
+                  <td className={`${adminCellClass} text-sand-300`}>{formatDate(r.movedInAt)}</td>
                 </tr>
               ))}
               {visibleRows?.length === 0 && (
                 <tr>
                   <td className={`${adminCellClass} text-sand-300`} colSpan={6}>
-                    Тұрғын табылмады
+                    {t('admin.residents.notFound')}
                   </td>
                 </tr>
               )}

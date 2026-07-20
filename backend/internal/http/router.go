@@ -19,7 +19,6 @@ type Handlers struct {
 	Notification    *handler.NotificationHandler
 	Report          *handler.ReportHandler
 	Contract        *handler.ContractHandler
-	Payment         *handler.PaymentHandler
 	ExitRequest     *handler.ExitRequestHandler
 	TransferRequest *handler.TransferRequestHandler
 	Upload          *handler.UploadHandler
@@ -27,6 +26,7 @@ type Handlers struct {
 
 func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 	r := gin.Default()
+	r.Use(middleware.DetectLanguage())
 
 	admin := middleware.RequireRole(domain.RoleAdmin)
 	adminOrManager := middleware.RequireRole(domain.RoleAdmin, domain.RoleManager)
@@ -87,14 +87,17 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 			protected.GET("/students/:id/residence", h.Room.GetMyResidence)
 			protected.PATCH("/users/:id/avatar", h.User.UpdateAvatar)
 
+			// Any authenticated user: their own password.
+			protected.PATCH("/users/me/password", h.User.ChangeOwnPassword)
+
 			// Any authenticated user: their own in-app notifications.
 			protected.GET("/notifications", h.Notification.ListMine)
 			protected.PATCH("/notifications/:id/read", h.Notification.MarkRead)
 			protected.DELETE("/notifications/:id", h.Notification.Delete)
 			protected.DELETE("/notifications", h.Notification.ClearAll)
 
-			// Any authenticated user: students upload application/payment
-			// documents, admins/managers upload dormitory images and report
+			// Any authenticated user: students upload application documents,
+			// admins/managers upload dormitory images and report
 			// templates — all through the same generic file-storage endpoint.
 			protected.POST("/uploads", h.Upload.Upload)
 
@@ -106,7 +109,6 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 			// checked inside the handler.
 			protected.GET("/applications/:id", h.Application.GetDetail)
 			protected.GET("/applications/:id/contract", h.Contract.GetByApplication)
-			protected.GET("/contracts/:id/payment", h.Payment.GetByContract)
 			protected.GET("/exit-requests/:id", h.ExitRequest.Get)
 			protected.GET("/transfer-requests/:id", h.TransferRequest.Get)
 
@@ -132,8 +134,6 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 
 				studentGroup.GET("/contracts/my", h.Contract.ListMine)
 				studentGroup.PATCH("/contracts/:id/respond", h.Contract.Respond)
-				studentGroup.GET("/payments/my", h.Payment.ListMine)
-				studentGroup.POST("/payments/:id/submit", h.Payment.Submit)
 				studentGroup.POST("/exit-requests", h.ExitRequest.Create)
 				studentGroup.GET("/exit-requests/my", h.ExitRequest.ListMine)
 				studentGroup.POST("/transfer-requests", h.TransferRequest.Create)
@@ -191,10 +191,6 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 				mgmt.GET("/reports/:id/export", h.Report.Export)
 				mgmt.DELETE("/reports/:id", h.Report.Delete)
 
-				mgmt.GET("/payments", h.Payment.List)
-				mgmt.PATCH("/payments/:id/confirm", h.Payment.Confirm)
-				mgmt.POST("/admin/payments/expire-check", h.Payment.ExpireCheck)
-				mgmt.PATCH("/payments/:id/manager-decision", h.Payment.ManagerDecision)
 				mgmt.POST("/admin/contracts/expire-check", h.Contract.ExpireCheck)
 				mgmt.GET("/contracts", h.Contract.List)
 				mgmt.PATCH("/contracts/:id/manager-decision", h.Contract.ManagerDecision)

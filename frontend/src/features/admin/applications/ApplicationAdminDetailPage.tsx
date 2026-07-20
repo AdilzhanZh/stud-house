@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { ChevronLeft, Check } from 'lucide-react'
 import { Card } from '../../../components/Card'
 import { Button } from '../../../components/Button'
@@ -9,27 +10,18 @@ import { ApplicationJourneyStepper } from '../../../components/ApplicationJourne
 import { extractErrorMessage } from '../../../api/client'
 import { getApplication } from '../../../api/applicationApi'
 import { decideApplication, listApplications } from '../../../api/applicationAdminApi'
-import { getDormitory } from '../../../api/dormitoryApi'
+import { getDormitory, listDormitories } from '../../../api/dormitoryApi'
 import { listRoomResidents, listRoomsByDormitory } from '../../../api/roomApi'
 import { listUsers } from '../../../api/adminUserApi'
-import { createReport, getReportDetail, listReports } from '../../../api/reportApi'
-import { listReportTemplates } from '../../../api/reportTemplateApi'
+import { createReport, listClaimedApplicationIds } from '../../../api/reportApi'
 import { listBenefits, listStudentBenefits } from '../../../api/benefitApi'
 import { applicationStatusToJourneyStep } from '../../applications/statusHelpers'
-import type { ApplicationDetail, ApplicationStatus } from '../../../types/applications'
+import { formatDateTime } from '../../../utils/dateFormat'
+import type { ApplicationDetail } from '../../../types/applications'
 import type { Dormitory } from '../../../types/dormitories'
 import type { Benefit } from '../../../types/benefits'
 import type { Room } from '../../../types/rooms'
 import type { User } from '../../../types'
-
-const statusLabels: Record<ApplicationStatus, string> = {
-  pending: 'Қаралуда',
-  manager_review: 'Қаралуда',
-  needs_correction: 'Түзету қажет',
-  approved: 'Мақұлданды',
-  rejected: 'Қабылданбады',
-  settled: 'Аяқталды',
-}
 
 interface RoomWithOccupancy extends Room {
   residentCount: number
@@ -38,6 +30,7 @@ interface RoomWithOccupancy extends Room {
 type ActionPanel = 'reject' | 'correction' | null
 
 export function ApplicationAdminDetailPage() {
+  const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
@@ -77,9 +70,9 @@ export function ApplicationAdminDetailPage() {
           }),
         )
         setRooms(withOccupancy)
-        setSelectedRoomId(app.assigned_room_id)
+        setSelectedRoomId(app.assigned_room_id ?? app.preferred_room_id)
       })
-      .catch((err) => setLoadError(extractErrorMessage(err, 'Жүктеу сәтсіз аяқталды')))
+      .catch((err) => setLoadError(extractErrorMessage(err, t('admin.common.loadError'))))
   }
 
   useEffect(load, [id])
@@ -91,25 +84,36 @@ export function ApplicationAdminDetailPage() {
   }
 
   // Committee reports bundle every approved-and-not-yet-reported application
-  // together. "Already reported" means attached to any non-rejected report
-  // (pending_committee or approved) — a rejected report's applications are
-  // free to be re-bundled into a new one. Silently a no-op if no report
-  // template is configured yet (nothing to auto-register into).
+  // together, grouped by dormitory since each dormitory can configure its
+  // own default report template. "Already reported" means attached to any
+  // non-rejected report (pending_committee or approved) — a rejected
+  // report's applications are free to be re-bundled into a new one. A
+  // dormitory with no default template configured is silently skipped
+  // (nothing to auto-register into) — the manager can still create that
+  // dormitory's report manually from the Reports page.
   async function autoRegisterInReport() {
-    const templates = await listReportTemplates()
-    const templateId = templates[0]?.id
-    if (!templateId) return
+    const [approvedApps, dormitories, claimed] = await Promise.all([
+      listApplications('approved'),
+      listDormitories(),
+      listClaimedApplicationIds(),
+    ])
+    const defaultTemplateByDormitory = new Map(dormitories.map((d) => [d.id, d.default_report_template_id]))
 
-    const [approvedApps, allReports] = await Promise.all([listApplications('approved'), listReports()])
-    const activeReports = allReports.filter((r) => r.status !== 'rejected')
-    const claimed = new Set<string>()
-    const details = await Promise.all(activeReports.map((r) => getReportDetail(r.id)))
-    for (const detail of details) {
-      for (const s of detail.students) claimed.add(s.application_id)
+    const eligibleByDormitory = new Map<string, string[]>()
+    for (const a of approvedApps) {
+      if (claimed.has(a.id)) continue
+      const templateId = defaultTemplateByDormitory.get(a.dormitory_id)
+      if (!templateId) continue
+      const ids = eligibleByDormitory.get(a.dormitory_id) ?? []
+      ids.push(a.id)
+      eligibleByDormitory.set(a.dormitory_id, ids)
     }
-    const eligibleIds = approvedApps.filter((a) => !claimed.has(a.id)).map((a) => a.id)
-    if (eligibleIds.length === 0) return
-    await createReport(templateId, eligibleIds)
+
+    for (const [dormitoryId, applicationIds] of eligibleByDormitory) {
+      const templateId = defaultTemplateByDormitory.get(dormitoryId)
+      if (!templateId) continue
+      await createReport(templateId, applicationIds).catch(() => {})
+    }
   }
 
   // Room selection here is optional — if a manager doesn't pick one, the
@@ -129,7 +133,7 @@ export function ApplicationAdminDetailPage() {
       await autoRegisterInReport().catch(() => {})
       navigate('/admin/applications')
     } catch (err) {
-      setActionError(extractErrorMessage(err, 'Қабылдау сәтсіз аяқталды'))
+      setActionError(extractErrorMessage(err, t('admin.applications.approveFailed')))
     } finally {
       setIsSubmitting(false)
     }
@@ -143,7 +147,7 @@ export function ApplicationAdminDetailPage() {
       await decideApplication(id, { action: 'reject', comment: comment.trim() })
       navigate('/admin/applications')
     } catch (err) {
-      setActionError(extractErrorMessage(err, 'Әрекет сәтсіз аяқталды'))
+      setActionError(extractErrorMessage(err, t('admin.common.actionFailed')))
     } finally {
       setIsSubmitting(false)
     }
@@ -157,14 +161,14 @@ export function ApplicationAdminDetailPage() {
       await decideApplication(id, { action: 'request_correction', comment: comment.trim() })
       navigate('/admin/applications')
     } catch (err) {
-      setActionError(extractErrorMessage(err, 'Әрекет сәтсіз аяқталды'))
+      setActionError(extractErrorMessage(err, t('admin.common.actionFailed')))
     } finally {
       setIsSubmitting(false)
     }
   }
 
   if (loadError) return <Alert variant="error" message={loadError} />
-  if (!application) return <p className="text-sm text-sand-300">Жүктелуде...</p>
+  if (!application) return <p className="text-sm text-sand-300">{t('admin.common.loading')}</p>
 
   // Decide() only accepts status='pending' on the backend — needs_correction
   // is a student-facing waiting state (they resubmit via PATCH
@@ -178,7 +182,7 @@ export function ApplicationAdminDetailPage() {
         onClick={() => navigate('/admin/applications')}
         className="inline-flex w-fit items-center gap-1 text-sm font-semibold text-sand-300 hover:text-sand-100"
       >
-        <ChevronLeft className="h-4 w-4" /> Өтініштер
+        <ChevronLeft className="h-4 w-4" /> {t('admin.layout.applications')}
       </button>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -189,13 +193,13 @@ export function ApplicationAdminDetailPage() {
         {canDecide && (
           <div className="flex gap-2">
             <Button variant="secondary" className="!text-amber-400" onClick={() => setPanel('correction')}>
-              Құжат сұрау
+              {t('admin.applications.requestDocument')}
             </Button>
             <Button variant="secondary" className="!text-clay-400" onClick={() => setPanel('reject')}>
-              Бас тарту
+              {t('admin.applications.reject')}
             </Button>
             <Button onClick={handleApprove} isLoading={isSubmitting}>
-              Мақұлдау
+              {t('admin.applications.approve')}
             </Button>
           </div>
         )}
@@ -206,12 +210,12 @@ export function ApplicationAdminDetailPage() {
       {panel && (
         <Card>
           <p className="mb-3 text-sm font-semibold text-sand-100">
-            {panel === 'reject' ? 'Қабылдамау себебі' : 'Түзету талабы'}
+            {panel === 'reject' ? t('admin.applications.rejectReason') : t('admin.applications.correctionRequest')}
           </p>
           <div className="flex flex-col gap-3">
             <textarea
               rows={3}
-              placeholder="Міндетті"
+              placeholder={t('admin.common.required')}
               className="rounded-[14px] border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sm text-sand-100 outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
               value={comment}
               onChange={(e) => setComment(e.target.value)}
@@ -223,10 +227,10 @@ export function ApplicationAdminDetailPage() {
                 isLoading={isSubmitting}
                 disabled={!comment.trim()}
               >
-                Растау
+                {t('common.confirm')}
               </Button>
               <Button variant="secondary" onClick={resetPanel}>
-                Бас тарту
+                {t('common.cancel')}
               </Button>
             </div>
           </div>
@@ -236,34 +240,28 @@ export function ApplicationAdminDetailPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="flex flex-col gap-4">
           <Card>
-            <p className="mb-3 text-[15px] font-bold text-sand-100">Студент туралы</p>
+            <p className="mb-3 text-[15px] font-bold text-sand-100">{t('admin.applications.aboutStudent')}</p>
             <div className="flex flex-col gap-2 text-sm">
               <div className="flex justify-between gap-3">
                 <span className="text-sand-300">Email</span>
                 <span className="font-semibold text-sand-100">{student?.email}</span>
               </div>
               <div className="flex justify-between gap-3">
-                <span className="text-sand-300">Телефон</span>
+                <span className="text-sand-300">{t('admin.applications.phone')}</span>
                 <span className="font-semibold text-sand-100">{student?.phone || '—'}</span>
               </div>
               <div className="flex justify-between gap-3">
-                <span className="text-sand-300">ИИН</span>
+                <span className="text-sand-300">{t('admin.applications.iin')}</span>
                 <span className="font-semibold text-sand-100">{student?.iin ?? '—'}</span>
               </div>
               <div className="flex justify-between gap-3">
-                <span className="text-sand-300">Жатақхана</span>
+                <span className="text-sand-300">{t('admin.layout.dormitories')}</span>
                 <span className="font-semibold text-sand-100">{dormitory?.name}</span>
               </div>
               <div className="flex justify-between gap-3">
-                <span className="text-sand-300">Тұру мерзімі</span>
+                <span className="text-sand-300">{t('admin.applications.benefit')}</span>
                 <span className="font-semibold text-sand-100">
-                  {application.stay_months != null ? `${application.stay_months} ай` : '—'}
-                </span>
-              </div>
-              <div className="flex justify-between gap-3">
-                <span className="text-sand-300">Льгота</span>
-                <span className="font-semibold text-sand-100">
-                  {studentBenefitNames.length > 0 ? studentBenefitNames.join(', ') : 'Жоқ'}
+                  {studentBenefitNames.length > 0 ? studentBenefitNames.join(', ') : t('admin.applications.none')}
                 </span>
               </div>
             </div>
@@ -271,21 +269,22 @@ export function ApplicationAdminDetailPage() {
 
           {application.notes && (
             <Card>
-              <p className="mb-2 text-[15px] font-bold text-sand-100">Тілегі</p>
+              <p className="mb-2 text-[15px] font-bold text-sand-100">{t('admin.applications.wish')}</p>
               <p className="text-sm text-sand-200">{application.notes}</p>
             </Card>
           )}
 
           {canDecide && (
             <Card>
-              <p className="mb-3 text-[15px] font-bold text-sand-100">Бөлме тағайындау</p>
+              <p className="mb-3 text-[15px] font-bold text-sand-100">{t('admin.applications.assignRoom')}</p>
               {rooms.length === 0 ? (
-                <p className="text-sm text-sand-300">Бұл жатақханада бөлме енгізілмеген</p>
+                <p className="text-sm text-sand-300">{t('admin.applications.noRooms')}</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {rooms.map((r) => {
                     const full = r.residentCount >= r.capacity
                     const selected = selectedRoomId === r.id
+                    const preferred = application.preferred_room_id === r.id
                     return (
                       <button
                         key={r.id}
@@ -300,20 +299,19 @@ export function ApplicationAdminDetailPage() {
                         }`}
                       >
                         {r.room_number}
+                        {preferred && ` ★ ${t('admin.applications.studentPreferred')}`}
                       </button>
                     )
                   })}
                 </div>
               )}
-              <p className="mt-2.5 text-xs text-sand-300">
-                Мақұлдаған кезде тағайындалған бөлме сақталады. Таңдамасаңыз, кейінірек тағайындауға болады.
-              </p>
+              <p className="mt-2.5 text-xs text-sand-300">{t('admin.applications.roomAssignHint')}</p>
             </Card>
           )}
 
           {applicationStatusToJourneyStep(application.status) && (
             <Card>
-              <p className="mb-3 text-[15px] font-bold text-sand-100">Өтініштің жолы</p>
+              <p className="mb-3 text-[15px] font-bold text-sand-100">{t('admin.applications.journey')}</p>
               <ApplicationJourneyStepper
                 currentStep={applicationStatusToJourneyStep(application.status)!}
                 className="overflow-x-auto py-2"
@@ -324,8 +322,10 @@ export function ApplicationAdminDetailPage() {
 
         <div className="flex flex-col gap-4">
           <Card>
-            <p className="mb-3 text-[15px] font-bold text-sand-100">Құжаттар</p>
-            {application.documents.length === 0 && <p className="text-sm text-sand-300">Құжат жүктелмеген</p>}
+            <p className="mb-3 text-[15px] font-bold text-sand-100">{t('admin.layout.documents')}</p>
+            {application.documents.length === 0 && (
+              <p className="text-sm text-sand-300">{t('admin.applications.noDocuments')}</p>
+            )}
             <div className="flex flex-col gap-2.5">
               {application.documents.map((doc) => (
                 <div key={doc.id} className="flex items-center gap-2.5">
@@ -346,17 +346,17 @@ export function ApplicationAdminDetailPage() {
           </Card>
 
           <Card>
-            <p className="mb-2.5 text-[15px] font-bold text-sand-100">Тарих</p>
+            <p className="mb-2.5 text-[15px] font-bold text-sand-100">{t('admin.applications.history')}</p>
             <div className="flex flex-col gap-2 text-sm">
               {application.history.map((entry) => (
                 <div key={entry.id} className="flex flex-col gap-0.5 border-b border-navy-700 pb-2 last:border-0">
                   <div className="flex justify-between gap-3">
                     <span className="text-sand-100">
-                      {entry.from_status ? `${statusLabels[entry.from_status]} → ` : ''}
-                      {statusLabels[entry.to_status]}
+                      {entry.from_status ? `${t(`status.${entry.from_status}`)} → ` : ''}
+                      {t(`status.${entry.to_status}`)}
                     </span>
                     <span className="shrink-0 text-sand-300">
-                      {new Date(entry.created_at).toLocaleString('kk-KZ')}
+                      {formatDateTime(entry.created_at)}
                     </span>
                   </div>
                   {entry.comment && <p className="text-sand-300">{entry.comment}</p>}

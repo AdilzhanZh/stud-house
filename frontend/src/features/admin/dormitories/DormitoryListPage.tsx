@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Card } from '../../../components/Card'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
@@ -22,6 +23,7 @@ const placeholderStyle = {
 }
 
 export function DormitoryListPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [rows, setRows] = useState<Row[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -50,7 +52,7 @@ export function DormitoryListPage() {
         setRows(withMeta)
       })
       .catch((err) => {
-        setError(extractErrorMessage(err, 'Жатақханаларды жүктеу сәтсіз аяқталды'))
+        setError(extractErrorMessage(err, t('admin.dormitories.loadError')))
       })
   }
 
@@ -65,7 +67,7 @@ export function DormitoryListPage() {
       setDeleteTarget(null)
       load()
     } catch (err) {
-      setDeleteError(extractErrorMessage(err, 'Жатақхананы өшіру сәтсіз аяқталды'))
+      setDeleteError(extractErrorMessage(err, t('admin.dormitories.deleteFailed')))
     } finally {
       setIsDeleting(false)
     }
@@ -74,13 +76,13 @@ export function DormitoryListPage() {
   return (
     <div className="flex flex-col gap-3.5">
       <div className="flex items-center justify-between">
-        <h1 className={adminPageHeading}>Жатақханалар</h1>
-        <Button onClick={() => navigate('/admin/dormitories/new')}>+ Жаңа жатақхана</Button>
+        <h1 className={adminPageHeading}>{t('admin.layout.dormitories')}</h1>
+        <Button onClick={() => navigate('/admin/dormitories/new')}>+ {t('admin.dormitories.new')}</Button>
       </div>
 
       {error && <Alert variant="error" message={error} />}
       {deleteError && <Alert variant="error" message={deleteError} />}
-      {!error && !rows && <p className="text-sm text-sand-300">Жүктелуде...</p>}
+      {!error && !rows && <p className="text-sm text-sand-300">{t('admin.common.loading')}</p>}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {rows?.map((d) => {
@@ -91,15 +93,22 @@ export function DormitoryListPage() {
                 <img src={d.imageUrl} alt={d.name} className="h-27.5 w-full rounded-2xl object-cover" />
               ) : (
                 <div className="flex h-27.5 w-full items-center justify-center rounded-2xl" style={placeholderStyle}>
-                  <span className="font-mono text-[10px] text-sand-400">жатақхана фотосы</span>
+                  <span className="font-mono text-[10px] text-sand-400">{t('admin.dormitories.photoPlaceholder')}</span>
                 </div>
               )}
-              <p className="mt-3 text-base font-bold text-sand-100">{d.name}</p>
+              <div className="mt-3 flex items-center gap-2">
+                <p className="text-base font-bold text-sand-100">{d.name}</p>
+                {d.closed_for_applications && (
+                  <span className="inline-flex shrink-0 items-center rounded-full bg-clay-500/10 px-2 py-0.5 text-xs font-semibold text-clay-400">
+                    {t('admin.dormitories.closed')}
+                  </span>
+                )}
+              </div>
               <p className="mt-0.5 text-sm text-sand-300">{d.address}</p>
               <div className="mt-3 flex items-baseline justify-between text-xs text-sand-300">
-                <span>Толуы</span>
+                <span>{t('admin.dormitories.occupancy')}</span>
                 <span className="font-semibold">
-                  {d.allocated}/{d.total_capacity} · {d.roomsCreated} бөлме
+                  {d.allocated}/{d.total_capacity} · {t('admin.dormitories.roomsCount', { count: d.roomsCreated })}
                 </span>
               </div>
               <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-navy-800">
@@ -113,7 +122,7 @@ export function DormitoryListPage() {
                 onClick={(e) => e.stopPropagation()}
               >
                 <button className={adminChipButtonClass} onClick={() => navigate(`/admin/dormitories/${d.id}/edit`)}>
-                  Өзгерту
+                  {t('admin.common.edit')}
                 </button>
                 <DeleteIconButton onClick={() => setDeleteTarget(d)} />
               </div>
@@ -124,8 +133,8 @@ export function DormitoryListPage() {
 
       <ConfirmDialog
         open={deleteTarget != null}
-        title="Жатақхананы өшіру"
-        message={`"${deleteTarget?.name}" жатақханасын өшіргіңіз келе ме? Бұл әрекетті қайтару мүмкін емес.`}
+        title={t('admin.dormitories.deleteTitle')}
+        message={t('admin.dormitories.deleteConfirm', { name: deleteTarget?.name })}
         danger
         isLoading={isDeleting}
         onConfirm={handleDelete}

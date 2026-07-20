@@ -40,13 +40,10 @@ type Application struct {
 	// assign a different room later via RoomService.AddResident.
 	PreferredRoomID *uuid.UUID
 	Notes           *string
-	// StayMonths is how many months the student intends to reside, as
-	// declared at application time.
-	StayMonths     *int
-	AssignedRoomID *uuid.UUID
-	HandledBy      *uuid.UUID
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	AssignedRoomID  *uuid.UUID
+	HandledBy       *uuid.UUID
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 // ApplicationStatusHistory is an immutable audit log entry for one status

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Download } from 'lucide-react'
 
 interface DownloadIconButtonProps {
@@ -5,12 +6,14 @@ interface DownloadIconButtonProps {
   label?: string
 }
 
-export function DownloadIconButton({ onClick, label = 'Жүктеу' }: DownloadIconButtonProps) {
+export function DownloadIconButton({ onClick, label }: DownloadIconButtonProps) {
+  const { t } = useTranslation()
+  const resolvedLabel = label ?? t('admin.applications.download')
   return (
     <button
       type="button"
-      aria-label={label}
-      title={label}
+      aria-label={resolvedLabel}
+      title={resolvedLabel}
       className="shrink-0 rounded-lg p-1.5 text-turquoise-400 transition-colors hover:bg-turquoise-500/10"
       onClick={onClick}
     >

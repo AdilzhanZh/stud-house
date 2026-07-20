@@ -1,10 +1,5 @@
+import { useTranslation } from 'react-i18next'
 import type { ReportStatus } from '../types/reports'
-
-const labels: Record<ReportStatus, string> = {
-  pending_committee: 'Комиссия қарауда',
-  approved: 'Мақұлданды',
-  rejected: 'Қабылданбады',
-}
 
 const classes: Record<ReportStatus, string> = {
   pending_committee: 'bg-amber-500/10 text-amber-400 ring-amber-400/20',
@@ -13,11 +8,12 @@ const classes: Record<ReportStatus, string> = {
 }
 
 export function ReportStatusBadge({ status }: { status: ReportStatus }) {
+  const { t } = useTranslation()
   return (
     <span
       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${classes[status]}`}
     >
-      {labels[status]}
+      {t(`reportStatus.${status}`)}
     </span>
   )
 }

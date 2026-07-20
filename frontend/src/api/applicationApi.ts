@@ -5,7 +5,6 @@ export interface CreateApplicationPayload {
   dormitory_id: string
   notes: string | null
   preferred_room_id?: string | null
-  stay_months: number
 }
 
 export async function createApplication(payload: CreateApplicationPayload): Promise<Application> {
@@ -23,15 +22,16 @@ export async function getApplication(id: string): Promise<ApplicationDetail> {
   return data.data
 }
 
-// Rolls back a just-created application whose document/benefit attachment
-// failed partway through — only works while it's still pending.
+// Deletes the caller's own application. Only works while it's still
+// pending (used to roll back a just-created application whose
+// document/benefit attachment failed partway through) or once it has been
+// rejected (lets the student clear it out of their list).
 export async function deleteApplication(id: string): Promise<void> {
   await apiClient.delete(`/applications/${id}`)
 }
 
 export interface ResubmitApplicationPayload {
   notes: string | null
-  stay_months: number
 }
 
 export async function resubmitApplication(

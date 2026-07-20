@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 interface CorridorRoom {
   id: string
   room_number: string
@@ -26,12 +28,17 @@ function RoomTile({
   onSelectRoom?: (roomId: string) => void
   selected?: boolean
 }) {
+  const { t } = useTranslation()
   if (!room) return <div className="h-11 w-11 shrink-0" />
   return (
     <button
       type="button"
       onClick={() => onSelectRoom?.(room.id)}
-      title={`Бөлме ${room.room_number}: ${room.residentCount}/${room.capacity} орын`}
+      title={t('admin.dormitories.roomTileTitle', {
+        room: room.room_number,
+        occupied: room.residentCount,
+        capacity: room.capacity,
+      })}
       className={`relative flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-lg ring-1 ring-inset transition-colors hover:brightness-110 ${occupancyClasses(room.residentCount, room.capacity)} ${
         selected ? 'ring-2 ring-turquoise-400' : ''
       }`}

@@ -21,6 +21,8 @@ type ReportService struct {
 	reports         repository.ReportRepository
 	applications    repository.ApplicationRepository
 	users           repository.UserRepository
+	dormitories     repository.DormitoryRepository
+	rooms           repository.RoomRepository
 	notifier        *notifier.Notifier
 	// onApproved is an optional phase-4 hook (contract auto-generation),
 	// wired via SetOnApproved. Vote() calls it right after a report becomes
@@ -41,6 +43,8 @@ func NewReportService(
 	reports repository.ReportRepository,
 	applications repository.ApplicationRepository,
 	users repository.UserRepository,
+	dormitories repository.DormitoryRepository,
+	rooms repository.RoomRepository,
 	notifier *notifier.Notifier,
 ) *ReportService {
 	return &ReportService{
@@ -48,15 +52,33 @@ func NewReportService(
 		reports:         reports,
 		applications:    applications,
 		users:           users,
+		dormitories:     dormitories,
+		rooms:           rooms,
 		notifier:        notifier,
 	}
 }
 
-func (s *ReportService) CreateTemplate(ctx context.Context, actorID uuid.UUID, name, fileURL string) (*domain.ReportTemplate, error) {
-	if name == "" || fileURL == "" {
-		return nil, apperror.BadRequest("атауы және файл сілтемесі міндетті")
+// CreateTemplate builds a structured, in-app report template. fileURL is
+// optional (nil/empty means none attached) — kept only so a manager can
+// still attach a real document that OnReportApproved copies onto the
+// student-facing contract "Open PDF" link; it's never required or asked for
+// as the primary way to define a template anymore.
+func (s *ReportService) CreateTemplate(ctx context.Context, actorID uuid.UUID, name, introText string, studentColumns []string, fileURL *string) (*domain.ReportTemplate, error) {
+	if name == "" {
+		return nil, apperror.BadRequest("атауы міндетті")
 	}
-	t := &domain.ReportTemplate{Name: name, FileURL: fileURL, CreatedBy: actorID}
+	if len(studentColumns) == 0 {
+		return nil, apperror.BadRequest("кемінде бір баған таңдалуы керек")
+	}
+	for _, c := range studentColumns {
+		if !domain.ReportStudentColumn(c).Valid() {
+			return nil, apperror.BadRequest("баған жарамсыз: " + c)
+		}
+	}
+	if fileURL != nil && *fileURL == "" {
+		fileURL = nil
+	}
+	t := &domain.ReportTemplate{Name: name, IntroText: introText, StudentColumns: studentColumns, FileURL: fileURL, CreatedBy: actorID}
 	if err := s.reportTemplates.Create(ctx, t); err != nil {
 		return nil, err
 	}
@@ -70,10 +92,10 @@ func (s *ReportService) ListTemplates(ctx context.Context) ([]*domain.ReportTemp
 func (s *ReportService) DeleteTemplate(ctx context.Context, id uuid.UUID) error {
 	if err := s.reportTemplates.Delete(ctx, id); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return apperror.NotFound("рапорт шаблоны табылмады")
+			return apperror.NotFound("хаттама шаблоны табылмады")
 		}
 		if errors.Is(err, repository.ErrConflict) {
-			return apperror.Conflict("бұл шаблон қолданыстағы рапортта пайдаланылып тұр, оны өшіру мүмкін емес")
+			return apperror.Conflict("бұл шаблон қолданыстағы хаттамада пайдаланылып тұр, оны өшіру мүмкін емес")
 		}
 		return err
 	}
@@ -84,7 +106,7 @@ func (s *ReportService) GetByID(ctx context.Context, id uuid.UUID) (*domain.Repo
 	report, err := s.reports.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, apperror.NotFound("рапорт табылмады")
+			return nil, apperror.NotFound("хаттама табылмады")
 		}
 		return nil, err
 	}
@@ -98,10 +120,10 @@ func (s *ReportService) List(ctx context.Context, status *domain.ReportStatus) (
 func (s *ReportService) Delete(ctx context.Context, id uuid.UUID) error {
 	if err := s.reports.Delete(ctx, id); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return apperror.NotFound("рапорт табылмады")
+			return apperror.NotFound("хаттама табылмады")
 		}
 		if errors.Is(err, repository.ErrConflict) {
-			return apperror.Conflict("бұл рапорт басқа рапорттың негізі болғандықтан оны өшіру мүмкін емес")
+			return apperror.Conflict("бұл хаттама басқа хаттаманың негізі болғандықтан оны өшіру мүмкін емес")
 		}
 		return err
 	}
@@ -117,7 +139,7 @@ func (s *ReportService) activeCommitteeMemberIDs(ctx context.Context) ([]uuid.UU
 		return nil, err
 	}
 	if len(members) == 0 {
-		return nil, apperror.BadRequest("бұл рапортты қарайтын комиссия мүшесі жоқ")
+		return nil, apperror.BadRequest("бұл хаттаманы қарайтын комиссия мүшесі жоқ")
 	}
 	ids := make([]uuid.UUID, len(members))
 	for i, m := range members {
@@ -133,7 +155,7 @@ func mapReportCreationError(err error) error {
 	case errors.Is(err, repository.ErrApplicationNotApproved):
 		return apperror.BadRequest("барлық өтініштер \"мақұлданды\" мәртебесінде болуы керек")
 	case errors.Is(err, repository.ErrConflict):
-		return apperror.Conflict("бір немесе бірнеше өтініш басқа қаралып жатқан рапортта бар")
+		return apperror.Conflict("бір немесе бірнеше өтініш басқа қаралып жатқан хаттамада бар")
 	default:
 		return err
 	}
@@ -149,7 +171,7 @@ func (s *ReportService) CreateReport(ctx context.Context, actorID, templateID uu
 	}
 	if _, err := s.reportTemplates.GetByID(ctx, templateID); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, apperror.NotFound("рапорт шаблоны табылмады")
+			return nil, apperror.NotFound("хаттама шаблоны табылмады")
 		}
 		return nil, err
 	}
@@ -181,7 +203,7 @@ func (s *ReportService) Revise(ctx context.Context, actorID, oldReportID uuid.UU
 		return nil, err
 	}
 	if oldReport.Status != domain.ReportRejected {
-		return nil, apperror.BadRequest("тек қабылданбаған рапортты қайта өңдеуге болады")
+		return nil, apperror.BadRequest("тек қабылданбаған хаттаманы қайта өңдеуге болады")
 	}
 
 	oldAppIDs, err := s.reports.ListApplicationIDs(ctx, oldReportID)
@@ -213,7 +235,7 @@ func (s *ReportService) Revise(ctx context.Context, actorID, oldReportID uuid.UU
 
 	if err := s.reports.Revise(ctx, oldReportID, newReport, newApplicationIDs, dropped, droppedApplicationComment, actorID, committeeMemberIDs); err != nil {
 		if errors.Is(err, repository.ErrConflict) {
-			return nil, apperror.Conflict("рапорт қабылданбаған емес немесе өтініштердің бірі басқа қаралып жатқан рапортта бар")
+			return nil, apperror.Conflict("хаттама қабылданбаған емес немесе өтініштердің бірі басқа қаралып жатқан хаттамада бар")
 		}
 		return nil, mapReportCreationError(err)
 	}
@@ -256,11 +278,11 @@ func (s *ReportService) Vote(ctx context.Context, actorID, reportID uuid.UUID, d
 
 	err := s.reports.WithVoteLock(ctx, reportID, func(ctx context.Context, report *domain.Report, tx repository.ReportTx) error {
 		if report.Status != domain.ReportPendingCommittee {
-			return apperror.Conflict("рапорт енді комиссия қарауында емес")
+			return apperror.Conflict("хаттама енді комиссия қарауында емес")
 		}
 		if _, err := tx.GetVote(ctx, reportID, actorID); err != nil {
 			if errors.Is(err, repository.ErrNotFound) {
-				return apperror.Forbidden("сіз бұл рапорттың комиссия мүшесі емессіз")
+				return apperror.Forbidden("сіз бұл хаттаманың комиссия мүшесі емессіз")
 			}
 			return err
 		}
@@ -301,9 +323,9 @@ func (s *ReportService) Vote(ctx context.Context, actorID, reportID uuid.UUID, d
 }
 
 func (s *ReportService) notifyCommitteeNewReport(ctx context.Context, reportID uuid.UUID, committeeMemberIDs []uuid.UUID) {
-	body := fmt.Sprintf("Жаңа рапорт (ID: %s) сіздің қарауыңызды күтуде.", reportID)
+	body := fmt.Sprintf("Жаңа хаттама (ID: %s) сіздің қарауыңызды күтуде.", reportID)
 	for _, memberID := range committeeMemberIDs {
-		_ = s.notifier.Notify(ctx, memberID, domain.NotificationReportReview, "Жаңа рапорт қарауға жіберілді", body, nil)
+		_ = s.notifier.Notify(ctx, memberID, domain.NotificationReportReview, "Жаңа хаттама қарауға жіберілді", body, nil)
 	}
 }
 
@@ -320,9 +342,9 @@ func (s *ReportService) runOnApproved(ctx context.Context, reportID uuid.UUID) {
 }
 
 func (s *ReportService) notifyReportDecision(ctx context.Context, report *domain.Report) {
-	title, body := "Рапорт мақұлданды", fmt.Sprintf("Рапорт (ID: %s) комиссия тарапынан мақұлданды.", report.ID)
+	title, body := "Хаттама мақұлданды", fmt.Sprintf("Хаттама (ID: %s) комиссия тарапынан мақұлданды.", report.ID)
 	if report.Status == domain.ReportRejected {
-		title, body = "Рапорт қабылданбады", fmt.Sprintf("Рапорт (ID: %s) комиссия тарапынан қабылданбады.", report.ID)
+		title, body = "Хаттама қабылданбады", fmt.Sprintf("Хаттама (ID: %s) комиссия тарапынан қабылданбады.", report.ID)
 	}
 	_ = s.notifier.Notify(ctx, report.CreatedBy, domain.NotificationReportReview, title, body, nil)
 }
@@ -334,6 +356,8 @@ type ReportDetail struct {
 	Template         *domain.ReportTemplate
 	Applications     []*domain.Application
 	Students         map[uuid.UUID]*domain.User
+	Dormitories      map[uuid.UUID]*domain.Dormitory
+	Rooms            map[uuid.UUID]*domain.Room
 	Votes            []*domain.CommitteeVote
 	CommitteeMembers map[uuid.UUID]*domain.User
 }
@@ -347,7 +371,7 @@ func (s *ReportService) GetDetail(ctx context.Context, reportID uuid.UUID) (*Rep
 	template, err := s.reportTemplates.GetByID(ctx, report.TemplateID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, apperror.NotFound("рапорт шаблоны табылмады")
+			return nil, apperror.NotFound("хаттама шаблоны табылмады")
 		}
 		return nil, err
 	}
@@ -359,6 +383,8 @@ func (s *ReportService) GetDetail(ctx context.Context, reportID uuid.UUID) (*Rep
 
 	applications := make([]*domain.Application, 0, len(appIDs))
 	students := make(map[uuid.UUID]*domain.User)
+	dormitories := make(map[uuid.UUID]*domain.Dormitory)
+	rooms := make(map[uuid.UUID]*domain.Room)
 	for _, id := range appIDs {
 		app, err := s.applications.GetByID(ctx, id)
 		if err != nil {
@@ -374,6 +400,22 @@ func (s *ReportService) GetDetail(ctx context.Context, reportID uuid.UUID) (*Rep
 				return nil, err
 			}
 			students[app.StudentID] = student
+		}
+		if _, ok := dormitories[app.DormitoryID]; !ok {
+			dormitory, err := s.dormitories.GetByID(ctx, app.DormitoryID)
+			if err != nil {
+				return nil, err
+			}
+			dormitories[app.DormitoryID] = dormitory
+		}
+		if app.AssignedRoomID != nil {
+			if _, ok := rooms[*app.AssignedRoomID]; !ok {
+				room, err := s.rooms.GetByID(ctx, *app.AssignedRoomID)
+				if err != nil {
+					return nil, err
+				}
+				rooms[*app.AssignedRoomID] = room
+			}
 		}
 	}
 
@@ -397,6 +439,8 @@ func (s *ReportService) GetDetail(ctx context.Context, reportID uuid.UUID) (*Rep
 		Template:         template,
 		Applications:     applications,
 		Students:         students,
+		Dormitories:      dormitories,
+		Rooms:            rooms,
 		Votes:            votes,
 		CommitteeMembers: committeeMembers,
 	}, nil

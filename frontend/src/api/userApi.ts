@@ -7,3 +7,10 @@ export async function updateAvatar(userId: string, avatarUrl: string): Promise<U
   })
   return data.data
 }
+
+export async function changeOwnPassword(currentPassword: string, newPassword: string): Promise<void> {
+  await apiClient.patch('/users/me/password', {
+    current_password: currentPassword,
+    new_password: newPassword,
+  })
+}

@@ -22,8 +22,10 @@ func NewReportHandler(reports *service.ReportService) *ReportHandler {
 }
 
 type createReportTemplateRequest struct {
-	Name    string `json:"name" binding:"required"`
-	FileURL string `json:"file_url" binding:"required"`
+	Name           string   `json:"name" binding:"required"`
+	IntroText      string   `json:"intro_text"`
+	StudentColumns []string `json:"student_columns" binding:"required"`
+	FileURL        *string  `json:"file_url"`
 }
 
 // CreateTemplate is manager/admin-only.
@@ -34,7 +36,7 @@ func (h *ReportHandler) CreateTemplate(c *gin.Context) {
 		return
 	}
 	actorID, _ := middleware.UserID(c)
-	t, err := h.reports.CreateTemplate(c.Request.Context(), actorID, req.Name, req.FileURL)
+	t, err := h.reports.CreateTemplate(c.Request.Context(), actorID, req.Name, req.IntroText, req.StudentColumns, req.FileURL)
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -109,7 +111,7 @@ func (h *ReportHandler) List(c *gin.Context) {
 func (h *ReportHandler) Delete(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("рапорт идентификаторы дұрыс емес"))
+		response.Error(c, apperror.BadRequest("хаттама идентификаторы дұрыс емес"))
 		return
 	}
 	if err := h.reports.Delete(c.Request.Context(), id); err != nil {
@@ -124,7 +126,7 @@ func (h *ReportHandler) Delete(c *gin.Context) {
 func (h *ReportHandler) GetDetail(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("рапорт идентификаторы дұрыс емес"))
+		response.Error(c, apperror.BadRequest("хаттама идентификаторы дұрыс емес"))
 		return
 	}
 	detail, err := h.reports.GetDetail(c.Request.Context(), id)
@@ -153,7 +155,7 @@ type voteReportRequest struct {
 func (h *ReportHandler) Vote(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("рапорт идентификаторы дұрыс емес"))
+		response.Error(c, apperror.BadRequest("хаттама идентификаторы дұрыс емес"))
 		return
 	}
 	var req voteReportRequest
@@ -178,7 +180,7 @@ type reviseReportRequest struct {
 func (h *ReportHandler) Revise(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		response.Error(c, apperror.BadRequest("рапорт идентификаторы дұрыс емес"))
+		response.Error(c, apperror.BadRequest("хаттама идентификаторы дұрыс емес"))
 		return
 	}
 	var req reviseReportRequest

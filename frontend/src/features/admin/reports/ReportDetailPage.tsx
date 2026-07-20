@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Card } from '../../../components/Card'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
@@ -10,6 +11,7 @@ import { downloadReportPdf } from '../../../utils/reportPdf'
 import type { ReportDetail } from '../../../types/reports'
 
 export function ReportDetailPage() {
+  const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
@@ -29,7 +31,7 @@ export function ReportDetailPage() {
         setReport(r)
         setKeptIds(new Set(r.students.map((s) => s.application_id)))
       })
-      .catch((err) => setLoadError(extractErrorMessage(err, 'Жүктеу сәтсіз аяқталды')))
+      .catch((err) => setLoadError(extractErrorMessage(err, t('admin.common.loadError'))))
   }
 
   useEffect(load, [id])
@@ -51,7 +53,7 @@ export function ReportDetailPage() {
       const revised = await reviseReport(id, Array.from(keptIds))
       navigate(`/admin/reports/${revised.id}`)
     } catch (err) {
-      setReviseError(extractErrorMessage(err, 'Қайта қарау сәтсіз аяқталды'))
+      setReviseError(extractErrorMessage(err, t('admin.reports.reviseFailed')))
     } finally {
       setIsRevising(false)
     }
@@ -62,27 +64,27 @@ export function ReportDetailPage() {
     setExportError(null)
     setIsExporting(true)
     try {
-      await downloadReportPdf(report)
+      await downloadReportPdf(report, t)
     } catch (err) {
-      setExportError(extractErrorMessage(err, 'Выгрузка сәтсіз аяқталды'))
+      setExportError(extractErrorMessage(err, t('admin.reports.exportFailed')))
     } finally {
       setIsExporting(false)
     }
   }
 
   if (loadError) return <Alert variant="error" message={loadError} />
-  if (!report) return <p className="text-sm text-sand-300">Жүктелуде...</p>
+  if (!report) return <p className="text-sm text-sand-300">{t('admin.common.loading')}</p>
 
   return (
     <div className="flex flex-col gap-6">
       <Button variant="secondary" className="self-start" onClick={() => navigate('/admin/reports')}>
-        ← Артқа
+        ← {t('admin.common.back')}
       </Button>
 
       <ReportSummaryCards report={report} />
 
       {report.status === 'rejected' && (
-        <Card title="Рапортты қайта қарау">
+        <Card title={t('admin.reports.reviseTitle')}>
           {reviseError && <Alert variant="error" message={reviseError} />}
           <ul className="mb-4 flex flex-col gap-2">
             {report.students.map((s) => (
@@ -99,16 +101,16 @@ export function ReportDetailPage() {
             ))}
           </ul>
           <Button onClick={handleRevise} isLoading={isRevising} disabled={keptIds.size === 0}>
-            Қайта қарауға жіберу
+            {t('admin.reports.sendForRevision')}
           </Button>
         </Card>
       )}
 
       {report.status === 'approved' && (
-        <Card title="Выгрузка">
+        <Card title={t('admin.reports.exportTitle')}>
           {exportError && <Alert variant="error" message={exportError} />}
           <Button onClick={handleExport} isLoading={isExporting}>
-            Выгрузка
+            {t('admin.reports.exportTitle')}
           </Button>
         </Card>
       )}

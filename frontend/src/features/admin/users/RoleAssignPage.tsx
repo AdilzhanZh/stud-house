@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Card } from '../../../components/Card'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
@@ -11,6 +12,7 @@ import type { User } from '../../../types'
 // here, this page only toggles the committee-member/chairperson flags on top
 // of that role.
 export function RoleAssignPage() {
+  const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
@@ -30,14 +32,14 @@ export function RoleAssignPage() {
       .then((users) => {
         const found = users.find((u) => u.id === id)
         if (!found) {
-          setLoadError('Пайдаланушы табылмады')
+          setLoadError(t('admin.users.notFound'))
           return
         }
         setUser(found)
         setIsCommitteeMember(found.is_committee_member)
         setIsChairperson(found.is_chairperson)
       })
-      .catch((err) => setLoadError(extractErrorMessage(err, 'Жүктеу сәтсіз аяқталды')))
+      .catch((err) => setLoadError(extractErrorMessage(err, t('admin.common.loadError'))))
   }, [id])
 
   async function handleSubmit(e: React.FormEvent) {
@@ -52,22 +54,22 @@ export function RoleAssignPage() {
       }
       navigate('/admin/users')
     } catch (err) {
-      setError(extractErrorMessage(err, 'Сақтау сәтсіз аяқталды'))
+      setError(extractErrorMessage(err, t('admin.common.saveFailed')))
     } finally {
       setIsSubmitting(false)
     }
   }
 
   if (loadError) return <Alert variant="error" message={loadError} />
-  if (!user) return <p className="text-sm text-sand-300">Жүктелуде...</p>
+  if (!user) return <p className="text-sm text-sand-300">{t('admin.common.loading')}</p>
 
   return (
     <div className="flex flex-col gap-6">
       <Button variant="secondary" className="self-start" onClick={() => navigate('/admin/users')}>
-        ← Артқа
+        ← {t('admin.common.back')}
       </Button>
 
-      <Card title={`Комиссия тағайындау — ${user.full_name}`}>
+      <Card title={t('admin.users.assignCommitteeTitle', { name: user.full_name })}>
         <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
           {error && <Alert variant="error" message={error} />}
           <label className="flex items-center gap-2 text-sm text-sand-200">
@@ -79,7 +81,7 @@ export function RoleAssignPage() {
                 if (!e.target.checked) setIsChairperson(false)
               }}
             />
-            Комиссия мүшесі
+            {t('admin.users.committeeMember')}
           </label>
           <label className="flex items-center gap-2 text-sm text-sand-200">
             <input
@@ -88,13 +90,13 @@ export function RoleAssignPage() {
               disabled={!isCommitteeMember}
               onChange={(e) => setIsChairperson(e.target.checked)}
             />
-            Төраға
+            {t('admin.users.chairperson')}
             {!isCommitteeMember && (
-              <span className="text-xs text-sand-400">(тек комиссия мүшесіне)</span>
+              <span className="text-xs text-sand-400">{t('admin.users.chairpersonHint')}</span>
             )}
           </label>
           <Button type="submit" isLoading={isSubmitting} className="self-start">
-            Сақтау
+            {t('admin.common.save')}
           </Button>
         </form>
       </Card>

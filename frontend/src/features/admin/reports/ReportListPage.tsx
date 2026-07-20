@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Card } from '../../../components/Card'
+import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
 import { ConfirmDialog } from '../../../components/ConfirmDialog'
 import { DeleteIconButton } from '../../../components/DeleteIconButton'
@@ -15,6 +17,7 @@ import {
   adminTableWrapClass,
   adminTheadClass,
 } from '../adminTable'
+import { formatDate } from '../../../utils/dateFormat'
 import type { Report } from '../../../types/reports'
 
 interface Row extends Report {
@@ -23,6 +26,7 @@ interface Row extends Report {
 }
 
 export function ReportListPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [rows, setRows] = useState<Row[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -48,7 +52,7 @@ export function ReportListPage() {
         setRows(withDetail)
       })
       .catch((err) => {
-        setError(extractErrorMessage(err, 'Рапорттарды жүктеу сәтсіз аяқталды'))
+        setError(extractErrorMessage(err, t('admin.reports.loadError')))
       })
   }
 
@@ -63,7 +67,7 @@ export function ReportListPage() {
       setDeleteTarget(null)
       load()
     } catch (err) {
-      setDeleteError(extractErrorMessage(err, 'Рапортты өшіру сәтсіз аяқталды'))
+      setDeleteError(extractErrorMessage(err, t('admin.reports.deleteFailed')))
     } finally {
       setIsDeleting(false)
     }
@@ -71,21 +75,29 @@ export function ReportListPage() {
 
   return (
     <div className="flex flex-col gap-3.5">
-      <h1 className={adminPageHeading}>Рапорттар</h1>
+      <div className="flex items-center justify-between">
+        <h1 className={adminPageHeading}>{t('admin.layout.reports')}</h1>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => navigate('/admin/reports/templates')}>
+            {t('admin.reports.templates')}
+          </Button>
+          <Button onClick={() => navigate('/admin/reports/new')}>{t('admin.reports.newReport')}</Button>
+        </div>
+      </div>
 
       {error && <Alert variant="error" message={error} />}
       {deleteError && <Alert variant="error" message={deleteError} />}
-      {!error && !rows && <p className="text-sm text-sand-300">Жүктелуде...</p>}
+      {!error && !rows && <p className="text-sm text-sand-300">{t('admin.common.loading')}</p>}
 
       {rows && (
         <Card className={adminTableWrapClass}>
           <table className="w-full text-left text-sm">
             <thead className={adminTheadClass}>
               <tr>
-                <th className={adminCellClass}>Құрылған күні</th>
-                <th className={adminCellClass}>Шаблон</th>
-                <th className={adminCellClass}>Студенттер саны</th>
-                <th className={adminCellClass}>Статус</th>
+                <th className={adminCellClass}>{t('admin.reports.createdAt')}</th>
+                <th className={adminCellClass}>{t('admin.reports.template')}</th>
+                <th className={adminCellClass}>{t('admin.reports.studentCount')}</th>
+                <th className={adminCellClass}>{t('admin.applications.status')}</th>
                 <th className={adminCellClass} />
               </tr>
             </thead>
@@ -93,7 +105,7 @@ export function ReportListPage() {
               {rows.map((r) => (
                 <tr key={r.id} className={adminRowClickableClass} onClick={() => navigate(`/admin/reports/${r.id}`)}>
                   <td className={`${adminCellClass} text-sand-300`}>
-                    {new Date(r.created_at).toLocaleDateString('kk-KZ')}
+                    {formatDate(r.created_at)}
                   </td>
                   <td className={`${adminCellClass} font-semibold text-sand-100`}>{r.templateName}</td>
                   <td className={`${adminCellClass} text-sand-300`}>{r.studentCount}</td>
@@ -108,7 +120,7 @@ export function ReportListPage() {
               {rows.length === 0 && (
                 <tr>
                   <td className={`${adminCellClass} text-sand-300`} colSpan={5}>
-                    Рапорт жоқ
+                    {t('admin.reports.empty')}
                   </td>
                 </tr>
               )}
@@ -119,8 +131,8 @@ export function ReportListPage() {
 
       <ConfirmDialog
         open={deleteTarget != null}
-        title="Рапортты өшіру"
-        message="Бұл рапортты өшіргіңіз келе ме? Бұл әрекетті қайтару мүмкін емес."
+        title={t('admin.reports.deleteTitle')}
+        message={t('admin.reports.deleteConfirm')}
         danger
         isLoading={isDeleting}
         onConfirm={handleDelete}

@@ -17,6 +17,8 @@ export interface Dormitory {
   built_year: string | null
   commissioned_year: string | null
   ownership_form: string | null
+  closed_for_applications: boolean
+  default_report_template_id: string | null
   created_by: string
   created_at: string
   updated_at: string

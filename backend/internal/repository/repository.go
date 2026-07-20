@@ -13,6 +13,11 @@ import (
 var (
 	ErrNotFound = errors.New("resource not found")
 	ErrConflict = errors.New("resource already exists")
+	// ErrInvalidReference is a foreign-key violation on a value the caller
+	// supplied (e.g. a dormitory's default_report_template_id pointing at a
+	// report template that doesn't exist) — distinct from ErrNotFound, which
+	// means the row being fetched/updated itself doesn't exist.
+	ErrInvalidReference = errors.New("referenced resource not found")
 )
 
 type UserRepository interface {
@@ -51,7 +56,9 @@ type StudentProfileRepository interface {
 type DormitoryRepository interface {
 	Create(ctx context.Context, d *domain.Dormitory) error
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Dormitory, error)
-	List(ctx context.Context) ([]*domain.Dormitory, error)
+	// List returns every dormitory when openOnly is false, or only
+	// dormitories open for applications when true.
+	List(ctx context.Context, openOnly bool) ([]*domain.Dormitory, error)
 	Update(ctx context.Context, d *domain.Dormitory) error
 	Delete(ctx context.Context, id uuid.UUID) error
 	GetCapacity(ctx context.Context, id uuid.UUID) (*domain.DormitoryCapacity, error)

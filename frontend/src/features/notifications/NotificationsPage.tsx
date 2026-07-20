@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertCircle, Bell, Check, FileText } from 'lucide-react'
+import { AlertCircle, Bell, FileText } from 'lucide-react'
 import { Card } from '../../components/Card'
 import { Alert } from '../../components/Alert'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
@@ -19,7 +19,6 @@ const iconByType: Partial<Record<NotificationType, { icon: typeof Bell; tint: st
   document_requested: { icon: AlertCircle, tint: 'bg-amber-500/15', iconColor: 'text-amber-400' },
   contract_sent: { icon: FileText, tint: 'bg-turquoise-500/15', iconColor: 'text-turquoise-400' },
   application_status_changed: { icon: FileText, tint: 'bg-turquoise-500/15', iconColor: 'text-turquoise-400' },
-  payment_update: { icon: Check, tint: 'bg-mint-500/15', iconColor: 'text-mint-400' },
 }
 
 export function NotificationsPage() {

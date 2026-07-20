@@ -143,18 +143,6 @@ func (r *ContractRepo) ListByStudent(ctx context.Context, studentID uuid.UUID) (
 	return out, rows.Err()
 }
 
-func (r *ContractRepo) GetDormitoryPrice(ctx context.Context, dormitoryID uuid.UUID) (*float64, error) {
-	var price *float64
-	err := r.db.QueryRow(ctx, `SELECT yearly_payment FROM dormitories WHERE id = $1`, dormitoryID).Scan(&price)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, repository.ErrNotFound
-		}
-		return nil, err
-	}
-	return price, nil
-}
-
 func (r *ContractRepo) WithLock(ctx context.Context, id uuid.UUID, fn func(ctx context.Context, contract *domain.Contract, tx repository.ContractTx) error) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
@@ -184,12 +172,25 @@ func (t *contractTx) SetStatus(ctx context.Context, id uuid.UUID, status domain.
 	return err
 }
 
-func (t *contractTx) CreatePayment(ctx context.Context, p *domain.Payment) error {
-	const q = `
-		INSERT INTO payments (contract_id, amount, currency, status, deadline)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, created_at`
-	return t.tx.QueryRow(ctx, q, p.ContractID, p.Amount, p.Currency, string(p.Status), p.Deadline).Scan(&p.ID, &p.CreatedAt)
+func (t *contractTx) MarkApplicationSettled(ctx context.Context, applicationID uuid.UUID, changedBy uuid.UUID) error {
+	var fromStatus string
+	err := t.tx.QueryRow(ctx, `SELECT status FROM applications WHERE id = $1 FOR UPDATE`, applicationID).Scan(&fromStatus)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return repository.ErrNotFound
+		}
+		return err
+	}
+
+	if _, err := t.tx.Exec(ctx, `UPDATE applications SET status = 'settled', updated_at = now() WHERE id = $1`, applicationID); err != nil {
+		return err
+	}
+
+	const historyQ = `
+		INSERT INTO application_status_history (application_id, from_status, to_status, comment, changed_by)
+		VALUES ($1, $2, 'settled', $3, $4)`
+	_, err = t.tx.Exec(ctx, historyQ, applicationID, fromStatus, "Студент келісімшартты қабылдады", changedBy)
+	return err
 }
 
 func (t *contractTx) MarkApplicationRejected(ctx context.Context, applicationID uuid.UUID, comment string, changedBy uuid.UUID) error {

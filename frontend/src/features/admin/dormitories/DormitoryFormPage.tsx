@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Card } from '../../../components/Card'
 import { Input } from '../../../components/Input'
 import { Select } from '../../../components/Select'
@@ -18,11 +19,14 @@ import {
   updateDormitory,
 } from '../../../api/dormitoryApi'
 import { listRequiredDocuments } from '../../../api/documentApi'
+import { listReportTemplates } from '../../../api/reportTemplateApi'
 import { uploadFile } from '../../../api/uploadApi'
 import type { DormitoryImage, DormitoryRequiredDocument, DormitoryType } from '../../../types/dormitories'
 import type { RequiredDocument } from '../../../types/documents'
+import type { ReportTemplate } from '../../../types/reports'
 
 export function DormitoryFormPage() {
+  const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const isEdit = Boolean(id)
   const navigate = useNavigate()
@@ -42,6 +46,9 @@ export function DormitoryFormPage() {
   const [builtYear, setBuiltYear] = useState('')
   const [commissionedYear, setCommissionedYear] = useState('')
   const [ownershipForm, setOwnershipForm] = useState('')
+  const [closedForApplications, setClosedForApplications] = useState(false)
+  const [defaultReportTemplateId, setDefaultReportTemplateId] = useState('')
+  const [reportTemplates, setReportTemplates] = useState<ReportTemplate[]>([])
 
   const [loadError, setLoadError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -67,6 +74,7 @@ export function DormitoryFormPage() {
 
   useEffect(() => {
     listRequiredDocuments().then(setCatalog).catch(() => {})
+    listReportTemplates().then(setReportTemplates).catch(() => {})
     if (!id) return
     getDormitory(id)
       .then((d) => {
@@ -85,8 +93,10 @@ export function DormitoryFormPage() {
         setBuiltYear(d.built_year?.slice(0, 10) ?? '')
         setCommissionedYear(d.commissioned_year?.slice(0, 10) ?? '')
         setOwnershipForm(d.ownership_form ?? '')
+        setClosedForApplications(d.closed_for_applications)
+        setDefaultReportTemplateId(d.default_report_template_id ?? '')
       })
-      .catch((err) => setLoadError(extractErrorMessage(err, 'Жүктеу сәтсіз аяқталды')))
+      .catch((err) => setLoadError(extractErrorMessage(err, t('admin.common.loadError'))))
     loadImages(id)
     loadDocuments(id)
   }, [id])
@@ -111,6 +121,8 @@ export function DormitoryFormPage() {
       built_year: builtYear || null,
       commissioned_year: commissionedYear || null,
       ownership_form: ownershipForm.trim() || null,
+      closed_for_applications: closedForApplications,
+      default_report_template_id: defaultReportTemplateId || null,
     }
     try {
       if (isEdit && id) {
@@ -121,7 +133,7 @@ export function DormitoryFormPage() {
         navigate(`/admin/dormitories/${created.id}/edit`, { replace: true })
       }
     } catch (err) {
-      setSubmitError(extractErrorMessage(err, 'Сақтау сәтсіз аяқталды'))
+      setSubmitError(extractErrorMessage(err, t('admin.common.saveFailed')))
     } finally {
       setIsSubmitting(false)
     }
@@ -137,7 +149,7 @@ export function DormitoryFormPage() {
       setNewImageFile(null)
       loadImages(id)
     } catch (err) {
-      setImageError(extractErrorMessage(err, 'Сурет қосу сәтсіз аяқталды'))
+      setImageError(extractErrorMessage(err, t('admin.dormitories.addImageFailed')))
     } finally {
       setIsUploadingImage(false)
     }
@@ -149,7 +161,7 @@ export function DormitoryFormPage() {
       await deleteDormitoryImage(id, imageId)
       loadImages(id)
     } catch (err) {
-      setImageError(extractErrorMessage(err, 'Суретті өшіру сәтсіз аяқталды'))
+      setImageError(extractErrorMessage(err, t('admin.dormitories.deleteImageFailed')))
     }
   }
 
@@ -166,7 +178,7 @@ export function DormitoryFormPage() {
       }
       loadDocuments(id)
     } catch (err) {
-      setDocumentError(extractErrorMessage(err, 'Құжатты сақтау сәтсіз аяқталды'))
+      setDocumentError(extractErrorMessage(err, t('admin.dormitories.saveDocumentFailed')))
     } finally {
       setTogglingDocId(null)
     }
@@ -177,16 +189,16 @@ export function DormitoryFormPage() {
   return (
     <div className="flex flex-col gap-6">
       <Button variant="secondary" className="self-start" onClick={() => navigate('/admin/dormitories')}>
-        ← Артқа
+        ← {t('admin.common.back')}
       </Button>
 
-      <Card title={isEdit ? 'Жатақхананы өзгерту' : 'Жаңа жатақхана'}>
+      <Card title={isEdit ? t('admin.dormitories.editTitle') : t('admin.dormitories.new')}>
         <form id="dormitory-form" className="flex flex-col gap-4" onSubmit={handleSubmit}>
           {submitError && <Alert variant="error" message={submitError} />}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Input label="Атауы" value={name} onChange={(e) => setName(e.target.value)} required />
+            <Input label={t('admin.dormitories.name')} value={name} onChange={(e) => setName(e.target.value)} required />
             <Input
-              label="Мекен-жайы"
+              label={t('admin.dormitories.address')}
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               required
@@ -195,27 +207,27 @@ export function DormitoryFormPage() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Input
-              label="Байланыс телефоны"
+              label={t('admin.dormitories.contactPhone')}
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value.replace(/[^0-9+()\s-]/g, ''))}
             />
             <Select
-              label="Жатақхана түрі"
+              label={t('admin.dormitories.type')}
               value={dormType}
               onChange={(e) => setDormType(e.target.value as DormitoryType | '')}
               required
             >
-              <option value="">Таңдаңыз</option>
-              <option value="sectional">Секциялық (Sectional)</option>
-              <option value="corridor">Дәліздік (Corridor)</option>
-              <option value="block">Блоктық (Block)</option>
+              <option value="">{t('admin.common.select')}</option>
+              <option value="sectional">{t('admin.dormitories.typeSectional')}</option>
+              <option value="corridor">{t('admin.dormitories.typeCorridor')}</option>
+              <option value="block">{t('admin.dormitories.typeBlock')}</option>
             </Select>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Input
-              label="Қабат саны"
+              label={t('admin.dormitories.floorCount')}
               type="number"
               min={0}
               value={floorCount}
@@ -223,7 +235,7 @@ export function DormitoryFormPage() {
               required
             />
             <Input
-              label="Жалпы бөлме саны"
+              label={t('admin.dormitories.totalRoomsTarget')}
               type="number"
               min={0}
               value={totalRoomsTarget}
@@ -231,7 +243,7 @@ export function DormitoryFormPage() {
               required
             />
             <Input
-              label="Жалпы орын саны"
+              label={t('admin.dormitories.totalCapacity')}
               type="number"
               min={0}
               value={totalCapacity}
@@ -242,7 +254,7 @@ export function DormitoryFormPage() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Input
-              label="Ерлерге арналған бөлме саны"
+              label={t('admin.dormitories.roomsMale')}
               type="number"
               min={0}
               value={roomsMale}
@@ -250,7 +262,7 @@ export function DormitoryFormPage() {
               required
             />
             <Input
-              label="Қыздарға арналған бөлме саны"
+              label={t('admin.dormitories.roomsFemale')}
               type="number"
               min={0}
               value={roomsFemale}
@@ -258,7 +270,7 @@ export function DormitoryFormPage() {
               required
             />
             <Input
-              label="Ортақ бөлме саны"
+              label={t('admin.dormitories.roomsMixed')}
               type="number"
               min={0}
               value={roomsMixed}
@@ -268,14 +280,14 @@ export function DormitoryFormPage() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Input
-              label="Айлық жалдау ақысы (T)"
+              label={t('admin.dormitories.monthlyPayment')}
               type="number"
               min={0}
               value={monthlyPayment}
               onChange={(e) => setMonthlyPayment(e.target.value)}
             />
             <Input
-              label="Жылдық жалдау ақысы (T)"
+              label={t('admin.dormitories.yearlyPayment')}
               type="number"
               min={0}
               value={yearlyPayment}
@@ -285,13 +297,13 @@ export function DormitoryFormPage() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Input
-              label="Салынған жылы"
+              label={t('admin.dormitories.builtYear')}
               type="date"
               value={builtYear}
               onChange={(e) => setBuiltYear(e.target.value)}
             />
             <Input
-              label="Пайдалануға берілген жылы"
+              label={t('admin.dormitories.commissionedYear')}
               type="date"
               value={commissionedYear}
               onChange={(e) => setCommissionedYear(e.target.value)}
@@ -299,17 +311,44 @@ export function DormitoryFormPage() {
           </div>
 
           <Input
-            label="Меншік нысаны (Ownership Form)"
+            label={t('admin.dormitories.ownershipForm')}
             value={ownershipForm}
             onChange={(e) => setOwnershipForm(e.target.value)}
-            placeholder="мысалы: university"
+            placeholder={t('admin.dormitories.ownershipFormPlaceholder')}
           />
 
+          <label className="flex cursor-pointer items-start gap-2.5 text-sm text-sand-100">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4.5 w-4.5 accent-clay-500"
+              checked={closedForApplications}
+              onChange={(e) => setClosedForApplications(e.target.checked)}
+            />
+            <span>
+              {t('admin.dormitories.closedForApplications')}
+              <span className="mt-0.5 block text-xs font-normal text-sand-300">
+                {t('admin.dormitories.closedForApplicationsHint')}
+              </span>
+            </span>
+          </label>
+
+          <Select
+            label={t('admin.dormitories.defaultTemplate')}
+            value={defaultReportTemplateId}
+            onChange={(e) => setDefaultReportTemplateId(e.target.value)}
+          >
+            <option value="">{t('admin.common.none')}</option>
+            {reportTemplates.map((tpl) => (
+              <option key={tpl.id} value={tpl.id}>
+                {tpl.name}
+              </option>
+            ))}
+          </Select>
         </form>
       </Card>
 
       {isEdit && id && (
-        <Card title="Суреттер">
+        <Card title={t('admin.dormitories.images')}>
           {imageError && <Alert variant="error" message={imageError} />}
           <ul className="mb-4 flex flex-col gap-2">
             {images.map((img) => (
@@ -327,19 +366,19 @@ export function DormitoryFormPage() {
                   className="text-clay-400 hover:underline"
                   onClick={() => handleDeleteImage(img.id)}
                 >
-                  Өшіру
+                  {t('common.delete')}
                 </button>
               </li>
             ))}
-            {images.length === 0 && <p className="text-sm text-sand-300">Сурет қосылмаған</p>}
+            {images.length === 0 && <p className="text-sm text-sand-300">{t('admin.dormitories.noImages')}</p>}
           </ul>
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-sand-200">
-              Сурет
+              {t('admin.dormitories.image')}
               {images.length === 0 ? (
                 <span className="text-clay-400"> *</span>
               ) : (
-                <span className="ml-1 text-xs font-normal text-sand-400">(міндетті емес)</span>
+                <span className="ml-1 text-xs font-normal text-sand-400">{t('admin.common.optional')}</span>
               )}
             </label>
             <div className="flex gap-2">
@@ -357,7 +396,7 @@ export function DormitoryFormPage() {
                 isLoading={isUploadingImage}
                 disabled={!newImageFile}
               >
-                Қосу
+                {t('admin.common.add')}
               </Button>
             </div>
           </div>
@@ -365,12 +404,10 @@ export function DormitoryFormPage() {
       )}
 
       {isEdit && id && (
-        <Card title="Қажетті құжаттар">
+        <Card title={t('admin.dormitories.requiredDocuments')}>
           {documentError && <Alert variant="error" message={documentError} />}
           {catalog.length === 0 && (
-            <p className="text-sm text-sand-300">
-              Каталогта құжат жоқ — алдымен "Құжаттар" бетінен құжат қосыңыз.
-            </p>
+            <p className="text-sm text-sand-300">{t('admin.dormitories.emptyDocumentCatalog')}</p>
           )}
           <ul className="flex flex-col gap-2">
             {catalog.map((doc) => {
@@ -394,7 +431,7 @@ export function DormitoryFormPage() {
       )}
 
       <Button type="submit" form="dormitory-form" isLoading={isSubmitting} className="self-start">
-        Сақтау
+        {t('admin.common.save')}
       </Button>
     </div>
   )

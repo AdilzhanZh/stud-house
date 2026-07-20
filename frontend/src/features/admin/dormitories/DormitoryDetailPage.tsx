@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { ChevronLeft } from 'lucide-react'
 import { Card } from '../../../components/Card'
 import { Button } from '../../../components/Button'
@@ -16,21 +18,22 @@ interface RoomRow extends Room {
   residentCount: number
 }
 
-function restrictionsSummary(room: Room): string {
+function restrictionsSummary(room: Room, t: TFunction): string {
   const parts: string[] = []
   if (room.restrictions.gender) {
-    parts.push(room.restrictions.gender === 'male' ? 'Ер' : 'Әйел')
+    parts.push(room.restrictions.gender === 'male' ? t('admin.dormitories.male') : t('admin.dormitories.female'))
   }
   if ((room.restrictions.courses ?? []).length > 0) {
-    parts.push(`${room.restrictions.courses.join(',')} курс`)
+    parts.push(t('admin.dormitories.coursesRestriction', { courses: room.restrictions.courses.join(',') }))
   }
   if ((room.restrictions.benefit_ids ?? []).length > 0) {
-    parts.push(`${room.restrictions.benefit_ids.length} льгота`)
+    parts.push(t('admin.dormitories.benefitsRestriction', { count: room.restrictions.benefit_ids.length }))
   }
-  return parts.length > 0 ? parts.join(', ') : 'Шектеусіз'
+  return parts.length > 0 ? parts.join(', ') : t('admin.dormitories.unrestricted')
 }
 
 export function DormitoryDetailPage() {
+  const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
@@ -54,11 +57,11 @@ export function DormitoryDetailPage() {
         )
         setRooms(withResidents)
       })
-      .catch((err) => setError(extractErrorMessage(err, 'Жүктеу сәтсіз аяқталды')))
+      .catch((err) => setError(extractErrorMessage(err, t('admin.common.loadError'))))
   }, [id])
 
   if (error) return <Alert variant="error" message={error} />
-  if (!dormitory || !capacity || !rooms) return <p className="text-sm text-sand-300">Жүктелуде...</p>
+  if (!dormitory || !capacity || !rooms) return <p className="text-sm text-sand-300">{t('admin.common.loading')}</p>
 
   const floorGroups = Object.entries(
     rooms.reduce<Record<number, RoomRow[]>>((byFloor, room) => {
@@ -86,15 +89,15 @@ export function DormitoryDetailPage() {
         onClick={() => navigate('/admin/dormitories')}
         className="inline-flex w-fit items-center gap-1 text-sm font-semibold text-sand-300 hover:text-sand-100"
       >
-        <ChevronLeft className="h-4 w-4" /> Жатақханалар
+        <ChevronLeft className="h-4 w-4" /> {t('admin.layout.dormitories')}
       </button>
-      <h1 className={adminPageHeading}>{dormitory.name} · бөлмелер</h1>
+      <h1 className={adminPageHeading}>{dormitory.name} · {t('admin.dormitories.roomsWord')}</h1>
 
       <Card>
         <p className="text-sm text-sand-300">{dormitory.address}</p>
         <div className="mt-4">
           <div className="mb-1 flex justify-between text-sm text-sand-300">
-            <span>Жалпы орын саны / құрылған орын саны</span>
+            <span>{t('admin.dormitories.bedsProgress')}</span>
             <span>
               {capacity.total_capacity}/{capacity.allocated_beds}
             </span>
@@ -108,7 +111,7 @@ export function DormitoryDetailPage() {
         </div>
         <div className="mt-4">
           <div className="mb-1 flex justify-between text-sm text-sand-300">
-            <span>Жалпы бөлме саны / құрылған бөлме саны</span>
+            <span>{t('admin.dormitories.roomsProgress')}</span>
             <span>
               {capacity.total_rooms_target ?? '—'}/{capacity.rooms_created}
             </span>
@@ -123,8 +126,8 @@ export function DormitoryDetailPage() {
       </Card>
 
       <div className="flex items-center justify-between">
-        <h2 className="font-heading text-lg text-sand-100">Бөлмелер</h2>
-        <Button onClick={() => navigate(`/admin/dormitories/${id}/rooms/new`)}>Жаңа бөлме</Button>
+        <h2 className="font-heading text-lg text-sand-100">{t('admin.dormitories.roomsWord')}</h2>
+        <Button onClick={() => navigate(`/admin/dormitories/${id}/rooms/new`)}>{t('admin.dormitories.newRoom')}</Button>
       </div>
 
       {floorGroups.length > 0 && (
@@ -141,7 +144,7 @@ export function DormitoryDetailPage() {
                     : 'bg-navy-800 text-sand-300 hover:bg-navy-700'
                 }`}
               >
-                {floor}-қабат
+                {t('admin.dormitories.floorLabel', { floor })}
               </button>
             ))}
           </div>
@@ -151,14 +154,13 @@ export function DormitoryDetailPage() {
           />
           <div className="flex flex-wrap gap-4 text-xs text-sand-300">
             <span className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded ring-1 ring-inset ring-mint-500/30 bg-mint-500/10" /> Бос
+              <span className="h-3 w-3 rounded ring-1 ring-inset ring-mint-500/30 bg-mint-500/10" /> {t('admin.dormitories.free')}
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded ring-1 ring-inset ring-amber-400/30 bg-amber-500/10" /> Ішінара
-              толған
+              <span className="h-3 w-3 rounded ring-1 ring-inset ring-amber-400/30 bg-amber-500/10" /> {t('admin.dormitories.partiallyFull')}
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded ring-1 ring-inset ring-clay-500/30 bg-clay-500/10" /> Толған
+              <span className="h-3 w-3 rounded ring-1 ring-inset ring-clay-500/30 bg-clay-500/10" /> {t('admin.dormitories.full')}
             </span>
           </div>
         </div>
@@ -168,14 +170,14 @@ export function DormitoryDetailPage() {
         <table className="w-full text-left text-sm">
           <thead className={adminTheadClass}>
             <tr>
-              <th className={adminCellClass}>Бөлме №</th>
-              <th className={adminCellClass}>Қабат</th>
-              <th className={adminCellClass}>Сыйымдылық</th>
-              <th className={adminCellClass}>Ауданы</th>
-              <th className={adminCellClass}>Жабдықтаулар</th>
-              <th className={adminCellClass}>Тұрғындар</th>
-              <th className={adminCellClass}>Шектеулер</th>
-              <th className={adminCellClass}>Әрекеттер</th>
+              <th className={adminCellClass}>{t('admin.dormitories.roomNumber')}</th>
+              <th className={adminCellClass}>{t('admin.dormitories.floor')}</th>
+              <th className={adminCellClass}>{t('admin.dormitories.capacity')}</th>
+              <th className={adminCellClass}>{t('admin.dormitories.area')}</th>
+              <th className={adminCellClass}>{t('admin.dormitories.equipment')}</th>
+              <th className={adminCellClass}>{t('admin.layout.residents')}</th>
+              <th className={adminCellClass}>{t('admin.dormitories.restrictions')}</th>
+              <th className={adminCellClass}>{t('admin.dormitories.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -187,20 +189,20 @@ export function DormitoryDetailPage() {
                 <td className={`${adminCellClass} text-sand-300`}>{room.area_sq_m ?? '—'}</td>
                 <td className={`${adminCellClass} text-sand-300`}>{room.equipment ?? '—'}</td>
                 <td className={`${adminCellClass} text-sand-300`}>{room.residentCount}</td>
-                <td className={`${adminCellClass} text-sand-300`}>{restrictionsSummary(room)}</td>
+                <td className={`${adminCellClass} text-sand-300`}>{restrictionsSummary(room, t)}</td>
                 <td className={adminCellClass}>
                   <div className="flex gap-3">
                     <button
                       className="font-semibold text-turquoise-400 hover:text-turquoise-300"
                       onClick={() => navigate(`/admin/rooms/${room.id}/edit`)}
                     >
-                      Өзгерту
+                      {t('admin.common.edit')}
                     </button>
                     <button
                       className="font-semibold text-turquoise-400 hover:text-turquoise-300"
                       onClick={() => navigate(`/admin/rooms/${room.id}/residents`)}
                     >
-                      Тұрғындар
+                      {t('admin.layout.residents')}
                     </button>
                   </div>
                 </td>
@@ -209,7 +211,7 @@ export function DormitoryDetailPage() {
             {rooms.length === 0 && (
               <tr>
                 <td className={`${adminCellClass} text-sand-300`} colSpan={8}>
-                  Бөлме жоқ
+                  {t('admin.dormitories.noRooms')}
                 </td>
               </tr>
             )}

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Card } from '../../../components/Card'
 import { Alert } from '../../../components/Alert'
 import { StatusBadge } from '../../../components/StatusBadge'
@@ -11,6 +12,7 @@ import { listDormitories } from '../../../api/dormitoryApi'
 import { listUsers } from '../../../api/adminUserApi'
 import { listBenefits, listStudentBenefits } from '../../../api/benefitApi'
 import { downloadApplicationPdf } from '../../../utils/applicationPdf'
+import { formatDate } from '../../../utils/dateFormat'
 import { markApplicationsSeenNow } from './applicationsSeen'
 import {
   adminCellClass,
@@ -22,18 +24,19 @@ import {
 import type { Application, ApplicationStatus } from '../../../types/applications'
 
 const STATUSES: ApplicationStatus[] = ['pending', 'needs_correction', 'approved', 'rejected']
-const STATUS_LABELS: Record<ApplicationStatus | 'all', string> = {
-  all: 'Барлығы',
-  pending: 'Жаңа',
-  needs_correction: 'Түзетуде',
-  approved: 'Мақұлданды',
-  rejected: 'Бас тартылды',
-  manager_review: 'Қаралуда',
-  settled: 'Аяқталды',
-}
 
 export function ApplicationQueuePage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
+  const STATUS_LABELS: Record<ApplicationStatus | 'all', string> = {
+    all: t('admin.applications.statusAll'),
+    pending: t('admin.applications.statusNew'),
+    needs_correction: t('admin.applications.statusCorrection'),
+    approved: t('status.approved'),
+    rejected: t('admin.applications.statusRejected'),
+    manager_review: t('status.manager_review'),
+    settled: t('status.settled'),
+  }
   const [activeFilter, setActiveFilter] = useState<ApplicationStatus | 'all'>('all')
   const [applications, setApplications] = useState<Application[] | null>(null)
   const [namesById, setNamesById] = useState<Record<string, string>>({})
@@ -80,7 +83,7 @@ export function ApplicationQueuePage() {
         if (!cancelled) markApplicationsSeenNow()
       })
       .catch((err) => {
-        if (!cancelled) setError(extractErrorMessage(err, 'Өтініштерді жүктеу сәтсіз аяқталды'))
+        if (!cancelled) setError(extractErrorMessage(err, t('admin.applications.loadError')))
       })
     return () => {
       cancelled = true
@@ -126,7 +129,7 @@ export function ApplicationQueuePage() {
 
   return (
     <div className="flex flex-col gap-3.5">
-      <h1 className={adminPageHeading}>Өтініштер</h1>
+      <h1 className={adminPageHeading}>{t('admin.layout.applications')}</h1>
 
       <div className="flex flex-wrap gap-2">
         {(['all', ...STATUSES] as const).map((status) => (
@@ -145,17 +148,17 @@ export function ApplicationQueuePage() {
       </div>
 
       {error && <Alert variant="error" message={error} />}
-      {!error && !applications && <p className="text-sm text-sand-300">Жүктелуде...</p>}
+      {!error && !applications && <p className="text-sm text-sand-300">{t('admin.common.loading')}</p>}
 
       {applications && (
         <>
           <div className="max-w-xs">
             <Select
-              label="Жатақхана бойынша сүзгі"
+              label={t('admin.applications.dormitoryFilter')}
               value={dormitoryFilter}
               onChange={(e) => setDormitoryFilter(e.target.value)}
             >
-              <option value="">Барлық жатақханалар</option>
+              <option value="">{t('admin.applications.allDormitories')}</option>
               {Object.entries(dormitoryNamesById).map(([id, name]) => (
                 <option key={id} value={id}>
                   {name}
@@ -168,11 +171,11 @@ export function ApplicationQueuePage() {
             <table className="w-full text-left text-sm">
               <thead className={adminTheadClass}>
                 <tr>
-                  <th className={adminCellClass}>Студент</th>
-                  <th className={adminCellClass}>Жатақхана</th>
-                  <th className={adminCellClass}>Приоритет</th>
-                  <th className={adminCellClass}>Күні</th>
-                  <th className={adminCellClass}>Статус</th>
+                  <th className={adminCellClass}>{t('admin.applications.student')}</th>
+                  <th className={adminCellClass}>{t('admin.layout.dormitories')}</th>
+                  <th className={adminCellClass}>{t('admin.applications.priority')}</th>
+                  <th className={adminCellClass}>{t('admin.applications.date')}</th>
+                  <th className={adminCellClass}>{t('admin.applications.status')}</th>
                   <th className={adminCellClass} />
                 </tr>
               </thead>
@@ -193,7 +196,7 @@ export function ApplicationQueuePage() {
                       {priorityByStudent[app.student_id] ?? 1}
                     </td>
                     <td className={`${adminCellClass} text-sand-300`}>
-                      {new Date(app.created_at).toLocaleDateString('kk-KZ')}
+                      {formatDate(app.created_at)}
                     </td>
                     <td className={adminCellClass}>
                       <StatusBadge status={app.status} />
@@ -206,7 +209,7 @@ export function ApplicationQueuePage() {
                 {visibleApplications?.length === 0 && (
                   <tr>
                     <td className={`${adminCellClass} text-sand-300`} colSpan={6}>
-                      Өтініш жоқ
+                      {t('admin.applications.empty')}
                     </td>
                   </tr>
                 )}

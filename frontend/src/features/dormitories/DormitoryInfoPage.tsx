@@ -130,12 +130,16 @@ export function DormitoryInfoPage() {
         </div>
       </Card>
 
-      <Button
-        className="w-full"
-        onClick={() => navigate(`/applications/new?dormitory_id=${dormitory.id}`)}
-      >
-        {t('dorm.applyButton')}
-      </Button>
+      {dormitory.closed_for_applications ? (
+        <Alert variant="warning" message={t('dorm.closedNotice')} />
+      ) : (
+        <Button
+          className="w-full"
+          onClick={() => navigate(`/applications/new?dormitory_id=${dormitory.id}`)}
+        >
+          {t('dorm.applyButton')}
+        </Button>
+      )}
     </div>
   )
 }

@@ -11,7 +11,7 @@ import { useUnreadCount } from '../features/notifications/useUnreadCount'
 type MobileSection = 'home' | 'dorm' | 'apps' | 'profile' | null
 
 // The mobile tab bar groups every step of the application flow (wizard,
-// my applications, detail, contracts, payment) into one "Өтініштер" tab,
+// my applications, detail, contracts) into one "Өтініштер" tab,
 // mirroring the design handoff's tabMap. The desktop pill nav is more
 // granular — it has five separate pills for that same flow, so it gets its
 // own per-route matcher below instead of reusing this section grouping.

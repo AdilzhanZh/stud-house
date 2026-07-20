@@ -305,6 +305,30 @@ func (s *UserService) SetUserPassword(ctx context.Context, id uuid.UUID, newPass
 	return s.users.UpdatePassword(ctx, id, passwordHash)
 }
 
+// ChangeOwnPassword lets any authenticated user change their own password.
+// Unlike SetUserPassword (admin-only, no old-password check — an admin
+// resetting a locked-out user's access may not know their old password),
+// this verifies currentPassword against the stored hash first, since the
+// caller here already has full account access and this is a self-service
+// action rather than a recovery one.
+func (s *UserService) ChangeOwnPassword(ctx context.Context, id uuid.UUID, currentPassword, newPassword string) error {
+	if len(newPassword) < 8 {
+		return apperror.BadRequest("құпия сөз кемінде 8 таңбадан тұруы керек")
+	}
+	user, err := s.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if err := hasher.ComparePassword(user.PasswordHash, currentPassword); err != nil {
+		return apperror.BadRequest("ағымдағы құпия сөз қате")
+	}
+	passwordHash, err := hasher.HashPassword(newPassword)
+	if err != nil {
+		return err
+	}
+	return s.users.UpdatePassword(ctx, id, passwordHash)
+}
+
 // DeleteUser is admin-only. Callers must reject self-deletion before calling
 // this (an admin locking themselves out has no recovery path in this app).
 func (s *UserService) DeleteUser(ctx context.Context, id uuid.UUID) error {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Card } from '../../../components/Card'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
@@ -7,6 +8,7 @@ import { decideStudentApproval, listPendingStudents } from '../../../api/adminUs
 import type { User } from '../../../types'
 
 export function PendingStudentsPage() {
+  const { t } = useTranslation()
   const [students, setStudents] = useState<User[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -15,7 +17,7 @@ export function PendingStudentsPage() {
   function load() {
     listPendingStudents()
       .then(setStudents)
-      .catch((err) => setError(extractErrorMessage(err, 'Тіркелгілерді жүктеу сәтсіз аяқталды')))
+      .catch((err) => setError(extractErrorMessage(err, t('admin.users.loadPendingError'))))
   }
 
   useEffect(load, [])
@@ -27,7 +29,7 @@ export function PendingStudentsPage() {
       await decideStudentApproval(id, action)
       load()
     } catch (err) {
-      setActionError(extractErrorMessage(err, 'Әрекет сәтсіз аяқталды'))
+      setActionError(extractErrorMessage(err, t('admin.common.actionFailed')))
     } finally {
       setSubmittingId(null)
     }
@@ -35,11 +37,11 @@ export function PendingStudentsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-[23px] font-bold text-sand-100">Күтіп тұрған тіркелгілер</h1>
+      <h1 className="text-[23px] font-bold text-sand-100">{t('admin.layout.pendingStudents')}</h1>
 
       {error && <Alert variant="error" message={error} />}
       {actionError && <Alert variant="error" message={actionError} />}
-      {!error && !students && <p className="text-sm text-sand-300">Жүктелуде...</p>}
+      {!error && !students && <p className="text-sm text-sand-300">{t('admin.common.loading')}</p>}
 
       <div className="flex flex-col gap-3">
         {students?.map((s) => (
@@ -48,29 +50,29 @@ export function PendingStudentsPage() {
               <div>
                 <p className="font-medium text-sand-100">{s.full_name}</p>
                 <p className="text-sm text-sand-300">{s.email}</p>
-                <p className="text-sm text-sand-300">Телефон: {s.phone || '—'}</p>
-                <p className="font-mono text-sm text-sand-300">ЖСН (ИИН): {s.iin ?? '—'}</p>
+                <p className="text-sm text-sand-300">{t('admin.applications.phone')}: {s.phone || '—'}</p>
+                <p className="font-mono text-sm text-sand-300">{t('admin.applications.iin')}: {s.iin ?? '—'}</p>
               </div>
               <div className="flex shrink-0 gap-3">
                 <Button
                   onClick={() => handleDecision(s.id, 'approve')}
                   isLoading={submittingId === s.id}
                 >
-                  Растау
+                  {t('common.confirm')}
                 </Button>
                 <Button
                   variant="danger"
                   onClick={() => handleDecision(s.id, 'reject')}
                   isLoading={submittingId === s.id}
                 >
-                  Қабылдамау
+                  {t('admin.committee.disapprove')}
                 </Button>
               </div>
             </div>
           </Card>
         ))}
         {students && students.length === 0 && (
-          <p className="text-sm text-sand-300">Күтіп тұрған тіркелгі жоқ</p>
+          <p className="text-sm text-sand-300">{t('admin.users.noPendingStudents')}</p>
         )}
       </div>
     </div>

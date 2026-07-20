@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Check } from 'lucide-react'
 import { Card } from '../../../components/Card'
 import { Input } from '../../../components/Input'
@@ -19,13 +20,13 @@ interface SentEntry {
   sent: number
 }
 
-const AUDIENCE_LABELS: Record<BroadcastAudience, string> = {
-  all: 'Барлығы',
-  dormitory: 'Жатақхана',
-  student: 'Жеке студент',
-}
-
 export function NotificationBroadcastPage() {
+  const { t } = useTranslation()
+  const AUDIENCE_LABELS: Record<BroadcastAudience, string> = {
+    all: t('admin.notifications.audienceAll'),
+    dormitory: t('admin.layout.dormitories'),
+    student: t('admin.notifications.audienceStudent'),
+  }
   const [dormitories, setDormitories] = useState<Dormitory[]>([])
   const [students, setStudents] = useState<User[]>([])
   const [audience, setAudience] = useState<BroadcastAudience>('all')
@@ -50,15 +51,15 @@ export function NotificationBroadcastPage() {
   async function handleSend() {
     setError(null)
     if (audience === 'dormitory' && !dormitoryId) {
-      setError('Жатақхананы таңдаңыз')
+      setError(t('admin.notifications.selectDormitory'))
       return
     }
     if (audience === 'student' && !studentId) {
-      setError('Студентті таңдаңыз')
+      setError(t('admin.notifications.selectStudent'))
       return
     }
     if (!title.trim() || !body.trim()) {
-      setError('Тақырып пен мәтін міндетті')
+      setError(t('admin.notifications.titleBodyRequired'))
       return
     }
     setIsSending(true)
@@ -75,7 +76,7 @@ export function NotificationBroadcastPage() {
       setTitle('')
       setBody('')
     } catch (err) {
-      setError(extractErrorMessage(err, 'Хабарландыруды жіберу сәтсіз аяқталды'))
+      setError(extractErrorMessage(err, t('admin.notifications.sendFailed')))
     } finally {
       setIsSending(false)
     }
@@ -83,23 +84,23 @@ export function NotificationBroadcastPage() {
 
   return (
     <div className="flex max-w-2xl flex-col gap-5">
-      <h1 className={adminPageHeading}>Хабарландыру</h1>
+      <h1 className={adminPageHeading}>{t('admin.layout.broadcast')}</h1>
 
       {justSent !== null ? (
         <Card className="flex flex-col items-center gap-3 py-7 text-center">
           <span className="flex h-14 w-14 items-center justify-center rounded-full bg-mint-500/15">
             <Check className="h-6 w-6 text-mint-400" strokeWidth={2.5} />
           </span>
-          <p className="text-[17px] font-bold text-sand-100">Хабарландыру жіберілді ({justSent} студентке)</p>
-          <Button onClick={() => setJustSent(null)}>Жаңа хабарландыру жасау</Button>
+          <p className="text-[17px] font-bold text-sand-100">{t('admin.notifications.sentSuccess', { count: justSent })}</p>
+          <Button onClick={() => setJustSent(null)}>{t('admin.notifications.newBroadcast')}</Button>
         </Card>
       ) : (
         <Card className="flex flex-col gap-3.5">
-          <p className="text-[15px] font-bold text-sand-100">Хабарландыру жіберу</p>
+          <p className="text-[15px] font-bold text-sand-100">{t('admin.notifications.sendBroadcast')}</p>
           {error && <Alert variant="error" message={error} />}
 
           <div>
-            <p className="mb-2 text-sm font-semibold text-sand-200">Кімге</p>
+            <p className="mb-2 text-sm font-semibold text-sand-200">{t('admin.notifications.toWhom')}</p>
             <div className="flex flex-wrap gap-2">
               {(['all', 'dormitory', 'student'] as const).map((a) => (
                 <button
@@ -118,8 +119,8 @@ export function NotificationBroadcastPage() {
           </div>
 
           {audience === 'dormitory' && (
-            <Select label="Жатақхана" value={dormitoryId} onChange={(e) => setDormitoryId(e.target.value)} required>
-              <option value="">Таңдаңыз</option>
+            <Select label={t('admin.layout.dormitories')} value={dormitoryId} onChange={(e) => setDormitoryId(e.target.value)} required>
+              <option value="">{t('admin.common.select')}</option>
               {dormitories.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
@@ -129,8 +130,8 @@ export function NotificationBroadcastPage() {
           )}
 
           {audience === 'student' && (
-            <Select label="Студент" value={studentId} onChange={(e) => setStudentId(e.target.value)} required>
-              <option value="">Таңдаңыз</option>
+            <Select label={t('admin.applications.student')} value={studentId} onChange={(e) => setStudentId(e.target.value)} required>
+              <option value="">{t('admin.common.select')}</option>
               {students.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.full_name}
@@ -139,15 +140,15 @@ export function NotificationBroadcastPage() {
             </Select>
           )}
 
-          <Input label="Тақырып" name="title" value={title} onChange={(e) => setTitle(e.target.value)} required />
+          <Input label={t('admin.notifications.titleLabel')} name="title" value={title} onChange={(e) => setTitle(e.target.value)} required />
 
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-sand-200">
-              Мәтін <span className="text-clay-400">*</span>
+              {t('admin.notifications.bodyLabel')} <span className="text-clay-400">*</span>
             </label>
             <textarea
               rows={4}
-              placeholder="Хабарлама мәтінін жазыңыз..."
+              placeholder={t('admin.notifications.bodyPlaceholder')}
               className="w-full resize-y rounded-[14px] border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sm text-sand-100 outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
               value={body}
               onChange={(e) => setBody(e.target.value)}
@@ -155,20 +156,20 @@ export function NotificationBroadcastPage() {
           </div>
 
           <Button className="self-start" onClick={handleSend} isLoading={isSending}>
-            Жіберу
+            {t('admin.notifications.send')}
           </Button>
         </Card>
       )}
 
       {sentHistory.length > 0 && (
         <div>
-          <p className="mb-2.5 text-[15px] font-bold text-sand-100">Жіберілген хабарламалар</p>
+          <p className="mb-2.5 text-[15px] font-bold text-sand-100">{t('admin.notifications.sentHistory')}</p>
           <div className="flex flex-col gap-2.5">
             {sentHistory.map((h, i) => (
               <Card key={i} className="!p-3.5">
                 <p className="text-sm font-semibold text-sand-100">{h.title}</p>
                 <p className="mt-0.5 text-xs text-sand-300">
-                  {h.audienceLabel} · {h.sent} студентке жіберілді
+                  {h.audienceLabel} · {t('admin.notifications.sentToCount', { count: h.sent })}
                 </p>
               </Card>
             ))}

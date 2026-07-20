@@ -315,6 +315,28 @@ func (h *UserHandler) SetPassword(c *gin.Context) {
 	response.OK(c, gin.H{"updated": true})
 }
 
+type changeOwnPasswordRequest struct {
+	CurrentPassword string `json:"current_password" binding:"required"`
+	NewPassword     string `json:"new_password" binding:"required"`
+}
+
+// ChangeOwnPassword is available to any authenticated user: changes the
+// caller's own password after verifying their current one (see
+// UserService.ChangeOwnPassword).
+func (h *UserHandler) ChangeOwnPassword(c *gin.Context) {
+	var req changeOwnPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.BadRequest(err.Error()))
+		return
+	}
+	userID, _ := middleware.UserID(c)
+	if err := h.users.ChangeOwnPassword(c.Request.Context(), userID, req.CurrentPassword, req.NewPassword); err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, gin.H{"updated": true})
+}
+
 // DeleteUser is admin-only. An admin cannot delete their own account.
 func (h *UserHandler) DeleteUser(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))

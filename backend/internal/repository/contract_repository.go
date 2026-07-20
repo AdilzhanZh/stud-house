@@ -13,7 +13,11 @@ import (
 // the row lock acquired by ContractRepository.WithLock.
 type ContractTx interface {
 	SetStatus(ctx context.Context, id uuid.UUID, status domain.ContractStatus, respondedAt *time.Time) error
-	CreatePayment(ctx context.Context, p *domain.Payment) error
+	// MarkApplicationSettled writes directly to the phase-2 applications /
+	// application_status_history tables — called when a contract is
+	// accepted, since accepting it settles the application immediately
+	// (no separate payment-confirmation step).
+	MarkApplicationSettled(ctx context.Context, applicationID uuid.UUID, changedBy uuid.UUID) error
 	// MarkApplicationRejected writes directly to the phase-2 applications /
 	// application_status_history tables (no phase-2 Go file is touched).
 	MarkApplicationRejected(ctx context.Context, applicationID uuid.UUID, comment string, changedBy uuid.UUID) error
@@ -45,7 +49,6 @@ type ContractRepository interface {
 	// ListByStudent joins through applications.student_id, since contracts
 	// carry no student_id of their own (kezeng 3 frontend: GET /contracts/my).
 	ListByStudent(ctx context.Context, studentID uuid.UUID) ([]*domain.Contract, error)
-	GetDormitoryPrice(ctx context.Context, dormitoryID uuid.UUID) (*float64, error)
 
 	WithLock(ctx context.Context, id uuid.UUID, fn func(ctx context.Context, contract *domain.Contract, tx ContractTx) error) error
 }

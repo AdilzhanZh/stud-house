@@ -24,21 +24,23 @@ func NewDormitoryService(dormitories repository.DormitoryRepository, application
 // DormitoryInput bundles the admin "create/edit dormitory" form fields
 // (kept as a struct rather than growing the positional-arg list further).
 type DormitoryInput struct {
-	Name             string
-	Address          string
-	Phone            *string
-	Type             *domain.DormitoryType
-	FloorCount       *int
-	TotalRoomsTarget *int
-	TotalCapacity    int
-	RoomsMale        *int
-	RoomsFemale      *int
-	RoomsMixed       *int
-	MonthlyPayment   *float64
-	YearlyPayment    *float64
-	BuiltYear        *time.Time
-	CommissionedYear *time.Time
-	OwnershipForm    *string
+	Name                    string
+	Address                 string
+	Phone                   *string
+	Type                    *domain.DormitoryType
+	FloorCount              *int
+	TotalRoomsTarget        *int
+	TotalCapacity           int
+	RoomsMale               *int
+	RoomsFemale             *int
+	RoomsMixed              *int
+	MonthlyPayment          *float64
+	YearlyPayment           *float64
+	BuiltYear               *time.Time
+	CommissionedYear        *time.Time
+	OwnershipForm           *string
+	ClosedForApplications   bool
+	DefaultReportTemplateID *uuid.UUID
 }
 
 func validateDormitoryInput(in DormitoryInput) error {
@@ -78,21 +80,23 @@ func validateDormitoryInput(in DormitoryInput) error {
 
 func dormitoryFromInput(in DormitoryInput) *domain.Dormitory {
 	return &domain.Dormitory{
-		Name:             in.Name,
-		Address:          in.Address,
-		Phone:            in.Phone,
-		Type:             in.Type,
-		FloorCount:       in.FloorCount,
-		TotalRoomsTarget: in.TotalRoomsTarget,
-		TotalCapacity:    in.TotalCapacity,
-		RoomsMale:        in.RoomsMale,
-		RoomsFemale:      in.RoomsFemale,
-		RoomsMixed:       in.RoomsMixed,
-		MonthlyPayment:   in.MonthlyPayment,
-		YearlyPayment:    in.YearlyPayment,
-		BuiltYear:        in.BuiltYear,
-		CommissionedYear: in.CommissionedYear,
-		OwnershipForm:    in.OwnershipForm,
+		Name:                    in.Name,
+		Address:                 in.Address,
+		Phone:                   in.Phone,
+		Type:                    in.Type,
+		FloorCount:              in.FloorCount,
+		TotalRoomsTarget:        in.TotalRoomsTarget,
+		TotalCapacity:           in.TotalCapacity,
+		RoomsMale:               in.RoomsMale,
+		RoomsFemale:             in.RoomsFemale,
+		RoomsMixed:              in.RoomsMixed,
+		MonthlyPayment:          in.MonthlyPayment,
+		YearlyPayment:           in.YearlyPayment,
+		BuiltYear:               in.BuiltYear,
+		CommissionedYear:        in.CommissionedYear,
+		OwnershipForm:           in.OwnershipForm,
+		ClosedForApplications:   in.ClosedForApplications,
+		DefaultReportTemplateID: in.DefaultReportTemplateID,
 	}
 }
 
@@ -103,6 +107,9 @@ func (s *DormitoryService) Create(ctx context.Context, in DormitoryInput, create
 	d := dormitoryFromInput(in)
 	d.CreatedBy = createdBy
 	if err := s.dormitories.Create(ctx, d); err != nil {
+		if errors.Is(err, repository.ErrInvalidReference) {
+			return nil, apperror.BadRequest("әдепкі хаттама шаблоны табылмады")
+		}
 		return nil, err
 	}
 	return d, nil
@@ -119,8 +126,8 @@ func (s *DormitoryService) GetByID(ctx context.Context, id uuid.UUID) (*domain.D
 	return d, nil
 }
 
-func (s *DormitoryService) List(ctx context.Context) ([]*domain.Dormitory, error) {
-	return s.dormitories.List(ctx)
+func (s *DormitoryService) List(ctx context.Context, openOnly bool) ([]*domain.Dormitory, error) {
+	return s.dormitories.List(ctx, openOnly)
 }
 
 func (s *DormitoryService) Update(ctx context.Context, id uuid.UUID, in DormitoryInput) (*domain.Dormitory, error) {
@@ -132,6 +139,9 @@ func (s *DormitoryService) Update(ctx context.Context, id uuid.UUID, in Dormitor
 	if err := s.dormitories.Update(ctx, d); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return nil, apperror.NotFound("жатақхана табылмады")
+		}
+		if errors.Is(err, repository.ErrInvalidReference) {
+			return nil, apperror.BadRequest("әдепкі хаттама шаблоны табылмады")
 		}
 		return nil, err
 	}

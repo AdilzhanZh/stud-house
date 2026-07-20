@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Card } from '../../../components/Card'
 import { Button } from '../../../components/Button'
 import { Select } from '../../../components/Select'
@@ -8,10 +9,12 @@ import { extractErrorMessage } from '../../../api/client'
 import { addResident, getRoom, listRoomResidents } from '../../../api/roomApi'
 import { listUsers } from '../../../api/adminUserApi'
 import { listApplications } from '../../../api/applicationAdminApi'
+import { formatDate } from '../../../utils/dateFormat'
 import type { Room, RoomResident } from '../../../types/rooms'
 import type { Application } from '../../../types/applications'
 
 export function RoomResidentsView() {
+  const { t } = useTranslation()
   const { roomId } = useParams<{ roomId: string }>()
   const navigate = useNavigate()
 
@@ -39,7 +42,7 @@ export function RoomResidentsView() {
         setNamesById(Object.fromEntries(students.map((s) => [s.id, s.full_name])))
         setSettledApplications(settled.filter((a) => a.dormitory_id === r.dormitory_id))
       })
-      .catch((err) => setError(extractErrorMessage(err, 'Жүктеу сәтсіз аяқталды')))
+      .catch((err) => setError(extractErrorMessage(err, t('admin.common.loadError'))))
   }
 
   useEffect(load, [roomId])
@@ -53,14 +56,14 @@ export function RoomResidentsView() {
       setSelectedStudentId('')
       load()
     } catch (err) {
-      setAssignError(extractErrorMessage(err, 'Тұрғынды қосу сәтсіз аяқталды'))
+      setAssignError(extractErrorMessage(err, t('admin.rooms.addResidentFailed')))
     } finally {
       setIsAssigning(false)
     }
   }
 
   if (error) return <Alert variant="error" message={error} />
-  if (!room || !residents) return <p className="text-sm text-sand-300">Жүктелуде...</p>
+  if (!room || !residents) return <p className="text-sm text-sand-300">{t('admin.common.loading')}</p>
 
   const residentStudentIds = new Set(residents.map((r) => r.student_id))
   const eligibleApplications = settledApplications.filter(
@@ -74,41 +77,37 @@ export function RoomResidentsView() {
         className="self-start"
         onClick={() => navigate(`/admin/dormitories/${room.dormitory_id}`)}
       >
-        ← Артқа
+        ← {t('admin.common.back')}
       </Button>
 
-      <Card title={`Бөлме ${room.room_number} — тұрғындар`}>
-        {residents.length === 0 && <p className="text-sm text-sand-300">Тұрғын жоқ</p>}
+      <Card title={t('admin.rooms.residentsTitle', { room: room.room_number })}>
+        {residents.length === 0 && <p className="text-sm text-sand-300">{t('admin.rooms.noResidents')}</p>}
         <ul className="flex flex-col gap-2">
           {residents.map((r) => (
             <li key={r.id} className="flex justify-between text-sm">
               <span className="text-sand-100">{namesById[r.student_id] ?? r.student_id}</span>
-              <span className="text-sand-300">
-                {new Date(r.moved_in_at).toLocaleDateString('kk-KZ')}
-              </span>
+              <span className="text-sand-300">{formatDate(r.moved_in_at)}</span>
             </li>
           ))}
         </ul>
       </Card>
 
-      <Card title="Тұрғын қосу">
+      <Card title={t('admin.rooms.addResident')}>
         {assignError && <Alert variant="error" message={assignError} />}
         {eligibleApplications.length === 0 ? (
-          <p className="text-sm text-sand-300">
-            Осы жатақханада бөлмеге орналастыруды күтіп тұрған студент жоқ
-          </p>
+          <p className="text-sm text-sand-300">{t('admin.rooms.noEligibleStudents')}</p>
         ) : (
           <div className="flex flex-col gap-3">
             <Select
-              label="Студент"
+              label={t('admin.applications.student')}
               value={selectedStudentId}
               onChange={(e) => setSelectedStudentId(e.target.value)}
             >
-              <option value="">Таңдаңыз</option>
+              <option value="">{t('admin.common.select')}</option>
               {eligibleApplications.map((a) => (
                 <option key={a.id} value={a.student_id}>
                   {namesById[a.student_id] ?? a.student_id}
-                  {a.preferred_room_id === room.id ? ' (осы бөлмені қалаған)' : ''}
+                  {a.preferred_room_id === room.id ? ` ${t('admin.rooms.preferredThisRoom')}` : ''}
                 </option>
               ))}
             </Select>
@@ -118,7 +117,7 @@ export function RoomResidentsView() {
               disabled={!selectedStudentId}
               className="self-start"
             >
-              Қосу
+              {t('admin.common.add')}
             </Button>
           </div>
         )}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { Bell, Building2, Clock, FileText } from 'lucide-react'
 import { Card } from '../../components/Card'
 import { StatusBadge } from '../../components/StatusBadge'
@@ -17,7 +18,16 @@ import { useAuth } from '../auth/useAuth'
 import type { Application } from '../../types/applications'
 import type { JourneyStep } from '../../components/ApplicationJourneyStepper'
 
-const NEXT_STEP_HINT_STEPS: JourneyStep[] = ['submitted', 'under_review', 'approved', 'contract', 'payment']
+const NEXT_STEP_HINT_STEPS: JourneyStep[] = ['submitted', 'under_review', 'approved', 'contract']
+
+// The application card's action link should always take the student straight
+// to whatever they still need to do — sign the contract, or (once settled)
+// view their room — instead of always opening the application detail page.
+function actionForStep(step: JourneyStep, applicationId: string, t: TFunction): { label: string; to: string } {
+  if (step === 'contract') return { label: t('home.goToContract'), to: '/contracts/my' }
+  if (step === 'settled') return { label: t('home.goToResidence'), to: '/my-residence' }
+  return { label: t('home.openApplication'), to: `/applications/${applicationId}` }
+}
 
 export function HomePage() {
   const { t } = useTranslation()
@@ -43,6 +53,8 @@ export function HomePage() {
 
   const journeys = useApplicationJourneys(latestApplication ? [latestApplication] : null)
   const journey = latestApplication ? journeys[latestApplication.id] : undefined
+  const nextAction =
+    latestApplication && journey?.step ? actionForStep(journey.step, latestApplication.id, t) : null
 
   useEffect(() => {
     if (!latestApplication) return
@@ -76,8 +88,8 @@ export function HomePage() {
 
       <div className="flex flex-col gap-5 md:grid md:grid-cols-2 md:items-start md:gap-5">
         <div className="flex flex-col gap-3.5">
-          {latestApplication && journey?.step ? (
-            <Card onClick={() => navigate(`/applications/${latestApplication.id}`)} className="flex flex-col">
+          {latestApplication && journey?.step && nextAction ? (
+            <Card onClick={() => navigate(nextAction.to)} className="flex flex-col">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">
                   {t('home.myApplication')}
@@ -85,9 +97,9 @@ export function HomePage() {
                 <StatusBadge status={latestApplication.status} />
               </div>
               <p className="mt-2 text-lg font-semibold text-sand-100">{dormitoryName ?? '...'}</p>
-              <SegmentedProgress total={6} filled={journeyStepIndex(journey.step) + 1} className="mt-3" />
+              <SegmentedProgress total={5} filled={journeyStepIndex(journey.step) + 1} className="mt-3" />
               <p className="mt-2 text-sm text-sand-200">{journeyStepCaption(journey.step, t)}</p>
-              <p className="mt-3 text-sm font-semibold text-turquoise-400">{t('home.openApplication')}</p>
+              <p className="mt-3 text-sm font-semibold text-turquoise-400">{nextAction.label}</p>
             </Card>
           ) : applications && applications.length === 0 ? (
             <Card onClick={() => navigate('/dormitories')} className="flex flex-col gap-2">

@@ -2,7 +2,6 @@ import type { TFunction } from 'i18next'
 import type { JourneyStep } from '../../components/ApplicationJourneyStepper'
 import type { ApplicationStatus } from '../../types/applications'
 import type { Contract } from '../../types/contracts'
-import type { Payment } from '../../types/payments'
 
 // Mirrors ApplicationRepository.GetActiveByStudent's SQL filter
 // (status IN ('pending','manager_review','needs_correction')) — the backend
@@ -38,29 +37,35 @@ export function applicationStatusToJourneyStep(status: ApplicationStatus): Journ
   }
 }
 
-// The accurate version of the step above: contract/payment live on separate
-// endpoints, so an 'approved' application could really be sitting at
-// contract-review or payment depending on what's been created for it since.
-// Callers that already have the student's contract/payment lists (Home,
-// Application Detail) should use this instead so the 6-segment progress bar
-// reads the same everywhere, per the design spec's single-source-of-truth
-// note for application status.
+// The accurate version of the step above: contract lives on a separate
+// endpoint, so an 'approved' application could really be sitting at
+// contract-review depending on what's been created for it since. Callers
+// that already have the student's contract list (Home, Application Detail)
+// should use this instead so the 5-segment progress bar reads the same
+// everywhere, per the design spec's single-source-of-truth note for
+// application status. Accepting a contract settles the application
+// immediately (no separate payment-confirmation step), so 'settled' is
+// reached as soon as the contract is accepted — but an application's status
+// stays 'settled' forever even after the student later moves out (approving
+// an exit request only touches room_residents, not applications), so
+// hasActiveResidence lets callers fall back to the same "left the forward
+// path" treatment as rejected once the student no longer actually lives
+// there.
 export function computeJourneyStep(
   status: ApplicationStatus,
   contract: Contract | null,
-  payment: Payment | null,
+  hasActiveResidence: boolean,
 ): JourneyStep | null {
   if (status === 'rejected') return null
-  if (status === 'settled') return 'settled'
+  if (status === 'settled') return hasActiveResidence ? 'settled' : null
   if (status !== 'approved') return applicationStatusToJourneyStep(status)
 
   if (!contract) return 'approved'
   if (contract.status !== 'accepted') return 'contract'
-  if (!payment || payment.status !== 'confirmed') return 'payment'
-  return 'settled'
+  return hasActiveResidence ? 'settled' : null
 }
 
-const STEP_ORDER: JourneyStep[] = ['submitted', 'under_review', 'approved', 'contract', 'payment', 'settled']
+const STEP_ORDER: JourneyStep[] = ['submitted', 'under_review', 'approved', 'contract', 'settled']
 
 export function journeyStepIndex(step: JourneyStep): number {
   return STEP_ORDER.indexOf(step)

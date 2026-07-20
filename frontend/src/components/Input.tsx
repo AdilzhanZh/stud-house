@@ -1,4 +1,5 @@
 import { forwardRef, useState, type InputHTMLAttributes, type WheelEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Eye, EyeOff } from 'lucide-react'
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -10,6 +11,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   { label, error, id, className = '', type, required, onWheel, ...rest },
   ref,
 ) {
+  const { t } = useTranslation()
   const inputId = id ?? rest.name
   const isPassword = type === 'password'
   const [visible, setVisible] = useState(false)
@@ -32,7 +34,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
         {required ? (
           <span className="text-clay-400"> *</span>
         ) : (
-          <span className="ml-1 text-xs font-normal text-sand-400">(міндетті емес)</span>
+          <span className="ml-1 text-xs font-normal text-sand-400">{t('admin.common.optional')}</span>
         )}
       </label>
       <div className="relative">
@@ -56,7 +58,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
             type="button"
             tabIndex={-1}
             onClick={() => setVisible((v) => !v)}
-            aria-label={visible ? 'Құпия сөзді жасыру' : 'Құпия сөзді көрсету'}
+            aria-label={visible ? t('common.hidePassword') : t('common.showPassword')}
             className="absolute inset-y-0 right-0 flex items-center px-3 text-sand-400 transition-colors hover:text-sand-200"
           >
             {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

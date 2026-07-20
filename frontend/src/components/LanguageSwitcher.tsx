@@ -3,19 +3,28 @@ import { useTranslation } from 'react-i18next'
 import { Check, Globe } from 'lucide-react'
 import { storeLanguage, type SupportedLanguage } from '../i18n'
 
-const LANGUAGES: { code: SupportedLanguage; label: string }[] = [
+const ALL_LANGUAGES: { code: SupportedLanguage; label: string }[] = [
   { code: 'kk', label: 'Қазақша' },
   { code: 'ru', label: 'Русский' },
   { code: 'en', label: 'English' },
 ]
 
-export function LanguageSwitcher() {
+interface LanguageSwitcherProps {
+  // Restricts which languages are selectable (e.g. the admin/manager panel
+  // only exposes kk/ru, unlike the full kk/ru/en student-facing switcher).
+  // Defaults to all three.
+  languages?: SupportedLanguage[]
+}
+
+export function LanguageSwitcher({ languages }: LanguageSwitcherProps = {}) {
   const { i18n } = useTranslation()
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
-  const current = (i18n.language as SupportedLanguage) in { kk: 1, ru: 1, en: 1 }
+  const allowed = languages ?? ALL_LANGUAGES.map((l) => l.code)
+  const LANGUAGES = ALL_LANGUAGES.filter((l) => allowed.includes(l.code))
+  const current = allowed.includes(i18n.language as SupportedLanguage)
     ? (i18n.language as SupportedLanguage)
-    : 'kk'
+    : allowed[0]
 
   useEffect(() => {
     if (!open) return

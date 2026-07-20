@@ -5,8 +5,10 @@ import { Card } from '../../components/Card'
 import { Alert } from '../../components/Alert'
 import { StatusBadge } from '../../components/StatusBadge'
 import { SegmentedProgress } from '../../components/SegmentedProgress'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { DeleteIconButton } from '../../components/DeleteIconButton'
 import { extractErrorMessage } from '../../api/client'
-import { listMyApplications } from '../../api/applicationApi'
+import { deleteApplication, listMyApplications } from '../../api/applicationApi'
 import { listDormitories } from '../../api/dormitoryApi'
 import { useApplicationJourneys } from './useApplicationJourneys'
 import { journeyStepCaption, journeyStepIndex } from './statusHelpers'
@@ -20,29 +22,45 @@ export function MyApplicationsPage() {
   const [applications, setApplications] = useState<Application[] | null>(null)
   const [dormitoriesById, setDormitoriesById] = useState<Record<string, Dormitory>>({})
   const [error, setError] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Application | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const journeys = useApplicationJourneys(applications)
 
-  useEffect(() => {
-    let cancelled = false
+  function load() {
     Promise.all([listMyApplications(), listDormitories()])
       .then(([apps, dormitories]) => {
-        if (cancelled) return
         setApplications(apps)
         setDormitoriesById(Object.fromEntries(dormitories.map((d) => [d.id, d])))
       })
       .catch((err) => {
-        if (!cancelled) setError(extractErrorMessage(err, t('home.loadApplicationsError')))
+        setError(extractErrorMessage(err, t('home.loadApplicationsError')))
       })
-    return () => {
-      cancelled = true
+  }
+
+  useEffect(load, [t])
+
+  async function handleConfirmDelete() {
+    if (!deleteTarget) return
+    setDeleteError(null)
+    setIsDeleting(true)
+    try {
+      await deleteApplication(deleteTarget.id)
+      setDeleteTarget(null)
+      load()
+    } catch (err) {
+      setDeleteError(extractErrorMessage(err, t('myApplications.deleteFailed')))
+    } finally {
+      setIsDeleting(false)
     }
-  }, [t])
+  }
 
   return (
     <div className="flex flex-col gap-3.5">
       <h1 className="text-[23px] font-bold text-sand-100">{t('myApplications.title')}</h1>
 
       {error && <Alert variant="error" message={error} />}
+      {deleteError && <Alert variant="error" message={deleteError} />}
       {!error && !applications && <p className="text-sm text-sand-300">{t('myApplications.loading')}</p>}
       {applications && applications.length === 0 && (
         <p className="text-sm text-sand-300">{t('myApplications.empty')}</p>
@@ -67,11 +85,22 @@ export function MyApplicationsPage() {
                     {t('myApplications.submittedOn', { date: formatDate(app.created_at) })}
                   </p>
                 </div>
-                <StatusBadge status={app.status} />
+                <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                  <StatusBadge status={app.status} />
+                  {rejected && (
+                    <DeleteIconButton
+                      label={t('myApplications.deleteButton')}
+                      onClick={() => {
+                        setDeleteError(null)
+                        setDeleteTarget(app)
+                      }}
+                    />
+                  )}
+                </div>
               </div>
               {step && !rejected && (
                 <>
-                  <SegmentedProgress total={6} filled={journeyStepIndex(step) + 1} className="mt-3" />
+                  <SegmentedProgress total={5} filled={journeyStepIndex(step) + 1} className="mt-3" />
                   <p className="mt-2 text-sm text-sand-200">{journeyStepCaption(step, t)}</p>
                 </>
               )}
@@ -79,6 +108,16 @@ export function MyApplicationsPage() {
           )
         })}
       </div>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={t('myApplications.deleteTitle')}
+        message={t('myApplications.deleteConfirm')}
+        danger
+        isLoading={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   )
 }

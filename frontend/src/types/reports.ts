@@ -1,7 +1,11 @@
+export type ReportStudentColumn = 'full_name' | 'email' | 'phone' | 'dormitory_name' | 'room_number'
+
 export interface ReportTemplate {
   id: string
   name: string
-  file_url: string
+  intro_text: string
+  student_columns: ReportStudentColumn[]
+  file_url: string | null
   created_by: string
   created_at: string
 }
@@ -26,7 +30,9 @@ export interface ReportStudent {
   student_email: string
   student_phone: string
   dormitory_id: string
+  dormitory_name: string
   assigned_room_id: string | null
+  room_number: string | null
 }
 
 export type VoteDecision = 'approved' | 'rejected'

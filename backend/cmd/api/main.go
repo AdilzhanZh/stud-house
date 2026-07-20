@@ -47,7 +47,6 @@ func main() {
 	reportTemplateRepo := postgres.NewReportTemplateRepo(pool)
 	reportRepo := postgres.NewReportRepo(pool)
 	contractRepo := postgres.NewContractRepo(pool)
-	paymentRepo := postgres.NewPaymentRepo(pool)
 	exitRequestRepo := postgres.NewExitRequestRepo(pool)
 	transferRequestRepo := postgres.NewTransferRequestRepo(pool)
 
@@ -71,11 +70,10 @@ func main() {
 	notifierService := notifier.New(notificationRepo, userRepo, mailerService)
 	applicationService := service.NewApplicationService(applicationRepo, applicationDocumentRepo, dormitoryRepo, roomRepo, roomService, notifierService)
 	notificationService := service.NewNotificationService(notificationRepo, roomRepo, userRepo, notifierService)
-	reportService := service.NewReportService(reportTemplateRepo, reportRepo, applicationRepo, userRepo, notifierService)
-	contractService := service.NewContractService(contractRepo, applicationRepo, reportRepo, reportTemplateRepo, userRepo, notifierService, cfg.ContractResponseDeadline, cfg.ContractReminderWindow, cfg.PaymentDeadline)
-	paymentService := service.NewPaymentService(paymentRepo, contractRepo, applicationRepo, userRepo, notifierService, cfg.ContractReminderWindow, cfg.PaymentReapplyBlock)
+	reportService := service.NewReportService(reportTemplateRepo, reportRepo, applicationRepo, userRepo, dormitoryRepo, roomRepo, notifierService)
+	contractService := service.NewContractService(contractRepo, applicationRepo, reportRepo, reportTemplateRepo, userRepo, notifierService, cfg.ContractResponseDeadline, cfg.ContractReminderWindow)
 	exitRequestService := service.NewExitRequestService(exitRequestRepo, roomRepo, userRepo, notifierService)
-	transferRequestService := service.NewTransferRequestService(transferRequestRepo, applicationRepo, roomRepo, roomService, userRepo, notifierService)
+	transferRequestService := service.NewTransferRequestService(transferRequestRepo, roomRepo, roomService, userRepo, notifierService)
 
 	// Phase 4 hook into phase 3's vote tally: once a report is approved,
 	// auto-generate contracts for its applications.
@@ -92,7 +90,6 @@ func main() {
 		Notification:    handler.NewNotificationHandler(notificationService),
 		Report:          handler.NewReportHandler(reportService),
 		Contract:        handler.NewContractHandler(contractService, applicationService),
-		Payment:         handler.NewPaymentHandler(paymentService, contractService, applicationService),
 		ExitRequest:     handler.NewExitRequestHandler(exitRequestService),
 		TransferRequest: handler.NewTransferRequestHandler(transferRequestService),
 		Upload:          handler.NewUploadHandler(cfg.UploadDir),
@@ -102,9 +99,6 @@ func main() {
 
 	stopExpiryChecker := startContractExpiryChecker(contractService, cfg.ContractExpiryCheckInterval)
 	defer stopExpiryChecker()
-
-	stopPaymentExpiryChecker := startPaymentExpiryChecker(paymentService, cfg.ContractExpiryCheckInterval)
-	defer stopPaymentExpiryChecker()
 
 	log.Printf("listening on :%s", cfg.ServerPort)
 	if err := router.Run(":" + cfg.ServerPort); err != nil {
@@ -134,39 +128,6 @@ func startContractExpiryChecker(contracts *service.ContractService, interval tim
 					log.Printf("contract deadline reminder failed: %v", err)
 				} else if n > 0 {
 					log.Printf("sent %d contract deadline reminder(s)", n)
-				}
-			case <-done:
-				return
-			}
-		}
-	}()
-	return func() {
-		ticker.Stop()
-		close(done)
-	}
-}
-
-// startPaymentExpiryChecker runs PaymentService.FlagOverduePayments and
-// RemindApproachingPaymentDeadline on a ticker, mirroring
-// startContractExpiryChecker. Flagging never rejects an application by
-// itself — only PaymentService.ManagerDecision does that. Returns a stop func.
-func startPaymentExpiryChecker(payments *service.PaymentService, interval time.Duration) func() {
-	ticker := time.NewTicker(interval)
-	done := make(chan struct{})
-	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				ctx := context.Background()
-				if n, err := payments.FlagOverduePayments(ctx); err != nil {
-					log.Printf("payment overdue flagging failed: %v", err)
-				} else if n > 0 {
-					log.Printf("flagged %d overdue payment(s) for manager decision", n)
-				}
-				if n, err := payments.RemindApproachingPaymentDeadline(ctx); err != nil {
-					log.Printf("payment deadline reminder failed: %v", err)
-				} else if n > 0 {
-					log.Printf("sent %d payment deadline reminder(s)", n)
 				}
 			case <-done:
 				return

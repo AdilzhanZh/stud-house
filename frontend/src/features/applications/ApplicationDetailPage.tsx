@@ -7,14 +7,16 @@ import { Input } from '../../components/Input'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import { StatusBadge } from '../../components/StatusBadge'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { ApplicationJourneyStepper } from '../../components/ApplicationJourneyStepper'
 import { extractErrorMessage } from '../../api/client'
-import { addApplicationDocument, getApplication, resubmitApplication } from '../../api/applicationApi'
+import { addApplicationDocument, deleteApplication, getApplication, resubmitApplication } from '../../api/applicationApi'
 import { getDormitory } from '../../api/dormitoryApi'
-import { maxStayMonths } from '../../utils/stayMonths'
+import { getRoom } from '../../api/roomApi'
 import { formatDateTime } from '../../utils/dateFormat'
 import { useApplicationJourneys } from './useApplicationJourneys'
 import type { ApplicationDetail } from '../../types/applications'
+import type { Room } from '../../types/rooms'
 
 export function ApplicationDetailPage() {
   const { t } = useTranslation()
@@ -22,6 +24,7 @@ export function ApplicationDetailPage() {
   const navigate = useNavigate()
   const [application, setApplication] = useState<ApplicationDetail | null>(null)
   const [dormitoryName, setDormitoryName] = useState<string | null>(null)
+  const [preferredRoom, setPreferredRoom] = useState<Room | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const journeys = useApplicationJourneys(application ? [application] : null)
   const step = application ? journeys[application.id]?.step : undefined
@@ -32,10 +35,13 @@ export function ApplicationDetailPage() {
   const [docSubmitting, setDocSubmitting] = useState(false)
 
   const [notes, setNotes] = useState('')
-  const [stayMonths, setStayMonths] = useState('')
   const [editingNotes, setEditingNotes] = useState(false)
   const [notesError, setNotesError] = useState<string | null>(null)
   const [notesSubmitting, setNotesSubmitting] = useState(false)
+
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   function load() {
     if (!id) return
@@ -43,10 +49,16 @@ export function ApplicationDetailPage() {
       .then((data) => {
         setApplication(data)
         setNotes(data.notes ?? '')
-        setStayMonths(data.stay_months != null ? String(data.stay_months) : '')
         getDormitory(data.dormitory_id)
           .then((d) => setDormitoryName(d.name))
           .catch(() => setDormitoryName(null))
+        if (data.preferred_room_id) {
+          getRoom(data.preferred_room_id)
+            .then(setPreferredRoom)
+            .catch(() => setPreferredRoom(null))
+        } else {
+          setPreferredRoom(null)
+        }
       })
       .catch((err) => setLoadError(extractErrorMessage(err, t('appDetail.loadError'))))
   }
@@ -73,16 +85,10 @@ export function ApplicationDetailPage() {
   async function handleUpdateNotes(e: React.FormEvent) {
     e.preventDefault()
     if (!id) return
-    const months = Number(stayMonths)
-    const maxMonths = maxStayMonths()
-    if (!Number.isInteger(months) || months < 1 || months > maxMonths) {
-      setNotesError(t('appDetail.stayMonthsError', { max: maxMonths }))
-      return
-    }
     setNotesError(null)
     setNotesSubmitting(true)
     try {
-      await resubmitApplication(id, { notes: notes.trim() || null, stay_months: months })
+      await resubmitApplication(id, { notes: notes.trim() || null })
       setEditingNotes(false)
       load()
     } catch (err) {
@@ -92,10 +98,25 @@ export function ApplicationDetailPage() {
     }
   }
 
+  async function handleConfirmDelete() {
+    if (!id) return
+    setDeleteError(null)
+    setIsDeleting(true)
+    try {
+      await deleteApplication(id)
+      navigate('/applications/my')
+    } catch (err) {
+      setDeleteError(extractErrorMessage(err, t('myApplications.deleteFailed')))
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   if (loadError) return <Alert variant="error" message={loadError} />
   if (!application) return <p className="text-sm text-sand-300">{t('appDetail.loading')}</p>
 
   const canEdit = application.status === 'needs_correction'
+  const canDelete = application.status === 'rejected'
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -107,9 +128,25 @@ export function ApplicationDetailPage() {
       </button>
 
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[22px] font-bold text-sand-100">{dormitoryName ?? '...'}</p>
-        <StatusBadge status={application.status} />
+        <div>
+          <p className="text-[22px] font-bold text-sand-100">{dormitoryName ?? '...'}</p>
+          {preferredRoom && (
+            <p className="mt-0.5 text-sm text-sand-300">
+              {t('appDetail.preferredRoomLabel', { room: preferredRoom.room_number })}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-2.5">
+          <StatusBadge status={application.status} />
+          {canDelete && (
+            <Button variant="danger" onClick={() => setConfirmingDelete(true)}>
+              {t('myApplications.deleteButton')}
+            </Button>
+          )}
+        </div>
       </div>
+
+      {deleteError && <Alert variant="error" message={deleteError} />}
 
       <div className="flex flex-col gap-3.5 md:grid md:grid-cols-2 md:items-start md:gap-5">
         <div className="flex flex-col gap-3.5">
@@ -171,7 +208,7 @@ export function ApplicationDetailPage() {
 
           <Card>
             <div className="flex items-center justify-between">
-              <p className="text-[15px] font-bold text-sand-100">{t('appDetail.stayAndWishTitle')}</p>
+              <p className="text-[15px] font-bold text-sand-100">{t('appDetail.wishTitle')}</p>
               {canEdit && !editingNotes && (
                 <button
                   onClick={() => setEditingNotes(true)}
@@ -184,15 +221,6 @@ export function ApplicationDetailPage() {
             {editingNotes ? (
               <form className="mt-2.5 flex flex-col gap-3" onSubmit={handleUpdateNotes}>
                 {notesError && <Alert variant="error" message={notesError} />}
-                <Input
-                  label={t('appDetail.stayMonthsLabel', { max: maxStayMonths() })}
-                  type="number"
-                  min={1}
-                  max={maxStayMonths()}
-                  value={stayMonths}
-                  onChange={(e) => setStayMonths(e.target.value)}
-                  required
-                />
                 <textarea
                   rows={3}
                   value={notes}
@@ -209,14 +237,7 @@ export function ApplicationDetailPage() {
                 </div>
               </form>
             ) : (
-              <>
-                <p className="mt-1.5 text-sm text-sand-200">
-                  {application.stay_months != null
-                    ? t('appDetail.stayMonthsValue', { count: application.stay_months })
-                    : t('appDetail.stayMonthsUnset')}
-                </p>
-                <p className="mt-1 text-sm text-sand-200">{application.notes || t('appDetail.wishUnset')}</p>
-              </>
+              <p className="mt-1.5 text-sm text-sand-200">{application.notes || t('appDetail.wishUnset')}</p>
             )}
           </Card>
 
@@ -243,6 +264,16 @@ export function ApplicationDetailPage() {
           </Card>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        title={t('myApplications.deleteTitle')}
+        message={t('myApplications.deleteConfirm')}
+        danger
+        isLoading={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </div>
   )
 }

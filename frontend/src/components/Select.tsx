@@ -1,4 +1,5 @@
 import { forwardRef, type SelectHTMLAttributes } from 'react'
+import { useTranslation } from 'react-i18next'
 
 interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label: string
@@ -9,6 +10,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
   { label, error, id, className = '', children, required, ...rest },
   ref,
 ) {
+  const { t } = useTranslation()
   const selectId = id ?? rest.name
   return (
     <div className="flex flex-col gap-1">
@@ -17,7 +19,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
         {required ? (
           <span className="text-clay-400"> *</span>
         ) : (
-          <span className="ml-1 text-xs font-normal text-sand-400">(міндетті емес)</span>
+          <span className="ml-1 text-xs font-normal text-sand-400">{t('admin.common.optional')}</span>
         )}
       </label>
       <select

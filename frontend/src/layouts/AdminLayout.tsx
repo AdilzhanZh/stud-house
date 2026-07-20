@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   ArrowLeftRight,
   Building2,
@@ -16,6 +17,7 @@ import {
 import { useAuth } from '../features/auth/useAuth'
 import { Avatar } from '../components/Avatar'
 import { ThemeToggle } from '../components/ThemeToggle'
+import { LanguageSwitcher } from '../components/LanguageSwitcher'
 import { usePendingStudentsCount } from '../features/admin/users/usePendingStudentsCount'
 import { usePendingApplicationsCount } from '../features/admin/applications/usePendingApplicationsCount'
 
@@ -42,6 +44,7 @@ function CountBadge({ count }: { count: number }) {
 // doesn't cover but the app still needs (documents, reports, committee,
 // requests, users) — same visual treatment, just not the mockup's focus.
 export function AdminLayout() {
+  const { t } = useTranslation()
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const pendingStudentsCount = usePendingStudentsCount()
@@ -61,71 +64,75 @@ export function AdminLayout() {
           </span>
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-sand-100">Student House</p>
-            <p className="text-xs text-sand-300">{user?.role === 'manager' ? 'Менеджер панелі' : 'Админ панелі'}</p>
+            <p className="text-xs text-sand-300">
+              {user?.role === 'manager' ? t('admin.layout.managerPanel') : t('admin.layout.adminPanel')}
+            </p>
           </div>
         </div>
 
         <nav className="flex flex-col gap-0.5">
           <NavLink to="/admin/dashboard" className={navLinkClass}>
             <LayoutDashboard className="h-4.5 w-4.5 shrink-0" />
-            Дашборд
+            {t('admin.layout.dashboard')}
           </NavLink>
           <NavLink to="/admin/applications" className={navLinkClass}>
             <ClipboardList className="h-4.5 w-4.5 shrink-0" />
-            Өтініштер
+            {t('admin.layout.applications')}
             <CountBadge count={pendingApplicationsCount} />
           </NavLink>
           <NavLink to="/admin/dormitories" className={navLinkClass}>
             <Building2 className="h-4.5 w-4.5 shrink-0" />
-            Жатақханалар
+            {t('admin.layout.dormitories')}
           </NavLink>
           <NavLink to="/admin/contracts" className={navLinkClass}>
             <FileText className="h-4.5 w-4.5 shrink-0" />
-            Келісімшарттар мен төлемдер
+            {t('admin.layout.contracts')}
           </NavLink>
           <NavLink to="/admin/residents" className={navLinkClass}>
             <Users className="h-4.5 w-4.5 shrink-0" />
-            Тұрғындар
+            {t('admin.layout.residents')}
           </NavLink>
           <NavLink to="/admin/notifications/broadcast" className={navLinkClass}>
             <Megaphone className="h-4.5 w-4.5 shrink-0" />
-            Хабарландыру
+            {t('admin.layout.broadcast')}
           </NavLink>
         </nav>
 
-        <p className="mt-3 px-3 text-xs font-semibold tracking-wide text-sand-400 uppercase">Басқа</p>
+        <p className="mt-3 px-3 text-xs font-semibold tracking-wide text-sand-400 uppercase">
+          {t('admin.layout.other')}
+        </p>
         <nav className="flex flex-col gap-0.5">
           <NavLink to="/admin/documents" className={navLinkClass}>
             <FileText className="h-4.5 w-4.5 shrink-0" />
-            Құжаттар
+            {t('admin.layout.documents')}
           </NavLink>
           <NavLink to="/admin/reports" className={navLinkClass}>
             <FileBarChart className="h-4.5 w-4.5 shrink-0" />
-            Рапорттар
+            {t('admin.layout.reports')}
           </NavLink>
           {user?.is_committee_member && (
             <NavLink to="/committee/reports" className={navLinkClass}>
               <Gavel className="h-4.5 w-4.5 shrink-0" />
-              Комиссия рапорттары
+              {t('admin.layout.committeeReports')}
             </NavLink>
           )}
           <NavLink to="/admin/exit-requests" className={navLinkClass}>
             <DoorOpen className="h-4.5 w-4.5 shrink-0" />
-            Шығу сұраныстары
+            {t('admin.layout.exitRequests')}
           </NavLink>
           <NavLink to="/admin/transfer-requests" className={navLinkClass}>
             <ArrowLeftRight className="h-4.5 w-4.5 shrink-0" />
-            Ауыстыру сұраныстары
+            {t('admin.layout.transferRequests')}
           </NavLink>
           {user?.role === 'admin' && (
             <NavLink to="/admin/users" className={navLinkClass}>
               <UserCog className="h-4.5 w-4.5 shrink-0" />
-              Пайдаланушылар
+              {t('admin.layout.users')}
             </NavLink>
           )}
           <NavLink to="/admin/students/pending" className={navLinkClass}>
             <UserPlus className="h-4.5 w-4.5 shrink-0" />
-            Күтіп тұрған тіркелгілер
+            {t('admin.layout.pendingStudents')}
             <CountBadge count={pendingStudentsCount} />
           </NavLink>
         </nav>
@@ -135,15 +142,18 @@ export function AdminLayout() {
           <Avatar fullName={user?.full_name} avatarUrl={user?.avatar_url} sizeClass="h-9 w-9" textClass="text-xs" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-sand-100">{user?.full_name}</p>
-            <p className="text-xs text-sand-300">{user?.role === 'manager' ? 'Жатақхана менеджері' : 'Әкімші'}</p>
+            <p className="text-xs text-sand-300">
+              {user?.role === 'manager' ? t('admin.layout.managerRole') : t('admin.layout.adminRole')}
+            </p>
           </div>
+          <LanguageSwitcher languages={['kk', 'ru']} />
           <ThemeToggle />
         </div>
         <button
           onClick={handleLogout}
           className="rounded-2xl px-3 py-2 text-left text-sm font-semibold text-clay-400 hover:bg-clay-500/10"
         >
-          Шығу
+          {t('admin.layout.logout')}
         </button>
       </aside>
 

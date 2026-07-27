@@ -25,6 +25,12 @@ type Config struct {
 	SMTPUsername string
 	SMTPPassword string
 	SMTPFrom     string
+	// FeedbackEmail is where FeedbackService.Send delivers the "report a
+	// bug/suggestion" email — a single fixed inbox rather than every
+	// role=admin DB user's email (those are often placeholder/fixture
+	// addresses that just bounce). Defaults to SMTPFrom: with no override,
+	// the feedback mailbox is the same account the server sends from.
+	FeedbackEmail string
 
 	// ContractResponseDeadline is how long a student has to accept/decline a
 	// contract before it's eligible to be flagged awaiting_manager_decision
@@ -54,6 +60,7 @@ func Load() (*Config, error) {
 		SMTPPassword: getEnv("SMTP_PASSWORD", ""),
 		SMTPFrom:     getEnv("SMTP_FROM", getEnv("SMTP_USERNAME", "")),
 	}
+	cfg.FeedbackEmail = getEnv("FEEDBACK_EMAIL", cfg.SMTPFrom)
 
 	accessMinutes, err := strconv.Atoi(getEnv("ACCESS_TOKEN_TTL_MINUTES", "15"))
 	if err != nil {

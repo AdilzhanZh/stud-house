@@ -17,21 +17,22 @@ import (
 const feedbackMessageMaxLen = 4000
 
 type FeedbackService struct {
-	users    repository.UserRepository
-	notifier *notifier.Notifier
-	mailer   *mailer.Mailer
+	users         repository.UserRepository
+	notifier      *notifier.Notifier
+	mailer        *mailer.Mailer
+	feedbackEmail string
 }
 
-func NewFeedbackService(users repository.UserRepository, notifier *notifier.Notifier, mailer *mailer.Mailer) *FeedbackService {
-	return &FeedbackService{users: users, notifier: notifier, mailer: mailer}
+func NewFeedbackService(users repository.UserRepository, notifier *notifier.Notifier, mailer *mailer.Mailer, feedbackEmail string) *FeedbackService {
+	return &FeedbackService{users: users, notifier: notifier, mailer: mailer, feedbackEmail: feedbackEmail}
 }
 
-// Send delivers a student/staff-composed bug report or suggestion to every
-// admin — as an in-app notification (so it's visible even if email is
-// disabled/misconfigured) and, unlike every other notification.Notify call
-// in this codebase, also directly by email regardless of recipient role:
-// the whole point of this feature is that it reaches the admin's inbox, not
-// just their in-app notification list.
+// Send delivers a student/staff-composed bug report or suggestion two ways:
+// as an in-app notification to every admin (so it's visible even if email is
+// disabled/misconfigured), and as a single email to cfg.FeedbackEmail — one
+// fixed, actually-monitored inbox, deliberately not every role=admin DB
+// user's email, since those are frequently placeholder/fixture addresses
+// (e.g. admin@example.com) that just bounce.
 func (s *FeedbackService) Send(ctx context.Context, actorID uuid.UUID, message string) error {
 	if message == "" {
 		return apperror.BadRequest("хабарлама мәтіні міндетті")
@@ -49,9 +50,6 @@ func (s *FeedbackService) Send(ctx context.Context, actorID uuid.UUID, message s
 	if err != nil {
 		return err
 	}
-	if len(admins) == 0 {
-		return apperror.Internal("жүйеде әкімші табылмады")
-	}
 
 	title := "Жаңа ұсыныс/қате хабарламасы"
 	body := fmt.Sprintf(
@@ -60,8 +58,10 @@ func (s *FeedbackService) Send(ctx context.Context, actorID uuid.UUID, message s
 	)
 	for _, admin := range admins {
 		_ = s.notifier.Notify(ctx, admin.ID, domain.NotificationFeedback, title, body, nil)
-		if err := s.mailer.Send(admin.Email, title, body); err != nil {
-			log.Printf("failed to email feedback to admin %s: %v", admin.Email, err)
+	}
+	if s.feedbackEmail != "" {
+		if err := s.mailer.Send(s.feedbackEmail, title, body); err != nil {
+			log.Printf("failed to email feedback to %s: %v", s.feedbackEmail, err)
 		}
 	}
 	return nil

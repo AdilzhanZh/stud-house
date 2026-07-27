@@ -7,6 +7,7 @@ import { RegisterPage } from './features/auth/RegisterPage'
 import { HomePage } from './features/home/HomePage'
 import { ProfilePage } from './features/profile/ProfilePage'
 import { EditProfilePage } from './features/profile/EditProfilePage'
+import { FeedbackPage } from './features/profile/FeedbackPage'
 import { DormitoriesPage } from './features/dormitories/DormitoriesPage'
 import { DormitoryInfoPage } from './features/dormitories/DormitoryInfoPage'
 import { NewApplicationPage } from './features/applications/NewApplicationPage'
@@ -67,6 +68,7 @@ function App() {
           <Route path="/dashboard/home" element={<HomePage />} />
           <Route path="/dashboard/profile" element={<ProfilePage />} />
           <Route path="/dashboard/profile/edit" element={<EditProfilePage />} />
+          <Route path="/dashboard/profile/feedback" element={<FeedbackPage />} />
           <Route path="/dormitories" element={<DormitoriesPage />} />
         <Route path="/dormitories/:id" element={<DormitoryInfoPage />} />
           <Route path="/applications/new" element={<NewApplicationPage />} />

@@ -47,7 +47,6 @@ var staticTranslations = map[string]translation{
 		"ИИН должен состоять из 12 цифр",
 		"IIN must be a 12-digit number",
 	},
-	"жүйеде әкімші табылмады":       {"В системе не найден администратор", "No admin found in the system"},
 	"авторизация қажет":             {"Требуется авторизация", "Authorization required"},
 	"алдымен email-ды растаңыз":     {"Сначала подтвердите email", "Please verify your email first"},
 	"атауы және мекенжайы міндетті": {"Название и адрес обязательны", "Name and address are required"},

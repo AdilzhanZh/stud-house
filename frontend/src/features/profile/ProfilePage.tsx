@@ -4,8 +4,12 @@ import { useTranslation } from 'react-i18next'
 import { Pencil, LogOut } from 'lucide-react'
 import { Card } from '../../components/Card'
 import { Avatar } from '../../components/Avatar'
+import { Button } from '../../components/Button'
+import { Alert } from '../../components/Alert'
 import { ThemeToggle } from '../../components/ThemeToggle'
 import { LanguageSwitcher } from '../../components/LanguageSwitcher'
+import { extractErrorMessage } from '../../api/client'
+import { sendFeedback } from '../../api/feedbackApi'
 import { useAuth } from '../auth/useAuth'
 import { useIsSettled } from '../residence/useIsSettled'
 import { getStudentProfile } from '../../api/profileApi'
@@ -17,6 +21,11 @@ export function ProfilePage() {
   const navigate = useNavigate()
   const isSettled = useIsSettled()
   const [profile, setProfile] = useState<StudentProfile | null>(null)
+
+  const [feedbackMessage, setFeedbackMessage] = useState('')
+  const [feedbackSent, setFeedbackSent] = useState(false)
+  const [feedbackError, setFeedbackError] = useState<string | null>(null)
+  const [isSendingFeedback, setIsSendingFeedback] = useState(false)
 
   const degreeLabels: Record<NonNullable<StudentProfile['academic_degree']>, string> = {
     bachelor: t('auth.bachelor'),
@@ -40,6 +49,21 @@ export function ProfilePage() {
   async function handleLogout() {
     await logout()
     navigate('/login', { replace: true })
+  }
+
+  async function handleSendFeedback(e: React.FormEvent) {
+    e.preventDefault()
+    setFeedbackError(null)
+    setIsSendingFeedback(true)
+    try {
+      await sendFeedback(feedbackMessage.trim())
+      setFeedbackMessage('')
+      setFeedbackSent(true)
+    } catch (err) {
+      setFeedbackError(extractErrorMessage(err, t('profile.feedbackFailed')))
+    } finally {
+      setIsSendingFeedback(false)
+    }
   }
 
   return (
@@ -76,6 +100,34 @@ export function ProfilePage() {
             {profile?.gender ? genderLabels[profile.gender] : '—'}
           </span>
         </div>
+      </Card>
+
+      <Card>
+        <p className="text-[15px] font-bold text-sand-100">{t('profile.feedbackTitle')}</p>
+        <p className="mt-1 mb-3 text-sm text-sand-300">{t('profile.feedbackSubtitle')}</p>
+        {feedbackSent && <Alert variant="success" message={t('profile.feedbackSent')} />}
+        {feedbackError && <Alert variant="error" message={feedbackError} />}
+        <form className="mt-3 flex flex-col gap-3" onSubmit={handleSendFeedback}>
+          <textarea
+            rows={3}
+            placeholder={t('profile.feedbackPlaceholder')}
+            className="w-full resize-y rounded-xl border border-navy-700 bg-navy-950 px-3 py-2.5 text-sm text-sand-100 outline-none placeholder:text-sand-400 focus:border-turquoise-400"
+            value={feedbackMessage}
+            onChange={(e) => {
+              setFeedbackMessage(e.target.value)
+              setFeedbackSent(false)
+            }}
+          />
+          <Button
+            type="submit"
+            variant="secondary"
+            isLoading={isSendingFeedback}
+            disabled={!feedbackMessage.trim()}
+            className="self-start"
+          >
+            {t('profile.feedbackSend')}
+          </Button>
+        </form>
       </Card>
 
       <Card className="!py-1.5 !px-4.5 md:hidden">

@@ -19,6 +19,7 @@ type Handlers struct {
 	Notification    *handler.NotificationHandler
 	Report          *handler.ReportHandler
 	Contract        *handler.ContractHandler
+	Feedback        *handler.FeedbackHandler
 	ExitRequest     *handler.ExitRequestHandler
 	TransferRequest *handler.TransferRequestHandler
 	Upload          *handler.UploadHandler
@@ -89,6 +90,9 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 
 			// Any authenticated user: their own password.
 			protected.PATCH("/users/me/password", h.User.ChangeOwnPassword)
+
+			// Any authenticated user: send a bug report/suggestion to the admins.
+			protected.POST("/feedback", h.Feedback.Send)
 
 			// Any authenticated user: their own in-app notifications.
 			protected.GET("/notifications", h.Notification.ListMine)

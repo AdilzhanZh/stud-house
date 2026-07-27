@@ -150,6 +150,12 @@ export const kk = {
     myResidence: 'Менің орным',
     editData: 'Деректерді өзгерту',
     logout: 'Шығу',
+    feedbackTitle: 'Ұсыныс немесе қате туралы хабарлау',
+    feedbackSubtitle: 'Хабарламаңыз тікелей әкімшінің поштасына жіберіледі.',
+    feedbackPlaceholder: 'Не туралы жазғыңыз келеді?',
+    feedbackSend: 'Жіберу',
+    feedbackSent: 'Хабарламаңыз жіберілді, рахмет!',
+    feedbackFailed: 'Хабарламаны жіберу сәтсіз аяқталды',
     editProfile: {
       avatarTitle: 'Профиль суреті',
       avatarHint: 'Жаңа сурет жүктеу үшін суретті басыңыз',

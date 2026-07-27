@@ -153,6 +153,12 @@ export const ru: typeof kk = {
     myResidence: 'Моё место',
     editData: 'Изменить данные',
     logout: 'Выйти',
+    feedbackTitle: 'Сообщить о проблеме или предложении',
+    feedbackSubtitle: 'Ваше сообщение будет отправлено напрямую на почту администратора.',
+    feedbackPlaceholder: 'О чём хотите написать?',
+    feedbackSend: 'Отправить',
+    feedbackSent: 'Сообщение отправлено, спасибо!',
+    feedbackFailed: 'Не удалось отправить сообщение',
     editProfile: {
       avatarTitle: 'Фото профиля',
       avatarHint: 'Нажмите на фото, чтобы загрузить новое',

@@ -492,17 +492,23 @@ go run ./cmd/api
 
 ### 4. Бірінші admin пайдаланушысын жасау
 
-Self-registration тек student үшін жұмыс істейді, сондықтан бірінші
-admin-ды қолмен, тікелей дерекқорға (немесе уақытша seed script арқылы)
-енгізу керек, мысалы:
+Self-registration тек student үшін жұмыс істейді, сондықтан admin
+`cmd/seed` арқылы жасалады (немесе бар болса — жаңартылады, яғни қайта
+іске қосуға қауіпсіз):
 
-```sql
-INSERT INTO users (full_name, email, phone, password_hash, role)
-VALUES ('Admin', 'admin@example.com', '', '<bcrypt-hash>', 'admin');
+```sh
+go run ./cmd/seed -email admin@example.com -password Admin123
 ```
 
-(`password_hash` — `pkg/hasher.HashPassword` арқылы алдын ала есептелген
-bcrypt хэші.)
+Флагтардың бәрінің әдепкі мәні бар (`-email` → `studhouse@korkyt.kz`,
+`-password` → `Admin123`, `-full-name` → `Админ`), сондықтан флагсыз да
+іске қосуға болады. Егер берілген email базада бұрыннан бар болса, тек
+құпия сөзі мен рөлі (`admin`-ге) жаңартылады, жаңа жол қосылмайды.
+Docker Compose ортасында бинарник контейнерге бірге бумаланады:
+
+```sh
+docker compose exec backend ./seed -email admin@example.com -password Admin123
+```
 
 ### 5. Фондық тапсырма (overdue флаг қою + deadline ескерту)
 

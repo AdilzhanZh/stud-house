@@ -153,6 +153,12 @@ export const en: typeof kk = {
     myResidence: 'My residence',
     editData: 'Edit data',
     logout: 'Log out',
+    feedbackTitle: 'Report a bug or suggestion',
+    feedbackSubtitle: "Your message goes straight to the admin's email.",
+    feedbackPlaceholder: 'What would you like to write about?',
+    feedbackSend: 'Send',
+    feedbackSent: 'Your message has been sent, thank you!',
+    feedbackFailed: 'Failed to send the message',
     editProfile: {
       avatarTitle: 'Profile photo',
       avatarHint: 'Click the photo to upload a new one',

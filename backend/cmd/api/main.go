@@ -74,6 +74,7 @@ func main() {
 	contractService := service.NewContractService(contractRepo, applicationRepo, reportRepo, reportTemplateRepo, userRepo, notifierService, cfg.ContractResponseDeadline, cfg.ContractReminderWindow)
 	exitRequestService := service.NewExitRequestService(exitRequestRepo, roomRepo, userRepo, notifierService)
 	transferRequestService := service.NewTransferRequestService(transferRequestRepo, roomRepo, roomService, userRepo, notifierService)
+	feedbackService := service.NewFeedbackService(userRepo, notifierService, mailerService)
 
 	// Phase 4 hook into phase 3's vote tally: once a report is approved,
 	// auto-generate contracts for its applications.
@@ -90,6 +91,7 @@ func main() {
 		Notification:    handler.NewNotificationHandler(notificationService),
 		Report:          handler.NewReportHandler(reportService),
 		Contract:        handler.NewContractHandler(contractService, applicationService),
+		Feedback:        handler.NewFeedbackHandler(feedbackService),
 		ExitRequest:     handler.NewExitRequestHandler(exitRequestService),
 		TransferRequest: handler.NewTransferRequestHandler(transferRequestService),
 		Upload:          handler.NewUploadHandler(cfg.UploadDir),

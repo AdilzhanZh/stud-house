@@ -41,6 +41,9 @@ type UserRepository interface {
 	ListPendingStudents(ctx context.Context) ([]*domain.User, error)
 	UpdateApprovalStatus(ctx context.Context, id uuid.UUID, status domain.ApprovalStatus) error
 	UpdatePassword(ctx context.Context, id uuid.UUID, passwordHash string) error
+	// UpdateEmail is used by cmd/seed to repoint the single admin account at
+	// a new login email instead of creating a second admin row.
+	UpdateEmail(ctx context.Context, id uuid.UUID, email string) error
 	Delete(ctx context.Context, id uuid.UUID) error
 	// SetEmailVerificationCode stores a fresh code+expiry (registration or
 	// resend); MarkEmailVerified clears it and stamps email_verified_at.

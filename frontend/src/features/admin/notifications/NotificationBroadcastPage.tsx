@@ -31,7 +31,7 @@ export function NotificationBroadcastPage() {
   const [students, setStudents] = useState<User[]>([])
   const [audience, setAudience] = useState<BroadcastAudience>('all')
   const [dormitoryId, setDormitoryId] = useState('')
-  const [studentId, setStudentId] = useState('')
+  const [studentIin, setStudentIin] = useState('')
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -48,13 +48,16 @@ export function NotificationBroadcastPage() {
     listUsers('student').then(setStudents).catch(() => {})
   }, [])
 
+  const trimmedIin = studentIin.trim()
+  const matchedStudent = trimmedIin ? (students.find((s) => s.iin === trimmedIin) ?? null) : null
+
   async function handleSend() {
     setError(null)
     if (audience === 'dormitory' && !dormitoryId) {
       setError(t('admin.notifications.selectDormitory'))
       return
     }
-    if (audience === 'student' && !studentId) {
+    if (audience === 'student' && !matchedStudent) {
       setError(t('admin.notifications.selectStudent'))
       return
     }
@@ -67,7 +70,7 @@ export function NotificationBroadcastPage() {
       const { sent } = await sendBroadcast({
         audience,
         dormitory_id: audience === 'dormitory' ? dormitoryId : undefined,
-        student_id: audience === 'student' ? studentId : undefined,
+        student_id: audience === 'student' ? matchedStudent!.id : undefined,
         title: title.trim(),
         body: body.trim(),
       })
@@ -130,14 +133,22 @@ export function NotificationBroadcastPage() {
           )}
 
           {audience === 'student' && (
-            <Select label={t('admin.applications.student')} value={studentId} onChange={(e) => setStudentId(e.target.value)} required>
-              <option value="">{t('admin.common.select')}</option>
-              {students.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.full_name}
-                </option>
-              ))}
-            </Select>
+            <div className="flex flex-col gap-1">
+              <Input
+                label={t('admin.notifications.studentIinLabel')}
+                name="studentIin"
+                value={studentIin}
+                onChange={(e) => setStudentIin(e.target.value)}
+                placeholder={t('admin.notifications.studentIinPlaceholder')}
+                required
+              />
+              {trimmedIin &&
+                (matchedStudent ? (
+                  <p className="text-sm font-semibold text-mint-400">{matchedStudent.full_name}</p>
+                ) : (
+                  <p className="text-sm text-clay-400">{t('admin.notifications.studentIinNotFound')}</p>
+                ))}
+            </div>
           )}
 
           <Input label={t('admin.notifications.titleLabel')} name="title" value={title} onChange={(e) => setTitle(e.target.value)} required />

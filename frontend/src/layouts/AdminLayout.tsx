@@ -57,7 +57,7 @@ export function AdminLayout() {
 
   return (
     <div className="min-h-screen bg-navy-950 font-body md:flex">
-      <aside className="flex shrink-0 flex-col gap-1 border-r border-navy-700 bg-navy-900 p-4 md:w-62">
+      <aside className="flex shrink-0 flex-col border-r border-navy-700 bg-navy-900 p-4 md:sticky md:top-0 md:h-screen md:w-62">
         <div className="flex items-center gap-2.5 px-1 pb-4">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center">
             <img src="/favicon.svg" alt="" className="brand-icon h-full w-full object-contain" />
@@ -70,75 +70,78 @@ export function AdminLayout() {
           </div>
         </div>
 
-        <nav className="flex flex-col gap-0.5">
-          <NavLink to="/admin/dashboard" className={navLinkClass}>
-            <LayoutDashboard className="h-4.5 w-4.5 shrink-0" />
-            {t('admin.layout.dashboard')}
-          </NavLink>
-          <NavLink to="/admin/applications" className={navLinkClass}>
-            <ClipboardList className="h-4.5 w-4.5 shrink-0" />
-            {t('admin.layout.applications')}
-            <CountBadge count={pendingApplicationsCount} />
-          </NavLink>
-          <NavLink to="/admin/dormitories" className={navLinkClass}>
-            <Building2 className="h-4.5 w-4.5 shrink-0" />
-            {t('admin.layout.dormitories')}
-          </NavLink>
-          <NavLink to="/admin/contracts" className={navLinkClass}>
-            <FileText className="h-4.5 w-4.5 shrink-0" />
-            {t('admin.layout.contracts')}
-          </NavLink>
-          <NavLink to="/admin/residents" className={navLinkClass}>
-            <Users className="h-4.5 w-4.5 shrink-0" />
-            {t('admin.layout.residents')}
-          </NavLink>
-          <NavLink to="/admin/notifications/broadcast" className={navLinkClass}>
-            <Megaphone className="h-4.5 w-4.5 shrink-0" />
-            {t('admin.layout.broadcast')}
-          </NavLink>
-        </nav>
-
-        <p className="mt-3 px-3 text-xs font-semibold tracking-wide text-sand-400 uppercase">
-          {t('admin.layout.other')}
-        </p>
-        <nav className="flex flex-col gap-0.5">
-          <NavLink to="/admin/documents" className={navLinkClass}>
-            <FileText className="h-4.5 w-4.5 shrink-0" />
-            {t('admin.layout.documents')}
-          </NavLink>
-          <NavLink to="/admin/reports" className={navLinkClass}>
-            <FileBarChart className="h-4.5 w-4.5 shrink-0" />
-            {t('admin.layout.reports')}
-          </NavLink>
-          {user?.is_committee_member && (
-            <NavLink to="/committee/reports" className={navLinkClass}>
-              <Gavel className="h-4.5 w-4.5 shrink-0" />
-              {t('admin.layout.committeeReports')}
+        {/* The only part that scrolls — keeps the account footer below always
+            visible and in place, however many nav links there are. */}
+        <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+          <nav className="flex flex-col gap-0.5">
+            <NavLink to="/admin/dashboard" className={navLinkClass}>
+              <LayoutDashboard className="h-4.5 w-4.5 shrink-0" />
+              {t('admin.layout.dashboard')}
             </NavLink>
-          )}
-          <NavLink to="/admin/exit-requests" className={navLinkClass}>
-            <DoorOpen className="h-4.5 w-4.5 shrink-0" />
-            {t('admin.layout.exitRequests')}
-          </NavLink>
-          <NavLink to="/admin/transfer-requests" className={navLinkClass}>
-            <ArrowLeftRight className="h-4.5 w-4.5 shrink-0" />
-            {t('admin.layout.transferRequests')}
-          </NavLink>
-          {user?.role === 'admin' && (
-            <NavLink to="/admin/users" className={navLinkClass}>
-              <UserCog className="h-4.5 w-4.5 shrink-0" />
-              {t('admin.layout.users')}
+            <NavLink to="/admin/applications" className={navLinkClass}>
+              <ClipboardList className="h-4.5 w-4.5 shrink-0" />
+              {t('admin.layout.applications')}
+              <CountBadge count={pendingApplicationsCount} />
             </NavLink>
-          )}
-          <NavLink to="/admin/students/pending" className={navLinkClass}>
-            <UserPlus className="h-4.5 w-4.5 shrink-0" />
-            {t('admin.layout.pendingStudents')}
-            <CountBadge count={pendingStudentsCount} />
-          </NavLink>
-        </nav>
+            <NavLink to="/admin/dormitories" className={navLinkClass}>
+              <Building2 className="h-4.5 w-4.5 shrink-0" />
+              {t('admin.layout.dormitories')}
+            </NavLink>
+            <NavLink to="/admin/contracts" className={navLinkClass}>
+              <FileText className="h-4.5 w-4.5 shrink-0" />
+              {t('admin.layout.contracts')}
+            </NavLink>
+            <NavLink to="/admin/residents" className={navLinkClass}>
+              <Users className="h-4.5 w-4.5 shrink-0" />
+              {t('admin.layout.residents')}
+            </NavLink>
+            <NavLink to="/admin/notifications/broadcast" className={navLinkClass}>
+              <Megaphone className="h-4.5 w-4.5 shrink-0" />
+              {t('admin.layout.broadcast')}
+            </NavLink>
+          </nav>
 
-        <span className="flex-1" />
-        <div className="flex items-center gap-2.5 border-t border-navy-700 px-1 pt-3.5">
+          <p className="mt-3 px-3 text-xs font-semibold tracking-wide text-sand-400 uppercase">
+            {t('admin.layout.other')}
+          </p>
+          <nav className="flex flex-col gap-0.5">
+            <NavLink to="/admin/documents" className={navLinkClass}>
+              <FileText className="h-4.5 w-4.5 shrink-0" />
+              {t('admin.layout.documents')}
+            </NavLink>
+            <NavLink to="/admin/reports" className={navLinkClass}>
+              <FileBarChart className="h-4.5 w-4.5 shrink-0" />
+              {t('admin.layout.reports')}
+            </NavLink>
+            {user?.is_committee_member && (
+              <NavLink to="/committee/reports" className={navLinkClass}>
+                <Gavel className="h-4.5 w-4.5 shrink-0" />
+                {t('admin.layout.committeeReports')}
+              </NavLink>
+            )}
+            <NavLink to="/admin/exit-requests" className={navLinkClass}>
+              <DoorOpen className="h-4.5 w-4.5 shrink-0" />
+              {t('admin.layout.exitRequests')}
+            </NavLink>
+            <NavLink to="/admin/transfer-requests" className={navLinkClass}>
+              <ArrowLeftRight className="h-4.5 w-4.5 shrink-0" />
+              {t('admin.layout.transferRequests')}
+            </NavLink>
+            {user?.role === 'admin' && (
+              <NavLink to="/admin/users" className={navLinkClass}>
+                <UserCog className="h-4.5 w-4.5 shrink-0" />
+                {t('admin.layout.users')}
+              </NavLink>
+            )}
+            <NavLink to="/admin/students/pending" className={navLinkClass}>
+              <UserPlus className="h-4.5 w-4.5 shrink-0" />
+              {t('admin.layout.pendingStudents')}
+              <CountBadge count={pendingStudentsCount} />
+            </NavLink>
+          </nav>
+        </div>
+
+        <div className="mt-3.5 flex shrink-0 items-center gap-2.5 border-t border-navy-700 px-1 pt-3.5">
           <Avatar fullName={user?.full_name} avatarUrl={user?.avatar_url} sizeClass="h-9 w-9" textClass="text-xs" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-sand-100">{user?.full_name}</p>
@@ -151,7 +154,7 @@ export function AdminLayout() {
         </div>
         <button
           onClick={handleLogout}
-          className="rounded-2xl px-3 py-2 text-left text-sm font-semibold text-clay-400 hover:bg-clay-500/10"
+          className="shrink-0 rounded-2xl px-3 py-2 text-left text-sm font-semibold text-clay-400 hover:bg-clay-500/10"
         >
           {t('admin.layout.logout')}
         </button>

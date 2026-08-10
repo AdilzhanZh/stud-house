@@ -51,3 +51,22 @@ export async function generatePetitionPdfBlob(values: PetitionFieldValues): Prom
   const doc = await renderPetition(values)
   return doc.output('blob')
 }
+
+// Used by the manager's "download applications" bulk action (queue page) —
+// fetches the template once and renders every student's filled pages into a
+// single jsPDF document (one addPage() between each student, matching
+// renderHtmlPagesToPdf's per-page-string contract) so the result is one PDF
+// file containing every selected student's petition, instead of a zip of
+// separate files.
+export async function downloadPetitionsBulkPdf(entriesList: PetitionFieldValues[], filename: string): Promise<void> {
+  if (entriesList.length === 0) return
+  const template = await getPetitionTemplate()
+  const allPages = entriesList.flatMap((values) =>
+    fillPetitionTemplate(template.pages, {
+      ...values,
+      date: values.date ?? formatDate(new Date()),
+    }),
+  )
+  const doc = await renderHtmlPagesToPdf(allPages)
+  doc.save(filename)
+}

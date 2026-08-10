@@ -455,6 +455,13 @@ export const kk = {
       download: 'Жүктеу',
       petitionTemplateButton: 'Үлгі өтінішті қарау',
       petitionDownloadFailed: 'Өтініш құжатын жасау сәтсіз аяқталды',
+      downloadApplicationsButton: 'Өтініштерді жүктеу',
+      bulkDownloadTitle: 'Студенттердің өтініштерін жүктеу',
+      bulkDownloadDateFrom: 'Күні бастап',
+      bulkDownloadDateTo: 'Күні дейін',
+      bulkDownloadSelected: 'Таңдалды: {{count}}',
+      bulkDownloadButton: 'PDF жүктеу',
+      bulkDownloadFailed: 'Құжатты жасау сәтсіз аяқталды',
     },
     petitionTemplate: {
       title: 'Үлгі өтінішті басқару',

@@ -458,6 +458,13 @@ export const ru: typeof kk = {
       download: 'Скачать',
       petitionTemplateButton: 'Образец заявления',
       petitionDownloadFailed: 'Не удалось сформировать документ заявления',
+      downloadApplicationsButton: 'Скачать заявления',
+      bulkDownloadTitle: 'Скачать заявления студентов',
+      bulkDownloadDateFrom: 'Дата с',
+      bulkDownloadDateTo: 'Дата по',
+      bulkDownloadSelected: 'Выбрано: {{count}}',
+      bulkDownloadButton: 'Скачать PDF',
+      bulkDownloadFailed: 'Не удалось сформировать документ',
     },
     petitionTemplate: {
       title: 'Управление образцом заявления',

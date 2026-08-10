@@ -456,6 +456,13 @@ export const en: typeof kk = {
       download: 'Download',
       petitionTemplateButton: 'Sample application',
       petitionDownloadFailed: 'Failed to generate the application document',
+      downloadApplicationsButton: 'Download applications',
+      bulkDownloadTitle: 'Download student applications',
+      bulkDownloadDateFrom: 'Date from',
+      bulkDownloadDateTo: 'Date to',
+      bulkDownloadSelected: 'Selected: {{count}}',
+      bulkDownloadButton: 'Download PDF',
+      bulkDownloadFailed: 'Failed to generate the document',
     },
     petitionTemplate: {
       title: 'Manage the sample application',

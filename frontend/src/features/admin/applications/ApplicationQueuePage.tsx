@@ -15,6 +15,7 @@ import { listBenefits, listStudentBenefits } from '../../../api/benefitApi'
 import { downloadPetitionPdf } from '../../../utils/petitionPdf'
 import { formatDate } from '../../../utils/dateFormat'
 import { markApplicationsSeenNow } from './applicationsSeen'
+import { BulkDownloadDialog } from './BulkDownloadDialog'
 import {
   adminCellClass,
   adminPageHeading,
@@ -46,8 +47,11 @@ export function ApplicationQueuePage() {
   const [dormitoryNamesById, setDormitoryNamesById] = useState<Record<string, string>>({})
   const [priorityByStudent, setPriorityByStudent] = useState<Record<string, number>>({})
   const [dormitoryFilter, setDormitoryFilter] = useState('')
+  const [sortField, setSortField] = useState<'priority' | 'date'>('priority')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [error, setError] = useState<string | null>(null)
   const [downloadError, setDownloadError] = useState<string | null>(null)
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -115,12 +119,30 @@ export function ApplicationQueuePage() {
     if (!applications) return null
     let filtered = activeFilter === 'all' ? applications : applications.filter((a) => a.status === activeFilter)
     if (dormitoryFilter) filtered = filtered.filter((app) => app.dormitory_id === dormitoryFilter)
+    const dir = sortDirection === 'asc' ? 1 : -1
     return [...filtered].sort((a, b) => {
-      const priorityDiff = (priorityByStudent[b.student_id] ?? 1) - (priorityByStudent[a.student_id] ?? 1)
-      if (priorityDiff !== 0) return priorityDiff
-      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      if (sortField === 'priority') {
+        const priorityDiff = ((priorityByStudent[a.student_id] ?? 1) - (priorityByStudent[b.student_id] ?? 1)) * dir
+        if (priorityDiff !== 0) return priorityDiff
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      }
+      return (new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) * dir
     })
-  }, [applications, activeFilter, dormitoryFilter, priorityByStudent])
+  }, [applications, activeFilter, dormitoryFilter, priorityByStudent, sortField, sortDirection])
+
+  function toggleSort(field: 'priority' | 'date') {
+    if (sortField === field) {
+      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortField(field)
+      setSortDirection('desc')
+    }
+  }
+
+  function sortIndicator(field: 'priority' | 'date') {
+    if (sortField !== field) return null
+    return <span className="text-turquoise-400">{sortDirection === 'asc' ? ' ▲' : ' ▼'}</span>
+  }
 
   async function handleDownload(app: Application) {
     setDownloadError(null)
@@ -147,9 +169,14 @@ export function ApplicationQueuePage() {
     <div className="flex flex-col gap-3.5">
       <div className="flex items-center justify-between gap-3">
         <h1 className={adminPageHeading}>{t('admin.layout.applications')}</h1>
-        <Button variant="secondary" onClick={() => navigate('/admin/applications/petition-template')}>
-          {t('admin.applications.petitionTemplateButton')}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => setBulkDialogOpen(true)} disabled={!applications}>
+            {t('admin.applications.downloadApplicationsButton')}
+          </Button>
+          <Button variant="secondary" onClick={() => navigate('/admin/applications/petition-template')}>
+            {t('admin.applications.petitionTemplateButton')}
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -195,8 +222,20 @@ export function ApplicationQueuePage() {
                 <tr>
                   <th className={adminCellClass}>{t('admin.applications.student')}</th>
                   <th className={adminCellClass}>{t('admin.layout.dormitories')}</th>
-                  <th className={adminCellClass}>{t('admin.applications.priority')}</th>
-                  <th className={adminCellClass}>{t('admin.applications.date')}</th>
+                  <th
+                    className={`${adminCellClass} cursor-pointer select-none hover:text-sand-100`}
+                    onClick={() => toggleSort('priority')}
+                  >
+                    {t('admin.applications.priority')}
+                    {sortIndicator('priority')}
+                  </th>
+                  <th
+                    className={`${adminCellClass} cursor-pointer select-none hover:text-sand-100`}
+                    onClick={() => toggleSort('date')}
+                  >
+                    {t('admin.applications.date')}
+                    {sortIndicator('date')}
+                  </th>
                   <th className={adminCellClass}>{t('admin.applications.status')}</th>
                   <th className={adminCellClass} />
                 </tr>
@@ -239,6 +278,19 @@ export function ApplicationQueuePage() {
             </table>
           </Card>
         </>
+      )}
+
+      {applications && (
+        <BulkDownloadDialog
+          open={bulkDialogOpen}
+          onClose={() => setBulkDialogOpen(false)}
+          applications={applications}
+          namesById={namesById}
+          studentsById={studentsById}
+          dormitoryNamesById={dormitoryNamesById}
+          priorityByStudent={priorityByStudent}
+          statusLabels={STATUS_LABELS}
+        />
       )}
     </div>
   )

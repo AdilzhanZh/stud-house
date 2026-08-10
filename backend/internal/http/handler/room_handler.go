@@ -237,3 +237,26 @@ func (h *RoomHandler) MoveOutResident(c *gin.Context) {
 	}
 	c.Status(http.StatusNoContent)
 }
+
+type transferResidentRequest struct {
+	RoomID uuid.UUID `json:"room_id" binding:"required"`
+}
+
+func (h *RoomHandler) TransferResident(c *gin.Context) {
+	residentRowID, err := uuid.Parse(c.Param("residentId"))
+	if err != nil {
+		response.Error(c, apperror.BadRequest("тұрғын идентификаторы дұрыс емес"))
+		return
+	}
+	var req transferResidentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.BadRequest(err.Error()))
+		return
+	}
+	resident, err := h.rooms.TransferResident(c.Request.Context(), residentRowID, req.RoomID)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, roomResidentDTO(resident))
+}

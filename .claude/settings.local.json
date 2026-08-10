@@ -4,7 +4,8 @@
       "Bash(go build *)",
       "Bash(go mod *)",
       "Bash(docker run --rm --network studhouse_app-network curlimages/curl -s -X POST http://backend:8080/api/v1/dormitories -H 'Content-Type: application/json' -H 'Authorization: Bearer __TRACKED_VAR__' -d '{ *)",
-      "Bash(docker compose *)"
+      "Bash(docker compose *)",
+      "Bash(go vet *)"
     ]
   }
 }

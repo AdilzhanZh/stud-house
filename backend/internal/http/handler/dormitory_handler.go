@@ -26,23 +26,22 @@ func NewDormitoryHandler(dormitories *service.DormitoryService) *DormitoryHandle
 // closely mirrors service.DormitoryInput, except dates come in as
 // "2006-01-02" strings (frontend <input type="date">).
 type dormitoryRequest struct {
-	Name                    string                `json:"name" binding:"required"`
-	Address                 string                `json:"address" binding:"required"`
-	Phone                   *string               `json:"phone"`
-	Type                    *domain.DormitoryType `json:"dorm_type"`
-	FloorCount              *int                  `json:"floor_count"`
-	TotalRoomsTarget        *int                  `json:"total_rooms_target"`
-	TotalCapacity           int                   `json:"total_capacity"`
-	RoomsMale               *int                  `json:"rooms_male"`
-	RoomsFemale             *int                  `json:"rooms_female"`
-	RoomsMixed              *int                  `json:"rooms_mixed"`
-	MonthlyPayment          *float64              `json:"monthly_payment"`
-	YearlyPayment           *float64              `json:"yearly_payment"`
-	BuiltYear               *string               `json:"built_year"`
-	CommissionedYear        *string               `json:"commissioned_year"`
-	OwnershipForm           *string               `json:"ownership_form"`
-	ClosedForApplications   bool                  `json:"closed_for_applications"`
-	DefaultReportTemplateID *uuid.UUID            `json:"default_report_template_id"`
+	Name                  string                `json:"name" binding:"required"`
+	Address               string                `json:"address" binding:"required"`
+	Phone                 *string               `json:"phone"`
+	Type                  *domain.DormitoryType `json:"dorm_type"`
+	FloorCount            *int                  `json:"floor_count"`
+	TotalRoomsTarget      *int                  `json:"total_rooms_target"`
+	TotalCapacity         int                   `json:"total_capacity"`
+	RoomsMale             *int                  `json:"rooms_male"`
+	RoomsFemale           *int                  `json:"rooms_female"`
+	RoomsMixed            *int                  `json:"rooms_mixed"`
+	MonthlyPayment        *float64              `json:"monthly_payment"`
+	YearlyPayment         *float64              `json:"yearly_payment"`
+	BuiltYear             *string               `json:"built_year"`
+	CommissionedYear      *string               `json:"commissioned_year"`
+	OwnershipForm         *string               `json:"ownership_form"`
+	ClosedForApplications bool                  `json:"closed_for_applications"`
 }
 
 func (req dormitoryRequest) toInput() (service.DormitoryInput, error) {
@@ -55,23 +54,22 @@ func (req dormitoryRequest) toInput() (service.DormitoryInput, error) {
 		return service.DormitoryInput{}, apperror.BadRequest("пайдалануға берілген жылы дұрыс емес, ЖЖЖЖ-АА-КК форматында болуы керек")
 	}
 	return service.DormitoryInput{
-		Name:                    req.Name,
-		Address:                 req.Address,
-		Phone:                   req.Phone,
-		Type:                    req.Type,
-		FloorCount:              req.FloorCount,
-		TotalRoomsTarget:        req.TotalRoomsTarget,
-		TotalCapacity:           req.TotalCapacity,
-		RoomsMale:               req.RoomsMale,
-		RoomsFemale:             req.RoomsFemale,
-		RoomsMixed:              req.RoomsMixed,
-		MonthlyPayment:          req.MonthlyPayment,
-		YearlyPayment:           req.YearlyPayment,
-		BuiltYear:               builtYear,
-		CommissionedYear:        commissionedYear,
-		OwnershipForm:           req.OwnershipForm,
-		ClosedForApplications:   req.ClosedForApplications,
-		DefaultReportTemplateID: req.DefaultReportTemplateID,
+		Name:                  req.Name,
+		Address:               req.Address,
+		Phone:                 req.Phone,
+		Type:                  req.Type,
+		FloorCount:            req.FloorCount,
+		TotalRoomsTarget:      req.TotalRoomsTarget,
+		TotalCapacity:         req.TotalCapacity,
+		RoomsMale:             req.RoomsMale,
+		RoomsFemale:           req.RoomsFemale,
+		RoomsMixed:            req.RoomsMixed,
+		MonthlyPayment:        req.MonthlyPayment,
+		YearlyPayment:         req.YearlyPayment,
+		BuiltYear:             builtYear,
+		CommissionedYear:      commissionedYear,
+		OwnershipForm:         req.OwnershipForm,
+		ClosedForApplications: req.ClosedForApplications,
 	}, nil
 }
 

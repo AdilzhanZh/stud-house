@@ -19,11 +19,9 @@ import {
   updateDormitory,
 } from '../../../api/dormitoryApi'
 import { listRequiredDocuments } from '../../../api/documentApi'
-import { listReportTemplates } from '../../../api/reportTemplateApi'
 import { uploadFile } from '../../../api/uploadApi'
 import type { DormitoryImage, DormitoryRequiredDocument, DormitoryType } from '../../../types/dormitories'
 import type { RequiredDocument } from '../../../types/documents'
-import type { ReportTemplate } from '../../../types/reports'
 
 export function DormitoryFormPage() {
   const { t } = useTranslation()
@@ -47,8 +45,6 @@ export function DormitoryFormPage() {
   const [commissionedYear, setCommissionedYear] = useState('')
   const [ownershipForm, setOwnershipForm] = useState('')
   const [closedForApplications, setClosedForApplications] = useState(false)
-  const [defaultReportTemplateId, setDefaultReportTemplateId] = useState('')
-  const [reportTemplates, setReportTemplates] = useState<ReportTemplate[]>([])
 
   const [loadError, setLoadError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -74,7 +70,6 @@ export function DormitoryFormPage() {
 
   useEffect(() => {
     listRequiredDocuments().then(setCatalog).catch(() => {})
-    listReportTemplates().then(setReportTemplates).catch(() => {})
     if (!id) return
     getDormitory(id)
       .then((d) => {
@@ -94,7 +89,6 @@ export function DormitoryFormPage() {
         setCommissionedYear(d.commissioned_year?.slice(0, 10) ?? '')
         setOwnershipForm(d.ownership_form ?? '')
         setClosedForApplications(d.closed_for_applications)
-        setDefaultReportTemplateId(d.default_report_template_id ?? '')
       })
       .catch((err) => setLoadError(extractErrorMessage(err, t('admin.common.loadError'))))
     loadImages(id)
@@ -122,7 +116,6 @@ export function DormitoryFormPage() {
       commissioned_year: commissionedYear || null,
       ownership_form: ownershipForm.trim() || null,
       closed_for_applications: closedForApplications,
-      default_report_template_id: defaultReportTemplateId || null,
     }
     try {
       if (isEdit && id) {
@@ -331,19 +324,6 @@ export function DormitoryFormPage() {
               </span>
             </span>
           </label>
-
-          <Select
-            label={t('admin.dormitories.defaultTemplate')}
-            value={defaultReportTemplateId}
-            onChange={(e) => setDefaultReportTemplateId(e.target.value)}
-          >
-            <option value="">{t('admin.common.none')}</option>
-            {reportTemplates.map((tpl) => (
-              <option key={tpl.id} value={tpl.id}>
-                {tpl.name}
-              </option>
-            ))}
-          </Select>
         </form>
       </Card>
 

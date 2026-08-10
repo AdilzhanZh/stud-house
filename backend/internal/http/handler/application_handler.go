@@ -26,6 +26,9 @@ type createApplicationRequest struct {
 	PreferredRoomType *string    `json:"preferred_room_type"`
 	PreferredRoomID   *uuid.UUID `json:"preferred_room_id"`
 	Notes             *string    `json:"notes"`
+	StudyGroup        string     `json:"study_group" binding:"required"`
+	Hometown          string     `json:"hometown" binding:"required"`
+	ParentContact     string     `json:"parent_contact" binding:"required"`
 }
 
 // Create is student-only: it always creates the application for the caller.
@@ -36,7 +39,7 @@ func (h *ApplicationHandler) Create(c *gin.Context) {
 		return
 	}
 	studentID, _ := middleware.UserID(c)
-	app, err := h.applications.Create(c.Request.Context(), studentID, req.DormitoryID, req.PreferredRoomType, req.Notes, req.PreferredRoomID)
+	app, err := h.applications.Create(c.Request.Context(), studentID, req.DormitoryID, req.PreferredRoomType, req.Notes, req.PreferredRoomID, req.StudyGroup, req.Hometown, req.ParentContact)
 	if err != nil {
 		response.Error(c, err)
 		return

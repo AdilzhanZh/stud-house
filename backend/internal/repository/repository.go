@@ -13,11 +13,6 @@ import (
 var (
 	ErrNotFound = errors.New("resource not found")
 	ErrConflict = errors.New("resource already exists")
-	// ErrInvalidReference is a foreign-key violation on a value the caller
-	// supplied (e.g. a dormitory's default_report_template_id pointing at a
-	// report template that doesn't exist) — distinct from ErrNotFound, which
-	// means the row being fetched/updated itself doesn't exist.
-	ErrInvalidReference = errors.New("referenced resource not found")
 )
 
 type UserRepository interface {
@@ -85,6 +80,10 @@ type RoomRepository interface {
 	AddResident(ctx context.Context, rr *domain.RoomResident) error
 	MoveOutResident(ctx context.Context, residentRowID uuid.UUID) error
 	GetActiveResidentByStudent(ctx context.Context, studentID uuid.UUID) (*domain.RoomResident, error)
+	// GetResidentByID resolves a room_residents row by its own id, regardless
+	// of whether it's still active — used to look up which student/room a
+	// release or transfer action applies to before mutating it.
+	GetResidentByID(ctx context.Context, id uuid.UUID) (*domain.RoomResident, error)
 	// ListResidentStudentIDsByDormitory backs the admin "жатақхана" broadcast
 	// audience — every student currently resident (moved_out_at IS NULL) in
 	// any room of the given dormitory.

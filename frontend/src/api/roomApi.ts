@@ -58,3 +58,15 @@ export async function addResident(roomId: string, studentId: string): Promise<Ro
   })
   return data.data
 }
+
+export async function moveOutResident(residentId: string): Promise<void> {
+  await apiClient.delete(`/room-residents/${residentId}`)
+}
+
+export async function transferResident(residentId: string, roomId: string): Promise<RoomResident> {
+  const { data } = await apiClient.post<{ data: RoomResident }>(
+    `/room-residents/${residentId}/transfer`,
+    { room_id: roomId },
+  )
+  return data.data
+}

@@ -5,13 +5,14 @@ import { Card } from '../../../components/Card'
 import { Alert } from '../../../components/Alert'
 import { StatusBadge } from '../../../components/StatusBadge'
 import { Select } from '../../../components/Select'
+import { Button } from '../../../components/Button'
 import { DownloadIconButton } from '../../../components/DownloadIconButton'
 import { extractErrorMessage } from '../../../api/client'
 import { listApplications } from '../../../api/applicationAdminApi'
 import { listDormitories } from '../../../api/dormitoryApi'
 import { listUsers } from '../../../api/adminUserApi'
 import { listBenefits, listStudentBenefits } from '../../../api/benefitApi'
-import { downloadApplicationPdf } from '../../../utils/applicationPdf'
+import { downloadPetitionPdf } from '../../../utils/petitionPdf'
 import { formatDate } from '../../../utils/dateFormat'
 import { markApplicationsSeenNow } from './applicationsSeen'
 import {
@@ -22,6 +23,7 @@ import {
   adminTheadClass,
 } from '../adminTable'
 import type { Application, ApplicationStatus } from '../../../types/applications'
+import type { User } from '../../../types'
 
 const STATUSES: ApplicationStatus[] = ['pending', 'needs_correction', 'approved', 'rejected']
 
@@ -40,10 +42,12 @@ export function ApplicationQueuePage() {
   const [activeFilter, setActiveFilter] = useState<ApplicationStatus | 'all'>('all')
   const [applications, setApplications] = useState<Application[] | null>(null)
   const [namesById, setNamesById] = useState<Record<string, string>>({})
+  const [studentsById, setStudentsById] = useState<Record<string, User>>({})
   const [dormitoryNamesById, setDormitoryNamesById] = useState<Record<string, string>>({})
   const [priorityByStudent, setPriorityByStudent] = useState<Record<string, number>>({})
   const [dormitoryFilter, setDormitoryFilter] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -62,6 +66,7 @@ export function ApplicationQueuePage() {
 
         setApplications(apps)
         setNamesById(Object.fromEntries(students.map((s) => [s.id, s.full_name])))
+        setStudentsById(Object.fromEntries(students.map((s) => [s.id, s])))
         setDormitoryNamesById(Object.fromEntries(dormitories.map((d) => [d.id, d.name])))
 
         // Highest-priority-first ordering (see BenefitFormPage's "Приоритет
@@ -117,19 +122,35 @@ export function ApplicationQueuePage() {
     })
   }, [applications, activeFilter, dormitoryFilter, priorityByStudent])
 
-  function handleDownload(app: Application) {
-    downloadApplicationPdf({
-      applicationId: app.id,
-      studentFullName: namesById[app.student_id] ?? app.student_id,
-      dormitoryName: dormitoryNamesById[app.dormitory_id] ?? app.dormitory_id,
-      roomNumber: null,
-      decidedAt: new Date(app.updated_at),
-    })
+  async function handleDownload(app: Application) {
+    setDownloadError(null)
+    const student = studentsById[app.student_id]
+    try {
+      await downloadPetitionPdf(
+        {
+          full_name: student?.full_name ?? namesById[app.student_id] ?? app.student_id,
+          study_group: app.study_group,
+          hometown: app.hometown,
+          phone_self: student?.phone ?? '',
+          parent_contact: app.parent_contact,
+          dormitory_name: dormitoryNamesById[app.dormitory_id] ?? app.dormitory_id,
+          date: formatDate(app.created_at),
+        },
+        `otinish-${app.id}.pdf`,
+      )
+    } catch (err) {
+      setDownloadError(extractErrorMessage(err, t('admin.applications.petitionDownloadFailed')))
+    }
   }
 
   return (
     <div className="flex flex-col gap-3.5">
-      <h1 className={adminPageHeading}>{t('admin.layout.applications')}</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className={adminPageHeading}>{t('admin.layout.applications')}</h1>
+        <Button variant="secondary" onClick={() => navigate('/admin/applications/petition-template')}>
+          {t('admin.applications.petitionTemplateButton')}
+        </Button>
+      </div>
 
       <div className="flex flex-wrap gap-2">
         {(['all', ...STATUSES] as const).map((status) => (
@@ -148,6 +169,7 @@ export function ApplicationQueuePage() {
       </div>
 
       {error && <Alert variant="error" message={error} />}
+      {downloadError && <Alert variant="error" message={downloadError} />}
       {!error && !applications && <p className="text-sm text-sand-300">{t('admin.common.loading')}</p>}
 
       {applications && (

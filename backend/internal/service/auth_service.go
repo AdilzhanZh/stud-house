@@ -63,6 +63,15 @@ func (s *AuthService) sendVerificationEmail(user *domain.User, code string) {
 	}
 }
 
+// isReplaceableRejectedStudent reports whether an existing user row is a
+// rejected self-registration and can therefore be silently discarded by a
+// new registration attempt reusing the same email/IIN — a rejected applicant
+// never became a real account (couldn't log in), so their email/IIN
+// shouldn't stay permanently reserved.
+func isReplaceableRejectedStudent(u *domain.User) bool {
+	return u.Role == domain.RoleStudent && u.ApprovalStatus == domain.ApprovalRejected
+}
+
 func isValidIIN(iin string) bool {
 	if len(iin) != 12 {
 		return false
@@ -79,6 +88,9 @@ func isValidIIN(iin string) bool {
 // Every other role must be created by an admin via UserService.CreateUser.
 // The new account starts ApprovalPending — it cannot log in (see Login)
 // until a manager/admin approves it via UserService.DecideStudentApproval.
+// If the email/IIN belongs to a previously rejected student registration,
+// that stale row is replaced rather than blocking the new attempt (see
+// isReplaceableRejectedStudent).
 func (s *AuthService) RegisterStudent(ctx context.Context, fullName, email, phone, password, iin string, gender domain.Gender, course int16, academicDegree domain.AcademicDegree) (*domain.User, error) {
 	if fullName == "" || email == "" || password == "" || iin == "" {
 		return nil, apperror.BadRequest("аты-жөні, email, ЖСН (ИИН) және құпия сөз міндетті")
@@ -99,16 +111,36 @@ func (s *AuthService) RegisterStudent(ctx context.Context, fullName, email, phon
 		return nil, apperror.BadRequest(fmt.Sprintf("курс 1 мен %d аралығында болуы керек", academicDegree.MaxCourse()))
 	}
 
-	if _, err := s.users.GetByEmail(ctx, email); err == nil {
-		return nil, apperror.Conflict("бұл email-мен пайдаланушы бұрыннан бар")
+	existingByEmail, err := s.users.GetByEmail(ctx, email)
+	if err == nil {
+		if !isReplaceableRejectedStudent(existingByEmail) {
+			return nil, apperror.Conflict("бұл email-мен пайдаланушы бұрыннан бар")
+		}
 	} else if !errors.Is(err, repository.ErrNotFound) {
 		return nil, err
 	}
 
-	if _, err := s.users.GetByIIN(ctx, iin); err == nil {
-		return nil, apperror.Conflict("бұл ЖСН (ИИН) бұрыннан тіркелген")
+	existingByIIN, err := s.users.GetByIIN(ctx, iin)
+	if err == nil {
+		if !isReplaceableRejectedStudent(existingByIIN) {
+			return nil, apperror.Conflict("бұл ЖСН (ИИН) бұрыннан тіркелген")
+		}
 	} else if !errors.Is(err, repository.ErrNotFound) {
 		return nil, err
+	}
+
+	// A rejected self-registration never gained login access, so it must not
+	// permanently squat the email/IIN it used — clear it out so the applicant
+	// can try again instead of being told the email/IIN "already exists".
+	if existingByEmail != nil {
+		if err := s.users.Delete(ctx, existingByEmail.ID); err != nil {
+			return nil, err
+		}
+	}
+	if existingByIIN != nil && (existingByEmail == nil || existingByIIN.ID != existingByEmail.ID) {
+		if err := s.users.Delete(ctx, existingByIIN.ID); err != nil {
+			return nil, err
+		}
 	}
 
 	passwordHash, err := hasher.HashPassword(password)

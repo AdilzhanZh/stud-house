@@ -41,7 +41,7 @@ function CountBadge({ count }: { count: number }) {
 // portal's top+bottom nav) since a dense admin panel reads better as a
 // sidebar. Split into a primary group (the "Админ панелі" hifi mockup's 6
 // screens) and a secondary group below a divider for everything the mockup
-// doesn't cover but the app still needs (documents, reports, committee,
+// doesn't cover but the app still needs (documents, protocols, committee,
 // requests, users) — same visual treatment, just not the mockup's focus.
 export function AdminLayout() {
   const { t } = useTranslation()
@@ -109,14 +109,14 @@ export function AdminLayout() {
               <FileText className="h-4.5 w-4.5 shrink-0" />
               {t('admin.layout.documents')}
             </NavLink>
-            <NavLink to="/admin/reports" className={navLinkClass}>
+            <NavLink to="/admin/protocols" className={navLinkClass}>
               <FileBarChart className="h-4.5 w-4.5 shrink-0" />
-              {t('admin.layout.reports')}
+              {t('admin.layout.protocols')}
             </NavLink>
             {user?.is_committee_member && (
-              <NavLink to="/committee/reports" className={navLinkClass}>
+              <NavLink to="/committee/protocols" className={navLinkClass}>
                 <Gavel className="h-4.5 w-4.5 shrink-0" />
-                {t('admin.layout.committeeReports')}
+                {t('admin.layout.committeeProtocols')}
               </NavLink>
             )}
             <NavLink to="/admin/exit-requests" className={navLinkClass}>

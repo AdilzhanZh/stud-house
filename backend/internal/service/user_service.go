@@ -244,8 +244,9 @@ func (s *UserService) ListPendingStudents(ctx context.Context) ([]*domain.User, 
 }
 
 // DecideStudentApproval is manager/admin-only. approve grants login access;
-// reject permanently blocks it (the account stays, matching how rejected
-// applications aren't deleted elsewhere in this codebase).
+// reject blocks it and the account row stays (for audit/history), but its
+// email/IIN is freed up again — AuthService.RegisterStudent silently
+// replaces a rejected row rather than treating the email/IIN as taken.
 func (s *UserService) DecideStudentApproval(ctx context.Context, id uuid.UUID, approve bool) error {
 	user, err := s.GetByID(ctx, id)
 	if err != nil {

@@ -38,7 +38,7 @@ type ApplicationRepository interface {
 	ListHistory(ctx context.Context, applicationID uuid.UUID) ([]*domain.ApplicationStatusHistory, error)
 	// Delete removes a single (already-rejected) application, e.g. when its
 	// dormitory is being deleted. Returns ErrConflict if some other row
-	// (contract, report) still references it.
+	// (contract, protocol) still references it.
 	Delete(ctx context.Context, id uuid.UUID) error
 
 	// WithLock locks the application row (SELECT ... FOR UPDATE) inside a DB

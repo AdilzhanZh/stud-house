@@ -44,11 +44,13 @@ func main() {
 	applicationRepo := postgres.NewApplicationRepo(pool)
 	applicationDocumentRepo := postgres.NewApplicationDocumentRepo(pool)
 	notificationRepo := postgres.NewNotificationRepo(pool)
-	reportTemplateRepo := postgres.NewReportTemplateRepo(pool)
-	reportRepo := postgres.NewReportRepo(pool)
+	protocolTemplateRepo := postgres.NewProtocolTemplateRepo(pool)
+	protocolRepo := postgres.NewProtocolRepo(pool)
 	contractRepo := postgres.NewContractRepo(pool)
 	exitRequestRepo := postgres.NewExitRequestRepo(pool)
 	transferRequestRepo := postgres.NewTransferRequestRepo(pool)
+	petitionTemplateRepo := postgres.NewPetitionTemplateRepo(pool)
+	contractTemplateRepo := postgres.NewContractTemplateRepo(pool)
 
 	mailerService := mailer.New(mailer.Config{
 		Host:     cfg.SMTPHost,
@@ -64,37 +66,43 @@ func main() {
 	authService := service.NewAuthService(userRepo, studentProfileRepo, refreshTokenRepo, mailerService, cfg.JWTSecret, cfg.AccessTokenTTL, cfg.RefreshTokenTTL)
 	userService := service.NewUserService(userRepo, studentProfileRepo, mailerService)
 	dormitoryService := service.NewDormitoryService(dormitoryRepo, applicationRepo)
-	roomService := service.NewRoomService(roomRepo, dormitoryRepo, userRepo, studentProfileRepo, studentBenefitRepo)
+	notifierService := notifier.New(notificationRepo, userRepo, mailerService)
+	roomService := service.NewRoomService(roomRepo, dormitoryRepo, userRepo, studentProfileRepo, studentBenefitRepo, notifierService)
 	benefitService := service.NewBenefitService(benefitRepo, userRepo, studentBenefitRepo)
 	documentService := service.NewDocumentService(requiredDocumentRepo)
-	notifierService := notifier.New(notificationRepo, userRepo, mailerService)
 	applicationService := service.NewApplicationService(applicationRepo, applicationDocumentRepo, dormitoryRepo, roomRepo, roomService, notifierService)
 	notificationService := service.NewNotificationService(notificationRepo, roomRepo, userRepo, notifierService)
-	reportService := service.NewReportService(reportTemplateRepo, reportRepo, applicationRepo, userRepo, dormitoryRepo, roomRepo, notifierService)
-	contractService := service.NewContractService(contractRepo, applicationRepo, reportRepo, reportTemplateRepo, userRepo, notifierService, cfg.ContractResponseDeadline, cfg.ContractReminderWindow)
+	protocolService := service.NewProtocolService(protocolRepo, applicationRepo, userRepo, dormitoryRepo, roomRepo, notifierService)
+	contractService := service.NewContractService(contractRepo, applicationRepo, protocolRepo, userRepo, notifierService, cfg.ContractResponseDeadline, cfg.ContractReminderWindow)
 	exitRequestService := service.NewExitRequestService(exitRequestRepo, roomRepo, userRepo, notifierService)
 	transferRequestService := service.NewTransferRequestService(transferRequestRepo, roomRepo, roomService, userRepo, notifierService)
 	feedbackService := service.NewFeedbackService(userRepo, notifierService, mailerService, cfg.FeedbackEmail)
+	petitionTemplateService := service.NewPetitionTemplateService(petitionTemplateRepo)
+	protocolTemplateService := service.NewProtocolTemplateService(protocolTemplateRepo)
+	contractTemplateService := service.NewContractTemplateService(contractTemplateRepo)
 
-	// Phase 4 hook into phase 3's vote tally: once a report is approved,
-	// auto-generate contracts for its applications.
-	reportService.SetOnApproved(contractService.OnReportApproved)
+	// Once a protocol's vote tally resolves to approved, auto-generate
+	// contracts for its applications.
+	protocolService.SetOnApproved(contractService.OnProtocolApproved)
 
 	handlers := apihttp.Handlers{
-		Auth:            handler.NewAuthHandler(authService),
-		User:            handler.NewUserHandler(userService),
-		Dormitory:       handler.NewDormitoryHandler(dormitoryService),
-		Room:            handler.NewRoomHandler(roomService),
-		Benefit:         handler.NewBenefitHandler(benefitService),
-		Document:        handler.NewDocumentHandler(documentService),
-		Application:     handler.NewApplicationHandler(applicationService),
-		Notification:    handler.NewNotificationHandler(notificationService),
-		Report:          handler.NewReportHandler(reportService),
-		Contract:        handler.NewContractHandler(contractService, applicationService),
-		Feedback:        handler.NewFeedbackHandler(feedbackService),
-		ExitRequest:     handler.NewExitRequestHandler(exitRequestService),
-		TransferRequest: handler.NewTransferRequestHandler(transferRequestService),
-		Upload:          handler.NewUploadHandler(cfg.UploadDir),
+		Auth:             handler.NewAuthHandler(authService),
+		User:             handler.NewUserHandler(userService),
+		Dormitory:        handler.NewDormitoryHandler(dormitoryService),
+		Room:             handler.NewRoomHandler(roomService),
+		Benefit:          handler.NewBenefitHandler(benefitService),
+		Document:         handler.NewDocumentHandler(documentService),
+		Application:      handler.NewApplicationHandler(applicationService),
+		Notification:     handler.NewNotificationHandler(notificationService),
+		Protocol:         handler.NewProtocolHandler(protocolService),
+		ProtocolTemplate: handler.NewProtocolTemplateHandler(protocolTemplateService),
+		Contract:         handler.NewContractHandler(contractService, applicationService),
+		Feedback:         handler.NewFeedbackHandler(feedbackService),
+		ExitRequest:      handler.NewExitRequestHandler(exitRequestService),
+		TransferRequest:  handler.NewTransferRequestHandler(transferRequestService),
+		Upload:           handler.NewUploadHandler(cfg.UploadDir),
+		PetitionTemplate: handler.NewPetitionTemplateHandler(petitionTemplateService),
+		ContractTemplate: handler.NewContractTemplateHandler(contractTemplateService),
 	}
 
 	router := apihttp.NewRouter(cfg.JWTSecret, cfg.UploadDir, handlers)

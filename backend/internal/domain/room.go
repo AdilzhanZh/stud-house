@@ -62,6 +62,14 @@ type Room struct {
 	UpdatedAt    time.Time
 }
 
+// NotificationRoomResidentReleased/Transferred back the two manager-initiated
+// room actions on RoomService (release, transfer) — distinct from
+// NotificationExitRequestUpdate/NotificationTransferRequestUpdate, which are
+// tied to the student-initiated request/approval workflows, not a direct
+// admin action.
+const NotificationRoomResidentReleased NotificationType = "room_resident_released"
+const NotificationRoomResidentTransferred NotificationType = "room_resident_transferred"
+
 // RoomResident represents one stay of a student in a room. MovedOutAt is nil
 // while the student currently lives there.
 type RoomResident struct {

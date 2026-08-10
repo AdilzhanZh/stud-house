@@ -27,8 +27,8 @@ type uploadResponse struct {
 // Upload is available to any authenticated user: accepts a multipart "file"
 // field and stores it under uploadDir with a random name (original
 // extension kept), so files can be picked from the caller's own computer
-// instead of pasting an external URL into a text field (report templates,
-// dormitory images, application/payment documents, etc). The returned URL
+// instead of pasting an external URL into a text field (dormitory images,
+// application/payment documents, etc). The returned URL
 // is absolute (built from the incoming request's own host/scheme) and is
 // served back by the static /api/v1/uploads/ route registered in router.go.
 func (h *UploadHandler) Upload(c *gin.Context) {

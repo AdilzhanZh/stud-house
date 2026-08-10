@@ -33,7 +33,7 @@ type ContractTx interface {
 type ContractRepository interface {
 	// CreateIfNotExists is idempotent: it returns created=false without
 	// error if a contract already exists for c.ApplicationID (defends
-	// against the same application ending up in two approved reports).
+	// against the same application ending up in two approved protocols).
 	CreateIfNotExists(ctx context.Context, c *domain.Contract) (created bool, err error)
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Contract, error)
 	GetByApplicationID(ctx context.Context, applicationID uuid.UUID) (*domain.Contract, error)

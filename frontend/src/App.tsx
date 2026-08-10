@@ -32,13 +32,15 @@ import { ResidentsPage } from './features/admin/residents/ResidentsPage'
 import { NotificationBroadcastPage } from './features/admin/notifications/NotificationBroadcastPage'
 import { ApplicationQueuePage } from './features/admin/applications/ApplicationQueuePage'
 import { ApplicationAdminDetailPage } from './features/admin/applications/ApplicationAdminDetailPage'
-import { ReportListPage } from './features/admin/reports/ReportListPage'
-import { ReportDetailPage } from './features/admin/reports/ReportDetailPage'
-import { ReportTemplateListPage } from './features/admin/reports/ReportTemplateListPage'
-import { ReportCreatePage } from './features/admin/reports/ReportCreatePage'
-import { CommitteeReportListPage } from './features/admin/committee/CommitteeReportListPage'
-import { CommitteeVotePage } from './features/admin/committee/CommitteeVotePage'
+import { PetitionTemplatePage } from './features/admin/applications/PetitionTemplatePage'
+import { ProtocolListPage } from './features/admin/protocols/ProtocolListPage'
+import { ProtocolDetailPage } from './features/admin/protocols/ProtocolDetailPage'
+import { ProtocolCreatePage } from './features/admin/protocols/ProtocolCreatePage'
+import { ProtocolTemplatePage } from './features/admin/protocols/ProtocolTemplatePage'
+import { CommitteeProtocolListPage } from './features/admin/committee/CommitteeProtocolListPage'
 import { ContractsAndPaymentsPage } from './features/admin/contracts/ContractsAndPaymentsPage'
+import { ContractTemplatePage } from './features/admin/contracts/ContractTemplatePage'
+import { ContractDetailPage } from './features/admin/contracts/ContractDetailPage'
 import { ExitRequestListPage } from './features/admin/requests/ExitRequestListPage'
 import { TransferRequestListPage } from './features/admin/requests/TransferRequestListPage'
 import { ProtectedRoute } from './routes/ProtectedRoute'
@@ -98,15 +100,17 @@ function App() {
           <Route path="/admin/students/pending" element={<PendingStudentsPage />} />
 
           <Route path="/admin/applications" element={<ApplicationQueuePage />} />
+          <Route path="/admin/applications/petition-template" element={<PetitionTemplatePage />} />
           <Route path="/admin/applications/:id" element={<ApplicationAdminDetailPage />} />
-          <Route path="/admin/reports" element={<ReportListPage />} />
-          <Route path="/admin/reports/templates" element={<ReportTemplateListPage />} />
-          <Route path="/admin/reports/new" element={<ReportCreatePage />} />
-          <Route path="/admin/reports/:id" element={<ReportDetailPage />} />
-          <Route path="/committee/reports" element={<CommitteeReportListPage />} />
-          <Route path="/committee/reports/:id" element={<CommitteeVotePage />} />
+          <Route path="/admin/protocols" element={<ProtocolListPage />} />
+          <Route path="/admin/protocols/new" element={<ProtocolCreatePage />} />
+          <Route path="/admin/protocols/template" element={<ProtocolTemplatePage />} />
+          <Route path="/admin/protocols/:id" element={<ProtocolDetailPage />} />
+          <Route path="/committee/protocols" element={<CommitteeProtocolListPage />} />
 
           <Route path="/admin/contracts" element={<ContractsAndPaymentsPage />} />
+          <Route path="/admin/contracts/contract-template" element={<ContractTemplatePage />} />
+          <Route path="/admin/contracts/:id" element={<ContractDetailPage />} />
           <Route path="/admin/exit-requests" element={<ExitRequestListPage />} />
           <Route path="/admin/transfer-requests" element={<TransferRequestListPage />} />
 

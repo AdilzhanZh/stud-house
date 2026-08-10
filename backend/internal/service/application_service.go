@@ -55,7 +55,10 @@ func statusPtr(s domain.ApplicationStatus) *domain.ApplicationStatus { return &s
 // of some room (an active room_residents row) — settled students must go
 // through a move-out flow, not a new intake application, which is out of
 // scope for this phase.
-func (s *ApplicationService) Create(ctx context.Context, studentID, dormitoryID uuid.UUID, preferredRoomType, notes *string, preferredRoomID *uuid.UUID) (*domain.Application, error) {
+func (s *ApplicationService) Create(ctx context.Context, studentID, dormitoryID uuid.UUID, preferredRoomType, notes *string, preferredRoomID *uuid.UUID, studyGroup, hometown, parentContact string) (*domain.Application, error) {
+	if studyGroup == "" || hometown == "" || parentContact == "" {
+		return nil, apperror.BadRequest("оқу тобы, келген жеріңіз және ата-ана/жақынның байланыс нөмірі міндетті")
+	}
 	dormitory, err := s.dormitories.GetByID(ctx, dormitoryID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -108,6 +111,9 @@ func (s *ApplicationService) Create(ctx context.Context, studentID, dormitoryID 
 		PreferredRoomType: preferredRoomType,
 		PreferredRoomID:   preferredRoomID,
 		Notes:             notes,
+		StudyGroup:        studyGroup,
+		Hometown:          hometown,
+		ParentContact:     parentContact,
 	}
 	if err := s.applications.Create(ctx, app); err != nil {
 		if errors.Is(err, repository.ErrConflict) {

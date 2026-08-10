@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Card } from '../../../components/Card'
 import { Button } from '../../../components/Button'
@@ -11,7 +12,13 @@ import { getApplication } from '../../../api/applicationApi'
 import { listUsers } from '../../../api/adminUserApi'
 import { listDormitories } from '../../../api/dormitoryApi'
 import { formatTimeElapsed } from '../../contracts/deadline'
-import { adminCellClass, adminPageHeading, adminRowClass, adminTableWrapClass, adminTheadClass } from '../adminTable'
+import {
+  adminCellClass,
+  adminPageHeading,
+  adminRowClickableClass,
+  adminTableWrapClass,
+  adminTheadClass,
+} from '../adminTable'
 import type { Contract } from '../../../types/contracts'
 
 interface ContractRow extends Contract {
@@ -21,6 +28,7 @@ interface ContractRow extends Contract {
 
 export function ContractsAndPaymentsPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const [contracts, setContracts] = useState<ContractRow[] | null>(null)
   const [overdueContracts, setOverdueContracts] = useState<ContractRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -95,7 +103,12 @@ export function ContractsAndPaymentsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className={adminPageHeading}>{t('admin.layout.contracts')}</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className={adminPageHeading}>{t('admin.layout.contracts')}</h1>
+        <Button variant="secondary" onClick={() => navigate('/admin/contracts/contract-template')}>
+          {t('admin.contracts.contractTemplateButton')}
+        </Button>
+      </div>
 
       {error && <Alert variant="error" message={error} />}
       {actionError && <Alert variant="error" message={actionError} />}
@@ -116,7 +129,11 @@ export function ContractsAndPaymentsPage() {
               </thead>
               <tbody>
                 {contracts.map((c) => (
-                  <tr key={c.id} className={adminRowClass}>
+                  <tr
+                    key={c.id}
+                    className={adminRowClickableClass}
+                    onClick={() => navigate(`/admin/contracts/${c.id}`)}
+                  >
                     <td className={`${adminCellClass} font-semibold text-sand-100`}>{c.studentName}</td>
                     <td className={`${adminCellClass} text-sand-300`}>{c.dormitoryName}</td>
                     <td className={adminCellClass}>

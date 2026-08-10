@@ -9,6 +9,7 @@ import (
 
 	"student-house/internal/domain"
 	"student-house/internal/repository"
+	"student-house/internal/service/notifier"
 	"student-house/pkg/apperror"
 )
 
@@ -18,6 +19,7 @@ type RoomService struct {
 	users           repository.UserRepository
 	profiles        repository.StudentProfileRepository
 	studentBenefits repository.StudentBenefitRepository
+	notifier        *notifier.Notifier
 }
 
 func NewRoomService(
@@ -26,6 +28,7 @@ func NewRoomService(
 	users repository.UserRepository,
 	profiles repository.StudentProfileRepository,
 	studentBenefits repository.StudentBenefitRepository,
+	notifier *notifier.Notifier,
 ) *RoomService {
 	return &RoomService{
 		rooms:           rooms,
@@ -33,6 +36,7 @@ func NewRoomService(
 		users:           users,
 		profiles:        profiles,
 		studentBenefits: studentBenefits,
+		notifier:        notifier,
 	}
 }
 
@@ -320,14 +324,95 @@ func (s *RoomService) AddResident(ctx context.Context, roomID, studentID uuid.UU
 	return rr, nil
 }
 
+// MoveOutResident is the admin/manager-facing "release from room" action: it
+// ends the resident's stay and notifies the student directly (in-app +
+// email). This is distinct from ExitRequestService's approval path, which
+// closes out the room_residents row via the repository directly and sends
+// its own "exit request approved" notification instead — so no risk of a
+// duplicate notification when a request is approved through that flow.
 func (s *RoomService) MoveOutResident(ctx context.Context, residentRowID uuid.UUID) error {
+	resident, err := s.rooms.GetResidentByID(ctx, residentRowID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return apperror.NotFound("белсенді тұрғын жазбасы табылмады")
+		}
+		return err
+	}
+
 	if err := s.rooms.MoveOutResident(ctx, residentRowID); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return apperror.NotFound("белсенді тұрғын жазбасы табылмады")
 		}
 		return err
 	}
+
+	_ = s.notifier.Notify(ctx, resident.StudentID, domain.NotificationRoomResidentReleased,
+		"Бөлмеден шығарылдыңыз",
+		"Сіз жатақхана әкімшілігі тарапынан бөлмеден шығарылдыңыз.", nil)
 	return nil
+}
+
+// TransferResident is the admin/manager-facing "move this resident to a
+// different room" action. Unlike TransferRequestService.Decide's approval
+// step (which vacates the old room before checking the new one, and accepts
+// the narrow risk of leaving the student roomless if that check fails —
+// acceptable there since a request only reaches approval after a manager
+// already looked at it), this direct action validates the target room's
+// capacity/gender/course/benefit fit up front, before touching the old
+// room_residents row: a manager picking an invalid destination room is the
+// common case here, not an edge case, so it must never strand the student
+// with no active room at all.
+func (s *RoomService) TransferResident(ctx context.Context, residentRowID, newRoomID uuid.UUID) (*domain.RoomResident, error) {
+	resident, err := s.rooms.GetResidentByID(ctx, residentRowID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, apperror.NotFound("белсенді тұрғын жазбасы табылмады")
+		}
+		return nil, err
+	}
+	if resident.MovedOutAt != nil {
+		return nil, apperror.Conflict("тұрғын бұрын осы бөлмеден шыққан")
+	}
+	if resident.RoomID == newRoomID {
+		return nil, apperror.Conflict("студент бұрыннан осы бөлмеде тұрады")
+	}
+
+	newRoom, err := s.GetByID(ctx, newRoomID)
+	if err != nil {
+		return nil, err
+	}
+	newRoomResidents, err := s.rooms.ListActiveResidents(ctx, newRoomID)
+	if err != nil {
+		return nil, err
+	}
+	if len(newRoomResidents) >= newRoom.Capacity {
+		return nil, apperror.Conflict("бөлме толығымен толған")
+	}
+	if err := s.checkStudentAgainstRestrictions(ctx, resident.StudentID, newRoom.Restrictions); err != nil {
+		return nil, err
+	}
+
+	if err := s.rooms.MoveOutResident(ctx, residentRowID); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, apperror.NotFound("белсенді тұрғын жазбасы табылмады")
+		}
+		return nil, err
+	}
+
+	// The capacity/restriction checks above were already satisfied, so this
+	// should succeed barring a concurrent write to newRoomID in between —
+	// the same narrow check-then-act race already accepted throughout this
+	// codebase (no cross-repository transactions exist anywhere in it).
+	newResident, err := s.AddResident(ctx, newRoomID, resident.StudentID)
+	if err != nil {
+		return nil, err
+	}
+
+	_ = s.notifier.Notify(ctx, resident.StudentID, domain.NotificationRoomResidentTransferred,
+		"Бөлме ауыстырылды",
+		fmt.Sprintf("Сіз жаңа бөлмеге (№%s) ауыстырылдыңыз.", newRoom.RoomNumber), nil)
+
+	return newResident, nil
 }
 
 func (s *RoomService) ListActiveResidents(ctx context.Context, roomID uuid.UUID) ([]*domain.RoomResident, error) {

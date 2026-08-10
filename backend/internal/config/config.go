@@ -14,7 +14,7 @@ type Config struct {
 	JWTSecret       string
 	AccessTokenTTL  time.Duration
 	RefreshTokenTTL time.Duration
-	// UploadDir is where POST /uploads writes files (report template files
+	// UploadDir is where POST /uploads writes files (documents/images
 	// uploaded from the admin's computer, instead of pasting an external URL).
 	UploadDir string
 

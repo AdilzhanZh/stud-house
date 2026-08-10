@@ -5,6 +5,9 @@ export interface CreateApplicationPayload {
   dormitory_id: string
   notes: string | null
   preferred_room_id?: string | null
+  study_group: string
+  hometown: string
+  parent_contact: string
 }
 
 export async function createApplication(payload: CreateApplicationPayload): Promise<Application> {

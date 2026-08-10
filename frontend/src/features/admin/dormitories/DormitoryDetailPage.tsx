@@ -181,7 +181,7 @@ export function DormitoryDetailPage() {
             </tr>
           </thead>
           <tbody>
-            {rooms.map((room) => (
+            {activeFloorRooms.map((room) => (
               <tr key={room.id} className={adminRowClass}>
                 <td className={`${adminCellClass} font-semibold text-sand-100`}>{room.room_number}</td>
                 <td className={`${adminCellClass} text-sand-300`}>{room.floor ?? '—'}</td>
@@ -208,7 +208,7 @@ export function DormitoryDetailPage() {
                 </td>
               </tr>
             ))}
-            {rooms.length === 0 && (
+            {activeFloorRooms.length === 0 && (
               <tr>
                 <td className={`${adminCellClass} text-sand-300`} colSpan={8}>
                   {t('admin.dormitories.noRooms')}

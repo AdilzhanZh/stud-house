@@ -5,6 +5,7 @@ import { ChevronLeft, Check, Upload } from 'lucide-react'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
+import { Input } from '../../components/Input'
 import { SegmentedProgress } from '../../components/SegmentedProgress'
 import { extractErrorMessage } from '../../api/client'
 import { listDormitoryRequiredDocuments } from '../../api/dormitoryApi'
@@ -18,7 +19,7 @@ import { assignOwnBenefit, listBenefitRequiredDocuments, listBenefits } from '..
 import { listRoomResidents, listRoomsByDormitory } from '../../api/roomApi'
 import { getStudentProfile } from '../../api/profileApi'
 import { uploadFile } from '../../api/uploadApi'
-import { generateApplicationSubmissionPdfBlob } from '../../utils/applicationPdf'
+import { generatePetitionPdfBlob } from '../../utils/petitionPdf'
 import { formatTenge } from '../../utils/dormitoryLabels'
 import { FloorCorridorMap } from '../../components/FloorCorridorMap'
 import { useDormitoriesWithMeta } from '../dormitories/useDormitoriesWithMeta'
@@ -123,6 +124,9 @@ export function NewApplicationPage() {
     Record<string, BenefitRequiredDocument[]>
   >({})
   const [docFiles, setDocFiles] = useState<Record<string, File | null>>({})
+  const [studyGroup, setStudyGroup] = useState('')
+  const [hometown, setHometown] = useState('')
+  const [parentContact, setParentContact] = useState('')
   const [wish, setWish] = useState('')
   const [loadError, setLoadError] = useState<string | null>(null)
   const [serverError, setServerError] = useState<string | null>(null)
@@ -262,6 +266,10 @@ export function NewApplicationPage() {
       setServerError(t('wizard.invalidDocError', { doc: invalidDoc.document_name }))
       return
     }
+    if (!studyGroup.trim() || !hometown.trim() || !parentContact.trim()) {
+      setServerError(t('wizard.missingPetitionFieldsError'))
+      return
+    }
 
     setIsSubmitting(true)
     let createdApplicationId: string | null = null
@@ -280,6 +288,9 @@ export function NewApplicationPage() {
         dormitory_id: dormitoryId,
         notes: wish.trim() || null,
         preferred_room_id: roomId || null,
+        study_group: studyGroup.trim(),
+        hometown: hometown.trim(),
+        parent_contact: parentContact.trim(),
       })
       createdApplicationId = application.id
 
@@ -306,14 +317,13 @@ export function NewApplicationPage() {
       if (user) {
         try {
           const dormitoryName = dormitories?.find((d) => d.id === dormitoryId)?.name ?? dormitoryId
-          const pdfBlob = await generateApplicationSubmissionPdfBlob({
-            applicationId: application.id,
-            studentFullName: user.full_name,
-            studentIIN: user.iin,
-            studentEmail: user.email,
-            studentPhone: user.phone,
-            dormitoryName,
-            submittedAt: new Date(),
+          const pdfBlob = await generatePetitionPdfBlob({
+            full_name: user.full_name,
+            study_group: studyGroup.trim(),
+            hometown: hometown.trim(),
+            phone_self: user.phone,
+            parent_contact: parentContact.trim(),
+            dormitory_name: dormitoryName,
           })
           const pdfFile = new File([pdfBlob], `otinish-${application.id}.pdf`, {
             type: 'application/pdf',
@@ -613,6 +623,33 @@ export function NewApplicationPage() {
                   </p>
                 ))
               )}
+            </Card>
+
+            <Card className="!p-4">
+              <p className="mb-3 text-sm text-sand-300">{t('wizard.petitionSection')}</p>
+              <div className="flex flex-col gap-3">
+                <Input
+                  label={t('wizard.studyGroupLabel')}
+                  placeholder={t('wizard.studyGroupPlaceholder')}
+                  value={studyGroup}
+                  onChange={(e) => setStudyGroup(e.target.value)}
+                  required
+                />
+                <Input
+                  label={t('wizard.hometownLabel')}
+                  placeholder={t('wizard.hometownPlaceholder')}
+                  value={hometown}
+                  onChange={(e) => setHometown(e.target.value)}
+                  required
+                />
+                <Input
+                  label={t('wizard.parentContactLabel')}
+                  placeholder={t('wizard.parentContactPlaceholder')}
+                  value={parentContact}
+                  onChange={(e) => setParentContact(e.target.value)}
+                  required
+                />
+              </div>
             </Card>
 
             <Card className="!p-4">

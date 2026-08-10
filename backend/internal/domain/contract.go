@@ -7,14 +7,14 @@ import (
 )
 
 // ApplicationSettled is a new application_status value (added via migration,
-// same pattern as NotificationReportReview in phase 3) marking that the
-// student has accepted their contract. Not added to the phase-2
-// ApplicationStatus.Valid() switch — nothing in this phase needs to validate
-// it as raw user input, since it's only ever set by the system.
+// same pattern as NotificationProtocolReview) marking that the
+// student has accepted their contract. Included in ApplicationStatus.Valid()
+// so it can be used as a status query filter (e.g. GET /applications?status=settled
+// for room-assignment screens), even though it's only ever set by the system.
 const ApplicationSettled ApplicationStatus = "settled"
 
 // NotificationContractSent is a new notification_type enum value (added by
-// a dedicated migration, same pattern as NotificationReportReview).
+// a dedicated migration, same pattern as NotificationProtocolReview).
 const NotificationContractSent NotificationType = "contract_sent"
 
 type ContractStatus string
@@ -31,9 +31,9 @@ const (
 	ContractExpired                 ContractStatus = "expired"
 )
 
-// Contract is auto-created (one per application, FileURL copied from the
-// report's template) once that application's report is approved by
-// committee. The student must accept/decline before ResponseDeadline.
+// Contract is auto-created (one per application) once that application's
+// protocol is approved by committee. The student must accept/decline before
+// ResponseDeadline.
 type Contract struct {
 	ID               uuid.UUID
 	ApplicationID    uuid.UUID

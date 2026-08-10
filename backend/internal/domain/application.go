@@ -18,7 +18,7 @@ const (
 
 func (s ApplicationStatus) Valid() bool {
 	switch s {
-	case ApplicationPending, ApplicationManagerReview, ApplicationNeedsCorrection, ApplicationApproved, ApplicationRejected:
+	case ApplicationPending, ApplicationManagerReview, ApplicationNeedsCorrection, ApplicationApproved, ApplicationRejected, ApplicationSettled:
 		return true
 	default:
 		return false
@@ -40,10 +40,17 @@ type Application struct {
 	// assign a different room later via RoomService.AddResident.
 	PreferredRoomID *uuid.UUID
 	Notes           *string
-	AssignedRoomID  *uuid.UUID
-	HandledBy       *uuid.UUID
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	// StudyGroup, Hometown, and ParentContact are required at submission
+	// (see ApplicationService.Create) — they don't belong anywhere else on
+	// the student's account and only exist to fill in the printed "Өтініш"
+	// placement petition document generated per approved application.
+	StudyGroup     string
+	Hometown       string
+	ParentContact  string
+	AssignedRoomID *uuid.UUID
+	HandledBy      *uuid.UUID
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 // ApplicationStatusHistory is an immutable audit log entry for one status

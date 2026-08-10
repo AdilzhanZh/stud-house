@@ -9,20 +9,23 @@ import (
 )
 
 type Handlers struct {
-	Auth            *handler.AuthHandler
-	User            *handler.UserHandler
-	Dormitory       *handler.DormitoryHandler
-	Room            *handler.RoomHandler
-	Benefit         *handler.BenefitHandler
-	Document        *handler.DocumentHandler
-	Application     *handler.ApplicationHandler
-	Notification    *handler.NotificationHandler
-	Report          *handler.ReportHandler
-	Contract        *handler.ContractHandler
-	Feedback        *handler.FeedbackHandler
-	ExitRequest     *handler.ExitRequestHandler
-	TransferRequest *handler.TransferRequestHandler
-	Upload          *handler.UploadHandler
+	Auth             *handler.AuthHandler
+	User             *handler.UserHandler
+	Dormitory        *handler.DormitoryHandler
+	Room             *handler.RoomHandler
+	Benefit          *handler.BenefitHandler
+	Document         *handler.DocumentHandler
+	Application      *handler.ApplicationHandler
+	Notification     *handler.NotificationHandler
+	Protocol         *handler.ProtocolHandler
+	ProtocolTemplate *handler.ProtocolTemplateHandler
+	PetitionTemplate *handler.PetitionTemplateHandler
+	ContractTemplate *handler.ContractTemplateHandler
+	Contract         *handler.ContractHandler
+	Feedback         *handler.FeedbackHandler
+	ExitRequest      *handler.ExitRequestHandler
+	TransferRequest  *handler.TransferRequestHandler
+	Upload           *handler.UploadHandler
 }
 
 func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
@@ -37,8 +40,8 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 
 	api := r.Group("/api/v1")
 	{
-		// Publicly readable (files are only linked from admin-authored report
-		// templates, same trust level as the plain external URLs this replaces).
+		// Publicly readable (files are only linked from admin-authored
+		// content, same trust level as the plain external URLs this replaces).
 		api.Static("/uploads", uploadDir)
 
 		authGroup := api.Group("/auth")
@@ -101,13 +104,9 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 			protected.DELETE("/notifications", h.Notification.ClearAll)
 
 			// Any authenticated user: students upload application documents,
-			// admins/managers upload dormitory images and report
-			// templates — all through the same generic file-storage endpoint.
+			// admins/managers upload dormitory images — all through the same
+			// generic file-storage endpoint.
 			protected.POST("/uploads", h.Upload.Upload)
-
-			// Any authenticated user: read a report (only a committee member
-			// — is_committee_member=true — can vote).
-			protected.GET("/reports/:id", h.Report.GetDetail)
 
 			// Any authenticated user: ownership (student) or admin/manager is
 			// checked inside the handler.
@@ -116,12 +115,18 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 			protected.GET("/exit-requests/:id", h.ExitRequest.Get)
 			protected.GET("/transfer-requests/:id", h.TransferRequest.Get)
 
+			// Any authenticated user can read the contract template — a student
+			// needs it client-side to render/download their own contract
+			// (see frontend's contractPdf.ts). Only admin/manager may edit it
+			// (see the PUT below, alongside the other admin template routes).
+			protected.GET("/contract-template", h.ContractTemplate.Get)
+
 			// Committee-only: is_committee_member=true, an admin-toggled flag on
 			// a manager (chairperson is a further flag on top of that).
 			committeeGroup := protected.Group("")
 			committeeGroup.Use(committeeOnly)
 			{
-				committeeGroup.PATCH("/reports/:id/vote", h.Report.Vote)
+				committeeGroup.PATCH("/protocols/:id/vote", h.Protocol.Vote)
 			}
 
 			// Student-only: submitting and managing their own application.
@@ -162,6 +167,7 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 				mgmt.PATCH("/rooms/:roomId/restrictions", h.Room.UpdateRestrictions)
 				mgmt.POST("/rooms/:roomId/residents", h.Room.AddResident)
 				mgmt.DELETE("/room-residents/:residentId", h.Room.MoveOutResident)
+				mgmt.POST("/room-residents/:residentId/transfer", h.Room.TransferResident)
 
 				mgmt.POST("/benefits", h.Benefit.Create)
 				mgmt.PATCH("/benefits/:id", h.Benefit.Update)
@@ -183,17 +189,21 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 				mgmt.GET("/applications", h.Application.List)
 				mgmt.PATCH("/applications/:id/decision", h.Application.Decide)
 
+				mgmt.GET("/petition-template", h.PetitionTemplate.Get)
+				mgmt.PUT("/petition-template", h.PetitionTemplate.Update)
+
 				mgmt.POST("/notifications/broadcast", h.Notification.Broadcast)
 
-				mgmt.POST("/report-templates", h.Report.CreateTemplate)
-				mgmt.GET("/report-templates", h.Report.ListTemplates)
-				mgmt.DELETE("/report-templates/:id", h.Report.DeleteTemplate)
+				mgmt.GET("/protocol-template", h.ProtocolTemplate.Get)
+				mgmt.PUT("/protocol-template", h.ProtocolTemplate.Update)
 
-				mgmt.GET("/reports", h.Report.List)
-				mgmt.POST("/reports", h.Report.Create)
-				mgmt.POST("/reports/:id/revise", h.Report.Revise)
-				mgmt.GET("/reports/:id/export", h.Report.Export)
-				mgmt.DELETE("/reports/:id", h.Report.Delete)
+				mgmt.PUT("/contract-template", h.ContractTemplate.Update)
+
+				mgmt.GET("/protocols", h.Protocol.List)
+				mgmt.POST("/protocols", h.Protocol.Create)
+				mgmt.GET("/protocols/eligible-applications", h.Protocol.EligibleApplications)
+				mgmt.GET("/protocols/:id", h.Protocol.GetDetail)
+				mgmt.DELETE("/protocols/:id", h.Protocol.Delete)
 
 				mgmt.POST("/admin/contracts/expire-check", h.Contract.ExpireCheck)
 				mgmt.GET("/contracts", h.Contract.List)

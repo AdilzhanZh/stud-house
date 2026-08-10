@@ -177,12 +177,16 @@ func (r *UserRepo) ListByRole(ctx context.Context, role domain.Role) ([]*domain.
 	return users, rows.Err()
 }
 
+// List is the admin panel's general roster. A self-registered student who
+// hasn't confirmed their email yet isn't a real user of the site — just an
+// unproven registration attempt — so those rows are excluded here (as well
+// as from ListPendingStudents) until email_verified_at is set.
 func (r *UserRepo) List(ctx context.Context, role *domain.Role) ([]*domain.User, error) {
-	baseQ := `SELECT ` + userColumns + ` FROM users`
+	baseQ := `SELECT ` + userColumns + ` FROM users WHERE NOT (role = 'student' AND email_verified_at IS NULL)`
 	var rows pgx.Rows
 	var err error
 	if role != nil {
-		rows, err = r.db.Query(ctx, baseQ+` WHERE role = $1 ORDER BY full_name`, string(*role))
+		rows, err = r.db.Query(ctx, baseQ+` AND role = $1 ORDER BY full_name`, string(*role))
 	} else {
 		rows, err = r.db.Query(ctx, baseQ+` ORDER BY full_name`)
 	}
@@ -202,8 +206,11 @@ func (r *UserRepo) List(ctx context.Context, role *domain.Role) ([]*domain.User,
 	return users, rows.Err()
 }
 
+// ListPendingStudents excludes unverified registrations (email_verified_at
+// IS NULL) — a manager should only see applications once the applicant has
+// proven ownership of the email, not the moment the form is submitted.
 func (r *UserRepo) ListPendingStudents(ctx context.Context) ([]*domain.User, error) {
-	q := `SELECT ` + userColumns + ` FROM users WHERE role = 'student' AND approval_status = 'pending' ORDER BY created_at`
+	q := `SELECT ` + userColumns + ` FROM users WHERE role = 'student' AND approval_status = 'pending' AND email_verified_at IS NOT NULL ORDER BY created_at`
 	rows, err := r.db.Query(ctx, q)
 	if err != nil {
 		return nil, err

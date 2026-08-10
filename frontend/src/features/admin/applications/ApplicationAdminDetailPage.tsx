@@ -9,11 +9,10 @@ import { StatusBadge } from '../../../components/StatusBadge'
 import { ApplicationJourneyStepper } from '../../../components/ApplicationJourneyStepper'
 import { extractErrorMessage } from '../../../api/client'
 import { getApplication } from '../../../api/applicationApi'
-import { decideApplication, listApplications } from '../../../api/applicationAdminApi'
-import { getDormitory, listDormitories } from '../../../api/dormitoryApi'
+import { decideApplication } from '../../../api/applicationAdminApi'
+import { getDormitory } from '../../../api/dormitoryApi'
 import { listRoomResidents, listRoomsByDormitory } from '../../../api/roomApi'
 import { listUsers } from '../../../api/adminUserApi'
-import { createReport, listClaimedApplicationIds } from '../../../api/reportApi'
 import { listBenefits, listStudentBenefits } from '../../../api/benefitApi'
 import { applicationStatusToJourneyStep } from '../../applications/statusHelpers'
 import { formatDateTime } from '../../../utils/dateFormat'
@@ -83,39 +82,6 @@ export function ApplicationAdminDetailPage() {
     setActionError(null)
   }
 
-  // Committee reports bundle every approved-and-not-yet-reported application
-  // together, grouped by dormitory since each dormitory can configure its
-  // own default report template. "Already reported" means attached to any
-  // non-rejected report (pending_committee or approved) — a rejected
-  // report's applications are free to be re-bundled into a new one. A
-  // dormitory with no default template configured is silently skipped
-  // (nothing to auto-register into) — the manager can still create that
-  // dormitory's report manually from the Reports page.
-  async function autoRegisterInReport() {
-    const [approvedApps, dormitories, claimed] = await Promise.all([
-      listApplications('approved'),
-      listDormitories(),
-      listClaimedApplicationIds(),
-    ])
-    const defaultTemplateByDormitory = new Map(dormitories.map((d) => [d.id, d.default_report_template_id]))
-
-    const eligibleByDormitory = new Map<string, string[]>()
-    for (const a of approvedApps) {
-      if (claimed.has(a.id)) continue
-      const templateId = defaultTemplateByDormitory.get(a.dormitory_id)
-      if (!templateId) continue
-      const ids = eligibleByDormitory.get(a.dormitory_id) ?? []
-      ids.push(a.id)
-      eligibleByDormitory.set(a.dormitory_id, ids)
-    }
-
-    for (const [dormitoryId, applicationIds] of eligibleByDormitory) {
-      const templateId = defaultTemplateByDormitory.get(dormitoryId)
-      if (!templateId) continue
-      await createReport(templateId, applicationIds).catch(() => {})
-    }
-  }
-
   // Room selection here is optional — if a manager doesn't pick one, the
   // student is placed later via the dormitory's room/resident management
   // screens, same as before this screen supported assignment inline. The
@@ -127,10 +93,6 @@ export function ApplicationAdminDetailPage() {
     setIsSubmitting(true)
     try {
       await decideApplication(id, { action: 'approve', room_id: selectedRoomId ?? undefined })
-      // Best-effort — the approval itself already succeeded by this point,
-      // so a report-registration hiccup shouldn't be reported as a failed
-      // approval (the manager can register it from the reports page).
-      await autoRegisterInReport().catch(() => {})
       navigate('/admin/applications')
     } catch (err) {
       setActionError(extractErrorMessage(err, t('admin.applications.approveFailed')))

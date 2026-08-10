@@ -21,8 +21,7 @@ const contractVoidedComment = "Мерзімде жауап бермегенді�
 type ContractService struct {
 	contracts        repository.ContractRepository
 	applications     repository.ApplicationRepository
-	reports          repository.ReportRepository
-	reportTemplates  repository.ReportTemplateRepository
+	protocols        repository.ProtocolRepository
 	users            repository.UserRepository
 	notifier         *notifier.Notifier
 	responseDeadline time.Duration
@@ -32,8 +31,7 @@ type ContractService struct {
 func NewContractService(
 	contracts repository.ContractRepository,
 	applications repository.ApplicationRepository,
-	reports repository.ReportRepository,
-	reportTemplates repository.ReportTemplateRepository,
+	protocols repository.ProtocolRepository,
 	users repository.UserRepository,
 	notifier *notifier.Notifier,
 	responseDeadline time.Duration,
@@ -42,8 +40,7 @@ func NewContractService(
 	return &ContractService{
 		contracts:        contracts,
 		applications:     applications,
-		reports:          reports,
-		reportTemplates:  reportTemplates,
+		protocols:        protocols,
 		users:            users,
 		notifier:         notifier,
 		responseDeadline: responseDeadline,
@@ -51,31 +48,18 @@ func NewContractService(
 	}
 }
 
-// OnReportApproved is wired as ReportService's onApproved hook: it creates
-// one contract per application in the report (idempotent — skips any
-// application that already has one) and notifies each student.
-func (s *ContractService) OnReportApproved(ctx context.Context, reportID uuid.UUID) error {
-	report, err := s.reports.GetByID(ctx, reportID)
-	if err != nil {
-		return err
-	}
-	template, err := s.reportTemplates.GetByID(ctx, report.TemplateID)
-	if err != nil {
-		return err
-	}
-	appIDs, err := s.reports.ListApplicationIDs(ctx, reportID)
+// OnProtocolApproved is wired as ProtocolService's onApproved hook: it
+// creates one contract per application in the protocol (idempotent — skips
+// any application that already has one) and notifies each student.
+func (s *ContractService) OnProtocolApproved(ctx context.Context, protocolID uuid.UUID) error {
+	appIDs, err := s.protocols.ListApplicationIDs(ctx, protocolID)
 	if err != nil {
 		return err
 	}
 
-	// FileURL is optional on ReportTemplate now (the in-app builder never
-	// requires an uploaded document) — a template with none attached still
-	// produces a contract, just with an empty "Open PDF" link (hidden by the
-	// frontend when file_url is empty).
+	// The protocol template has no attachable file — a contract's "Open PDF"
+	// link starts empty, hidden by the frontend when file_url is empty.
 	var contractFileURL string
-	if template.FileURL != nil {
-		contractFileURL = *template.FileURL
-	}
 
 	now := time.Now()
 	for _, appID := range appIDs {

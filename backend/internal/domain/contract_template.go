@@ -64,7 +64,11 @@ var ContractVariables = []ContractVariable{
 	{Token: "{{room_number}}", Label: "Бөлме нөмірі"},
 	{Token: "{{dormitory_name}}", Label: "Жатақхана атауы"},
 	{Token: "{{dormitory_address}}", Label: "Жатақхана мекен-жайы"},
-	{Token: "{{monthly_payment}}", Label: "Айлық төлем"},
-	{Token: "{{yearly_payment}}", Label: "Жылдық төлем"},
+	{Token: "{{monthly_payment_bachelor}}", Label: "Айлық төлем (бакалавриат)"},
+	{Token: "{{monthly_payment_master}}", Label: "Айлық төлем (магистратура)"},
+	{Token: "{{monthly_payment_doctorate}}", Label: "Айлық төлем (докторантура)"},
+	{Token: "{{yearly_payment_bachelor}}", Label: "Жылдық төлем (бакалавриат)"},
+	{Token: "{{yearly_payment_master}}", Label: "Жылдық төлем (магистратура)"},
+	{Token: "{{yearly_payment_doctorate}}", Label: "Жылдық төлем (докторантура)"},
 	{Token: "{{date}}", Label: "Күні"},
 }

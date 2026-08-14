@@ -23,14 +23,17 @@ type Dormitory struct {
 	FloorCount       *int
 	TotalRoomsTarget *int
 	TotalCapacity    int
-	RoomsMale        *int
-	RoomsFemale      *int
-	RoomsMixed       *int
-	MonthlyPayment   *float64
-	YearlyPayment    *float64
-	BuiltYear        *time.Time
-	CommissionedYear *time.Time
-	OwnershipForm    *string
+	// Payment tiers vary by academic degree — a dormitory can charge
+	// bachelor/master/doctorate students differently.
+	MonthlyPaymentBachelor  *float64
+	MonthlyPaymentMaster    *float64
+	MonthlyPaymentDoctorate *float64
+	YearlyPaymentBachelor   *float64
+	YearlyPaymentMaster     *float64
+	YearlyPaymentDoctorate  *float64
+	BuiltYear               *time.Time
+	CommissionedYear        *time.Time
+	OwnershipForm           *string
 	// ClosedForApplications hides this dormitory from the student-facing
 	// browse/apply list and blocks new applications to it, without
 	// affecting existing residents, applications, or admin management.

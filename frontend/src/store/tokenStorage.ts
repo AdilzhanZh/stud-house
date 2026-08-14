@@ -44,3 +44,25 @@ export function setStoredUser(user: User): void {
 export function clearStoredUser(): void {
   localStorage.removeItem(USER_CACHE_KEY)
 }
+
+// The claims that actually gate routing/authorization (role, committee
+// flags) live in the access token, set fresh by the backend on every
+// login/refresh. Decoding them here lets callers reconcile a stale cached
+// user against the token that was just issued, instead of trusting
+// whatever role the cache happened to hold before a promotion/demotion.
+interface AccessTokenClaims {
+  sub: string
+  role: User['role']
+  is_committee_member: boolean
+  is_chairperson: boolean
+}
+
+export function decodeAccessTokenClaims(accessToken: string): AccessTokenClaims | null {
+  try {
+    const payload = accessToken.split('.')[1]
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
+    return JSON.parse(json) as AccessTokenClaims
+  } catch {
+    return null
+  }
+}

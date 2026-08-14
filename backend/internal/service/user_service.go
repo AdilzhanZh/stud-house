@@ -243,6 +243,13 @@ func (s *UserService) ListPendingStudents(ctx context.Context) ([]*domain.User, 
 	return s.users.ListPendingStudents(ctx)
 }
 
+// ListUnhoused is manager/admin-only: approved students not currently
+// occupying any room, so they can be placed directly without going through
+// the application/approval workflow.
+func (s *UserService) ListUnhoused(ctx context.Context) ([]*domain.User, error) {
+	return s.users.ListUnhoused(ctx)
+}
+
 // DecideStudentApproval is manager/admin-only. approve grants login access;
 // reject blocks it and the account row stays (for audit/history), but its
 // email/IIN is freed up again — AuthService.RegisterStudent silently

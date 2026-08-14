@@ -17,10 +17,6 @@ export interface Room {
   capacity: number
   floor: number | null
   category: string
-  area_sq_m: number | null
-  equipment: string | null
-  top_beds: number
-  bottom_beds: number
   restrictions: RoomRestrictions
   created_at: string
   updated_at: string

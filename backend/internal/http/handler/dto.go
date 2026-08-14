@@ -75,50 +75,52 @@ func studentProfileDTO(p *domain.StudentProfile) studentProfileResponse {
 }
 
 type dormitoryResponse struct {
-	ID                    uuid.UUID             `json:"id"`
-	Name                  string                `json:"name"`
-	Address               string                `json:"address"`
-	Phone                 *string               `json:"phone"`
-	Type                  *domain.DormitoryType `json:"dorm_type"`
-	FloorCount            *int                  `json:"floor_count"`
-	TotalRoomsTarget      *int                  `json:"total_rooms_target"`
-	TotalCapacity         int                   `json:"total_capacity"`
-	RoomsMale             *int                  `json:"rooms_male"`
-	RoomsFemale           *int                  `json:"rooms_female"`
-	RoomsMixed            *int                  `json:"rooms_mixed"`
-	MonthlyPayment        *float64              `json:"monthly_payment"`
-	YearlyPayment         *float64              `json:"yearly_payment"`
-	BuiltYear             *time.Time            `json:"built_year"`
-	CommissionedYear      *time.Time            `json:"commissioned_year"`
-	OwnershipForm         *string               `json:"ownership_form"`
-	ClosedForApplications bool                  `json:"closed_for_applications"`
-	CreatedBy             uuid.UUID             `json:"created_by"`
-	CreatedAt             time.Time             `json:"created_at"`
-	UpdatedAt             time.Time             `json:"updated_at"`
+	ID                      uuid.UUID             `json:"id"`
+	Name                    string                `json:"name"`
+	Address                 string                `json:"address"`
+	Phone                   *string               `json:"phone"`
+	Type                    *domain.DormitoryType `json:"dorm_type"`
+	FloorCount              *int                  `json:"floor_count"`
+	TotalRoomsTarget        *int                  `json:"total_rooms_target"`
+	TotalCapacity           int                   `json:"total_capacity"`
+	MonthlyPaymentBachelor  *float64              `json:"monthly_payment_bachelor"`
+	MonthlyPaymentMaster    *float64              `json:"monthly_payment_master"`
+	MonthlyPaymentDoctorate *float64              `json:"monthly_payment_doctorate"`
+	YearlyPaymentBachelor   *float64              `json:"yearly_payment_bachelor"`
+	YearlyPaymentMaster     *float64              `json:"yearly_payment_master"`
+	YearlyPaymentDoctorate  *float64              `json:"yearly_payment_doctorate"`
+	BuiltYear               *time.Time            `json:"built_year"`
+	CommissionedYear        *time.Time            `json:"commissioned_year"`
+	OwnershipForm           *string               `json:"ownership_form"`
+	ClosedForApplications   bool                  `json:"closed_for_applications"`
+	CreatedBy               uuid.UUID             `json:"created_by"`
+	CreatedAt               time.Time             `json:"created_at"`
+	UpdatedAt               time.Time             `json:"updated_at"`
 }
 
 func dormitoryDTO(d *domain.Dormitory) dormitoryResponse {
 	return dormitoryResponse{
-		ID:                    d.ID,
-		Name:                  d.Name,
-		Address:               d.Address,
-		Phone:                 d.Phone,
-		Type:                  d.Type,
-		FloorCount:            d.FloorCount,
-		TotalRoomsTarget:      d.TotalRoomsTarget,
-		TotalCapacity:         d.TotalCapacity,
-		RoomsMale:             d.RoomsMale,
-		RoomsFemale:           d.RoomsFemale,
-		RoomsMixed:            d.RoomsMixed,
-		MonthlyPayment:        d.MonthlyPayment,
-		YearlyPayment:         d.YearlyPayment,
-		BuiltYear:             d.BuiltYear,
-		CommissionedYear:      d.CommissionedYear,
-		OwnershipForm:         d.OwnershipForm,
-		ClosedForApplications: d.ClosedForApplications,
-		CreatedBy:             d.CreatedBy,
-		CreatedAt:             d.CreatedAt,
-		UpdatedAt:             d.UpdatedAt,
+		ID:                      d.ID,
+		Name:                    d.Name,
+		Address:                 d.Address,
+		Phone:                   d.Phone,
+		Type:                    d.Type,
+		FloorCount:              d.FloorCount,
+		TotalRoomsTarget:        d.TotalRoomsTarget,
+		TotalCapacity:           d.TotalCapacity,
+		MonthlyPaymentBachelor:  d.MonthlyPaymentBachelor,
+		MonthlyPaymentMaster:    d.MonthlyPaymentMaster,
+		MonthlyPaymentDoctorate: d.MonthlyPaymentDoctorate,
+		YearlyPaymentBachelor:   d.YearlyPaymentBachelor,
+		YearlyPaymentMaster:     d.YearlyPaymentMaster,
+		YearlyPaymentDoctorate:  d.YearlyPaymentDoctorate,
+		BuiltYear:               d.BuiltYear,
+		CommissionedYear:        d.CommissionedYear,
+		OwnershipForm:           d.OwnershipForm,
+		ClosedForApplications:   d.ClosedForApplications,
+		CreatedBy:               d.CreatedBy,
+		CreatedAt:               d.CreatedAt,
+		UpdatedAt:               d.UpdatedAt,
 	}
 }
 
@@ -212,10 +214,6 @@ type roomResponse struct {
 	Capacity     int                     `json:"capacity"`
 	Floor        *int                    `json:"floor"`
 	Category     string                  `json:"category"`
-	AreaSqM      *float64                `json:"area_sq_m"`
-	Equipment    *string                 `json:"equipment"`
-	TopBeds      int                     `json:"top_beds"`
-	BottomBeds   int                     `json:"bottom_beds"`
 	Restrictions domain.RoomRestrictions `json:"restrictions"`
 	CreatedAt    time.Time               `json:"created_at"`
 	UpdatedAt    time.Time               `json:"updated_at"`
@@ -229,10 +227,6 @@ func roomDTO(r *domain.Room) roomResponse {
 		Capacity:     r.Capacity,
 		Floor:        r.Floor,
 		Category:     r.Category,
-		AreaSqM:      r.AreaSqM,
-		Equipment:    r.Equipment,
-		TopBeds:      r.TopBeds,
-		BottomBeds:   r.BottomBeds,
 		Restrictions: r.Restrictions,
 		CreatedAt:    r.CreatedAt,
 		UpdatedAt:    r.UpdatedAt,

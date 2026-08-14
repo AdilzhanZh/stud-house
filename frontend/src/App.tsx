@@ -29,6 +29,7 @@ import { RoleAssignPage } from './features/admin/users/RoleAssignPage'
 import { PendingStudentsPage } from './features/admin/users/PendingStudentsPage'
 import { DashboardPage } from './features/admin/dashboard/DashboardPage'
 import { ResidentsPage } from './features/admin/residents/ResidentsPage'
+import { PlaceStudentPage } from './features/admin/residents/PlaceStudentPage'
 import { NotificationBroadcastPage } from './features/admin/notifications/NotificationBroadcastPage'
 import { ApplicationQueuePage } from './features/admin/applications/ApplicationQueuePage'
 import { ApplicationAdminDetailPage } from './features/admin/applications/ApplicationAdminDetailPage'
@@ -86,6 +87,7 @@ function App() {
         <Route element={<AdminLayout />}>
           <Route path="/admin/dashboard" element={<DashboardPage />} />
           <Route path="/admin/residents" element={<ResidentsPage />} />
+          <Route path="/admin/residents/place" element={<PlaceStudentPage />} />
           <Route path="/admin/notifications/broadcast" element={<NotificationBroadcastPage />} />
           <Route path="/admin/dormitories" element={<DormitoryListPage />} />
           <Route path="/admin/dormitories/new" element={<DormitoryFormPage />} />

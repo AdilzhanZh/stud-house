@@ -85,14 +85,6 @@ export function DormitoryInfoPage() {
 
       <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
         <Card className="!p-3.5">
-          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('dorm.monthlyPayment')}</p>
-          <p className="mt-1.5 text-lg font-bold text-sand-100">{formatTenge(dormitory.monthly_payment)}</p>
-        </Card>
-        <Card className="!p-3.5">
-          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('dorm.yearlyPayment')}</p>
-          <p className="mt-1.5 text-lg font-bold text-sand-100">{formatTenge(dormitory.yearly_payment)}</p>
-        </Card>
-        <Card className="!p-3.5">
           <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('dorm.type')}</p>
           <p className="mt-1.5 text-lg font-bold text-sand-100">
             {dormitory.dorm_type ? dormTypeLabel(dormitory.dorm_type, t) : '—'}
@@ -105,18 +97,36 @@ export function DormitoryInfoPage() {
       </div>
 
       <Card>
+        <p className="mb-2.5 text-[15px] font-bold text-sand-100">{t('dorm.paymentTiers')}</p>
+        <div className="flex flex-col gap-2 text-sm">
+          <div className="flex justify-between gap-3">
+            <span className="text-sand-300">{t('dorm.degreeBachelor')}</span>
+            <span className="font-semibold text-sand-100">
+              {formatTenge(dormitory.monthly_payment_bachelor)} · {formatTenge(dormitory.yearly_payment_bachelor)}
+            </span>
+          </div>
+          <div className="flex justify-between gap-3">
+            <span className="text-sand-300">{t('dorm.degreeMaster')}</span>
+            <span className="font-semibold text-sand-100">
+              {formatTenge(dormitory.monthly_payment_master)} · {formatTenge(dormitory.yearly_payment_master)}
+            </span>
+          </div>
+          <div className="flex justify-between gap-3">
+            <span className="text-sand-300">{t('dorm.degreeDoctorate')}</span>
+            <span className="font-semibold text-sand-100">
+              {formatTenge(dormitory.monthly_payment_doctorate)} · {formatTenge(dormitory.yearly_payment_doctorate)}
+            </span>
+          </div>
+        </div>
+      </Card>
+
+      <Card>
         <p className="mb-2.5 text-[15px] font-bold text-sand-100">{t('dorm.details')}</p>
         <div className="flex flex-col gap-2 text-sm">
           <div className="flex justify-between gap-3">
             <span className="text-sand-300">{t('dorm.totalCapacityRooms')}</span>
             <span className="font-semibold text-sand-100">
               {dormitory.total_capacity} / {dormitory.total_rooms_target ?? '—'}
-            </span>
-          </div>
-          <div className="flex justify-between gap-3">
-            <span className="text-sand-300">{t('dorm.roomsByGender')}</span>
-            <span className="font-semibold text-sand-100">
-              {dormitory.rooms_male ?? '—'} / {dormitory.rooms_female ?? '—'} / {dormitory.rooms_mixed ?? '—'}
             </span>
           </div>
           <div className="flex justify-between gap-3">

@@ -34,6 +34,11 @@ type UserRepository interface {
 	// ListPendingStudents is the manager/admin queue of self-registered
 	// students awaiting approval before they can log in.
 	ListPendingStudents(ctx context.Context) ([]*domain.User, error)
+	// ListUnhoused returns approved students who have no active
+	// room_residents row (moved_out_at IS NULL) — i.e. they belong on
+	// campus but aren't currently placed in any room, regardless of
+	// whether they ever filed an application.
+	ListUnhoused(ctx context.Context) ([]*domain.User, error)
 	UpdateApprovalStatus(ctx context.Context, id uuid.UUID, status domain.ApprovalStatus) error
 	UpdatePassword(ctx context.Context, id uuid.UUID, passwordHash string) error
 	// UpdateEmail is used by cmd/seed to repoint the single admin account at

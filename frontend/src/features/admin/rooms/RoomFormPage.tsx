@@ -20,10 +20,7 @@ export function RoomFormPage() {
 
   const [roomNumber, setRoomNumber] = useState('')
   const [floor, setFloor] = useState('')
-  const [areaSqM, setAreaSqM] = useState('')
-  const [equipment, setEquipment] = useState('')
-  const [topBeds, setTopBeds] = useState('')
-  const [bottomBeds, setBottomBeds] = useState('')
+  const [capacity, setCapacity] = useState('')
   const [gender, setGender] = useState<Gender | 'any' | ''>('')
   const [courses, setCourses] = useState<number[]>([])
 
@@ -38,10 +35,7 @@ export function RoomFormPage() {
       .then((room) => {
         setRoomNumber(room.room_number)
         setFloor(room.floor != null ? String(room.floor) : '')
-        setAreaSqM(room.area_sq_m != null ? String(room.area_sq_m) : '')
-        setEquipment(room.equipment ?? '')
-        setTopBeds(String(room.top_beds))
-        setBottomBeds(String(room.bottom_beds))
+        setCapacity(String(room.capacity))
         setGender(room.restrictions.gender ?? 'any')
         setCourses(room.restrictions.courses ?? [])
         setOwnerDormitoryId(room.dormitory_id)
@@ -58,15 +52,9 @@ export function RoomFormPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitError(null)
-    const topBedsNum = Number(topBeds || 0)
-    const bottomBedsNum = Number(bottomBeds || 0)
-    const capacityNum = topBedsNum + bottomBedsNum
+    const capacityNum = Number(capacity || 0)
     if (capacityNum <= 0) {
-      setSubmitError(t('admin.rooms.bedsPositiveError'))
-      return
-    }
-    if (courses.length === 0) {
-      setSubmitError(t('admin.rooms.courseRequiredError'))
+      setSubmitError(t('admin.rooms.capacityPositiveError'))
       return
     }
     setIsSubmitting(true)
@@ -75,10 +63,6 @@ export function RoomFormPage() {
       capacity: capacityNum,
       floor: floor ? Number(floor) : null,
       category: 'general',
-      area_sq_m: areaSqM ? Number(areaSqM) : null,
-      equipment: equipment.trim() || null,
-      top_beds: topBedsNum,
-      bottom_beds: bottomBedsNum,
     }
     try {
       const room = isEdit && roomId ? await updateRoom(roomId, payload) : await createRoom(dormitoryId!, payload)
@@ -117,19 +101,11 @@ export function RoomFormPage() {
           required
         />
         <Input
-          label={t('admin.rooms.topBeds')}
+          label={t('admin.rooms.capacityLabel')}
           type="number"
           min={0}
-          value={topBeds}
-          onChange={(e) => setTopBeds(e.target.value)}
-          required
-        />
-        <Input
-          label={t('admin.rooms.bottomBeds')}
-          type="number"
-          min={0}
-          value={bottomBeds}
-          onChange={(e) => setBottomBeds(e.target.value)}
+          value={capacity}
+          onChange={(e) => setCapacity(e.target.value)}
           required
         />
         <Input
@@ -138,22 +114,6 @@ export function RoomFormPage() {
           min={0}
           value={floor}
           onChange={(e) => setFloor(e.target.value)}
-          required
-        />
-        <Input
-          label={t('admin.rooms.areaLabel')}
-          type="number"
-          min={0}
-          step="0.1"
-          value={areaSqM}
-          onChange={(e) => setAreaSqM(e.target.value)}
-          required
-        />
-        <Input
-          label={t('admin.rooms.equipmentLabel')}
-          value={equipment}
-          onChange={(e) => setEquipment(e.target.value)}
-          placeholder={t('admin.rooms.equipmentPlaceholder')}
           required
         />
         <Select
@@ -172,7 +132,7 @@ export function RoomFormPage() {
         <div className="flex flex-col gap-1">
           <span className="text-sm font-medium text-sand-200">
             {t('admin.rooms.courseRestriction')}
-            <span className="text-clay-400"> *</span>
+            <span className="ml-1 text-xs font-normal text-sand-400">{t('admin.common.optional')}</span>
           </span>
           <div className="flex flex-wrap gap-3">
             {ALL_COURSES.map((course) => (
@@ -186,7 +146,7 @@ export function RoomFormPage() {
               </label>
             ))}
           </div>
-          <p className="text-xs text-sand-300">{t('admin.rooms.selectAtLeastOne')}</p>
+          <p className="text-xs text-sand-300">{t('admin.rooms.noCourseSelectedHint')}</p>
         </div>
         <Button type="submit" isLoading={isSubmitting} className="self-start">
           {t('admin.common.save')}

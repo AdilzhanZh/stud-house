@@ -67,8 +67,12 @@ export function ContractDetailPage() {
           room_number: room?.room_number ?? '',
           dormitory_name: dormitory.name,
           dormitory_address: dormitory.address,
-          monthly_payment: formatTenge(dormitory.monthly_payment),
-          yearly_payment: formatTenge(dormitory.yearly_payment),
+          monthly_payment_bachelor: formatTenge(dormitory.monthly_payment_bachelor),
+          monthly_payment_master: formatTenge(dormitory.monthly_payment_master),
+          monthly_payment_doctorate: formatTenge(dormitory.monthly_payment_doctorate),
+          yearly_payment_bachelor: formatTenge(dormitory.yearly_payment_bachelor),
+          yearly_payment_master: formatTenge(dormitory.yearly_payment_master),
+          yearly_payment_doctorate: formatTenge(dormitory.yearly_payment_doctorate),
           date: formatDate(found.sent_at),
         }
         setDownloadValues(values)

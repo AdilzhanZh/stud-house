@@ -228,6 +228,39 @@ func (r *UserRepo) ListPendingStudents(ctx context.Context) ([]*domain.User, err
 	return users, rows.Err()
 }
 
+// ListUnhoused is students approved and email-verified who have no active
+// room_residents row (moved_out_at IS NULL) — the counterpart to
+// room_repo's "who's in this room" queries, but "which students are in
+// none".
+func (r *UserRepo) ListUnhoused(ctx context.Context) ([]*domain.User, error) {
+	q := `
+		SELECT ` + userColumns + `
+		FROM users u
+		WHERE u.role = 'student'
+			AND u.approval_status = 'approved'
+			AND u.email_verified_at IS NOT NULL
+			AND NOT EXISTS (
+				SELECT 1 FROM room_residents rr
+				WHERE rr.student_id = u.id AND rr.moved_out_at IS NULL
+			)
+		ORDER BY u.full_name`
+	rows, err := r.db.Query(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []*domain.User
+	for rows.Next() {
+		u, err := scanUserRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}
+
 func (r *UserRepo) UpdateApprovalStatus(ctx context.Context, id uuid.UUID, status domain.ApprovalStatus) error {
 	const q = `UPDATE users SET approval_status = $2, updated_at = now() WHERE id = $1`
 	tag, err := r.db.Exec(ctx, q, id, string(status))

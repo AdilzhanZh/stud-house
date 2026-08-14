@@ -58,7 +58,7 @@ export function DormitoryCard({ dormitory: d, onClick, variant = 'grid' }: Dormi
             <p className="truncate text-xs text-sand-300">{d.address}</p>
           </div>
           <span className="shrink-0 text-sm font-bold text-sand-100">
-            {formatTenge(d.monthly_payment)}
+            {formatTenge(d.monthly_payment_bachelor)}
             <span className="text-xs font-normal text-sand-300">{t('dorm.perMonth')}</span>
           </span>
         </div>
@@ -86,7 +86,7 @@ export function DormitoryCard({ dormitory: d, onClick, variant = 'grid' }: Dormi
       </p>
       {!noVacancy && (
         <p className="mt-2.5 text-base font-bold text-sand-100">
-          {formatTenge(d.monthly_payment)} <span className="text-xs font-normal text-sand-300">{t('dorm.perMonthLong')}</span>
+          {formatTenge(d.monthly_payment_bachelor)} <span className="text-xs font-normal text-sand-300">{t('dorm.perMonthLong')}</span>
         </p>
       )}
     </Card>

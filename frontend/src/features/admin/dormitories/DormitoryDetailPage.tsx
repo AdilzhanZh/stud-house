@@ -173,8 +173,6 @@ export function DormitoryDetailPage() {
               <th className={adminCellClass}>{t('admin.dormitories.roomNumber')}</th>
               <th className={adminCellClass}>{t('admin.dormitories.floor')}</th>
               <th className={adminCellClass}>{t('admin.dormitories.capacity')}</th>
-              <th className={adminCellClass}>{t('admin.dormitories.area')}</th>
-              <th className={adminCellClass}>{t('admin.dormitories.equipment')}</th>
               <th className={adminCellClass}>{t('admin.layout.residents')}</th>
               <th className={adminCellClass}>{t('admin.dormitories.restrictions')}</th>
               <th className={adminCellClass}>{t('admin.dormitories.actions')}</th>
@@ -186,8 +184,6 @@ export function DormitoryDetailPage() {
                 <td className={`${adminCellClass} font-semibold text-sand-100`}>{room.room_number}</td>
                 <td className={`${adminCellClass} text-sand-300`}>{room.floor ?? '—'}</td>
                 <td className={`${adminCellClass} text-sand-300`}>{room.capacity}</td>
-                <td className={`${adminCellClass} text-sand-300`}>{room.area_sq_m ?? '—'}</td>
-                <td className={`${adminCellClass} text-sand-300`}>{room.equipment ?? '—'}</td>
                 <td className={`${adminCellClass} text-sand-300`}>{room.residentCount}</td>
                 <td className={`${adminCellClass} text-sand-300`}>{restrictionsSummary(room, t)}</td>
                 <td className={adminCellClass}>
@@ -210,7 +206,7 @@ export function DormitoryDetailPage() {
             ))}
             {activeFloorRooms.length === 0 && (
               <tr>
-                <td className={`${adminCellClass} text-sand-300`} colSpan={8}>
+                <td className={`${adminCellClass} text-sand-300`} colSpan={6}>
                   {t('admin.dormitories.noRooms')}
                 </td>
               </tr>

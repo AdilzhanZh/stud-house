@@ -169,6 +169,17 @@ func (h *UserHandler) ListPendingStudents(c *gin.Context) {
 	response.OK(c, usersDTO(users))
 }
 
+// ListUnhoused is admin/manager-only: approved students with no active
+// room placement, for the "place a student" flow that bypasses applications.
+func (h *UserHandler) ListUnhoused(c *gin.Context) {
+	users, err := h.users.ListUnhoused(c.Request.Context())
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, usersDTO(users))
+}
+
 type decideStudentApprovalRequest struct {
 	Action string `json:"action" binding:"required"`
 }

@@ -81,8 +81,12 @@ export function ContractsPage() {
               room_number: e.room?.room_number ?? '',
               dormitory_name: e.dormitory.name,
               dormitory_address: e.dormitory.address,
-              monthly_payment: formatTenge(e.dormitory.monthly_payment),
-              yearly_payment: formatTenge(e.dormitory.yearly_payment),
+              monthly_payment_bachelor: formatTenge(e.dormitory.monthly_payment_bachelor),
+              monthly_payment_master: formatTenge(e.dormitory.monthly_payment_master),
+              monthly_payment_doctorate: formatTenge(e.dormitory.monthly_payment_doctorate),
+              yearly_payment_bachelor: formatTenge(e.dormitory.yearly_payment_bachelor),
+              yearly_payment_master: formatTenge(e.dormitory.yearly_payment_master),
+              yearly_payment_doctorate: formatTenge(e.dormitory.yearly_payment_doctorate),
               date: formatDate(e.contract.sent_at),
             }
             const [kk, ru] = await Promise.all([
@@ -116,8 +120,12 @@ export function ContractsPage() {
           room_number: room?.room_number ?? '',
           dormitory_name: dormitory?.name ?? '',
           dormitory_address: dormitory?.address ?? '',
-          monthly_payment: formatTenge(dormitory?.monthly_payment),
-          yearly_payment: formatTenge(dormitory?.yearly_payment),
+          monthly_payment_bachelor: formatTenge(dormitory?.monthly_payment_bachelor),
+          monthly_payment_master: formatTenge(dormitory?.monthly_payment_master),
+          monthly_payment_doctorate: formatTenge(dormitory?.monthly_payment_doctorate),
+          yearly_payment_bachelor: formatTenge(dormitory?.yearly_payment_bachelor),
+          yearly_payment_master: formatTenge(dormitory?.yearly_payment_master),
+          yearly_payment_doctorate: formatTenge(dormitory?.yearly_payment_doctorate),
           date: formatDate(contract.sent_at),
         },
         `${t('contracts.contractFallback')}-${language}.pdf`,
@@ -205,15 +213,19 @@ export function ContractsPage() {
                 </div>
               ) : (
                 dormitory &&
-                (dormitory.monthly_payment != null || dormitory.yearly_payment != null) && (
+                (dormitory.monthly_payment_bachelor != null || dormitory.yearly_payment_bachelor != null) && (
                   <div className="mt-3.5 flex flex-col gap-1.5 rounded-2xl border border-navy-700 bg-navy-950 p-3.5 text-sm">
                     <div className="flex justify-between gap-3">
                       <span className="text-sand-300">{t('dorm.monthlyPayment')}</span>
-                      <span className="font-semibold text-sand-100">{formatTenge(dormitory.monthly_payment)}</span>
+                      <span className="font-semibold text-sand-100">
+                        {formatTenge(dormitory.monthly_payment_bachelor)}
+                      </span>
                     </div>
                     <div className="flex justify-between gap-3">
                       <span className="text-sand-300">{t('dorm.yearlyPayment')}</span>
-                      <span className="font-semibold text-sand-100">{formatTenge(dormitory.yearly_payment)}</span>
+                      <span className="font-semibold text-sand-100">
+                        {formatTenge(dormitory.yearly_payment_bachelor)}
+                      </span>
                     </div>
                   </div>
                 )

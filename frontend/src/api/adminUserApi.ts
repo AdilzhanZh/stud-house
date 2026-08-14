@@ -56,6 +56,13 @@ export async function listPendingStudents(): Promise<User[]> {
   return data.data
 }
 
+// Approved students with no active room placement — for placing a student
+// into a room directly, without going through the application workflow.
+export async function listUnhousedStudents(): Promise<User[]> {
+  const { data } = await apiClient.get<{ data: User[] }>('/admin/students/unhoused')
+  return data.data
+}
+
 export async function decideStudentApproval(
   id: string,
   action: 'approve' | 'reject',

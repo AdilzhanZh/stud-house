@@ -11,8 +11,12 @@ export interface ContractFieldValues {
   room_number: string
   dormitory_name: string
   dormitory_address: string
-  monthly_payment: string
-  yearly_payment: string
+  monthly_payment_bachelor: string
+  monthly_payment_master: string
+  monthly_payment_doctorate: string
+  yearly_payment_bachelor: string
+  yearly_payment_master: string
+  yearly_payment_doctorate: string
   date?: string
 }
 

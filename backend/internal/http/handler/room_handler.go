@@ -23,14 +23,10 @@ func NewRoomHandler(rooms *service.RoomService) *RoomHandler {
 
 // roomRequest is shared by create/update.
 type roomRequest struct {
-	RoomNumber string   `json:"room_number" binding:"required"`
-	Capacity   int      `json:"capacity" binding:"required"`
-	Floor      *int     `json:"floor"`
-	Category   string   `json:"category"`
-	AreaSqM    *float64 `json:"area_sq_m"`
-	Equipment  *string  `json:"equipment"`
-	TopBeds    int      `json:"top_beds"`
-	BottomBeds int      `json:"bottom_beds"`
+	RoomNumber string `json:"room_number" binding:"required"`
+	Capacity   int    `json:"capacity" binding:"required"`
+	Floor      *int   `json:"floor"`
+	Category   string `json:"category"`
 }
 
 func (req roomRequest) toInput() service.RoomInput {
@@ -39,10 +35,6 @@ func (req roomRequest) toInput() service.RoomInput {
 		Capacity:   req.Capacity,
 		Floor:      req.Floor,
 		Category:   req.Category,
-		AreaSqM:    req.AreaSqM,
-		Equipment:  req.Equipment,
-		TopBeds:    req.TopBeds,
-		BottomBeds: req.BottomBeds,
 	}
 }
 

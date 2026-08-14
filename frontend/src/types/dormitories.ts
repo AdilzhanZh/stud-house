@@ -9,11 +9,12 @@ export interface Dormitory {
   floor_count: number | null
   total_rooms_target: number | null
   total_capacity: number
-  rooms_male: number | null
-  rooms_female: number | null
-  rooms_mixed: number | null
-  monthly_payment: number | null
-  yearly_payment: number | null
+  monthly_payment_bachelor: number | null
+  monthly_payment_master: number | null
+  monthly_payment_doctorate: number | null
+  yearly_payment_bachelor: number | null
+  yearly_payment_master: number | null
+  yearly_payment_doctorate: number | null
   built_year: string | null
   commissioned_year: string | null
   ownership_form: string | null

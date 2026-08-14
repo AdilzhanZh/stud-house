@@ -10,6 +10,7 @@ import {
   Gavel,
   LayoutDashboard,
   Megaphone,
+  UserCheck,
   UserCog,
   UserPlus,
   Users,
@@ -94,6 +95,10 @@ export function AdminLayout() {
             <NavLink to="/admin/residents" className={navLinkClass}>
               <Users className="h-4.5 w-4.5 shrink-0" />
               {t('admin.layout.residents')}
+            </NavLink>
+            <NavLink to="/admin/residents/place" className={navLinkClass}>
+              <UserCheck className="h-4.5 w-4.5 shrink-0" />
+              {t('admin.layout.placeStudent')}
             </NavLink>
             <NavLink to="/admin/notifications/broadcast" className={navLinkClass}>
               <Megaphone className="h-4.5 w-4.5 shrink-0" />

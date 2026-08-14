@@ -46,17 +46,6 @@ type RoomInput struct {
 	Capacity   int
 	Floor      *int
 	Category   string
-	AreaSqM    *float64
-	Equipment  *string
-	TopBeds    int
-	BottomBeds int
-}
-
-func validateBedLevels(in RoomInput) error {
-	if in.TopBeds+in.BottomBeds != in.Capacity {
-		return apperror.BadRequest("үстіңгі және астыңғы орын саны сыйымдылыққа тең болуы керек")
-	}
-	return nil
 }
 
 func (s *RoomService) Create(ctx context.Context, dormitoryID uuid.UUID, in RoomInput) (*domain.Room, error) {
@@ -65,9 +54,6 @@ func (s *RoomService) Create(ctx context.Context, dormitoryID uuid.UUID, in Room
 	}
 	if in.Capacity <= 0 {
 		return nil, apperror.BadRequest("сыйымдылық оң сан болуы керек")
-	}
-	if err := validateBedLevels(in); err != nil {
-		return nil, err
 	}
 	if _, err := s.dormitories.GetByID(ctx, dormitoryID); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -86,10 +72,6 @@ func (s *RoomService) Create(ctx context.Context, dormitoryID uuid.UUID, in Room
 		Capacity:    in.Capacity,
 		Floor:       in.Floor,
 		Category:    category,
-		AreaSqM:     in.AreaSqM,
-		Equipment:   in.Equipment,
-		TopBeds:     in.TopBeds,
-		BottomBeds:  in.BottomBeds,
 	}
 	if err := s.rooms.Create(ctx, room); err != nil {
 		if errors.Is(err, repository.ErrConflict) {
@@ -141,9 +123,6 @@ func (s *RoomService) Update(ctx context.Context, id uuid.UUID, in RoomInput) (*
 	if in.Capacity <= 0 {
 		return nil, apperror.BadRequest("сыйымдылық оң сан болуы керек")
 	}
-	if err := validateBedLevels(in); err != nil {
-		return nil, err
-	}
 	category := in.Category
 	if category == "" {
 		category = "general"
@@ -154,10 +133,6 @@ func (s *RoomService) Update(ctx context.Context, id uuid.UUID, in RoomInput) (*
 		Capacity:   in.Capacity,
 		Floor:      in.Floor,
 		Category:   category,
-		AreaSqM:    in.AreaSqM,
-		Equipment:  in.Equipment,
-		TopBeds:    in.TopBeds,
-		BottomBeds: in.BottomBeds,
 	}
 	if err := s.rooms.Update(ctx, room); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {

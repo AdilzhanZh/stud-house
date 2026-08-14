@@ -185,6 +185,7 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 				mgmt.GET("/admin/users", h.User.List)
 				mgmt.GET("/admin/students/pending", h.User.ListPendingStudents)
 				mgmt.PATCH("/admin/students/:id/approval", h.User.DecideStudentApproval)
+				mgmt.GET("/admin/students/unhoused", h.User.ListUnhoused)
 
 				mgmt.GET("/applications", h.Application.List)
 				mgmt.PATCH("/applications/:id/decision", h.Application.Decide)

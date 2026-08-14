@@ -455,7 +455,7 @@ export function NewApplicationPage() {
                       {d.vacancy > 0 ? t('dorm.vacancyCount', { count: d.vacancy }) : t('wizard.noVacancyShort')}
                     </span>
                     <span className="inline-flex items-center rounded-full bg-navy-800 px-2.5 py-1 text-xs font-semibold text-sand-200">
-                      {formatTenge(d.monthly_payment)}
+                      {formatTenge(d.monthly_payment_bachelor)}
                       {t('dorm.perMonth')}
                     </span>
                   </div>
@@ -599,7 +599,7 @@ export function NewApplicationPage() {
               </div>
               <p className="mt-1.5 text-[15px] font-semibold text-sand-100">{chosenDormitory?.name}</p>
               <p className="text-sm text-sand-300">
-                {chosenDormitory?.address} · {formatTenge(chosenDormitory?.monthly_payment)}
+                {chosenDormitory?.address} · {formatTenge(chosenDormitory?.monthly_payment_bachelor)}
                 {t('dorm.perMonth')}
               </p>
             </Card>

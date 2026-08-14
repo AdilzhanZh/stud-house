@@ -23,9 +23,10 @@ func NewDormitoryRepo(db *pgxpool.Pool) *DormitoryRepo {
 
 const dormitoryColumns = `
 	id, name, address, phone, dorm_type, floor_count, total_rooms_target,
-	total_capacity, rooms_male, rooms_female, rooms_mixed,
-	monthly_payment, yearly_payment, built_year,
-	commissioned_year, ownership_form, closed_for_applications,
+	total_capacity,
+	monthly_payment_bachelor, monthly_payment_master, monthly_payment_doctorate,
+	yearly_payment_bachelor, yearly_payment_master, yearly_payment_doctorate,
+	built_year, commissioned_year, ownership_form, closed_for_applications,
 	created_by, created_at, updated_at`
 
 // dormTypeToText/textToDormType convert domain.DormitoryType (a named string
@@ -53,9 +54,10 @@ func scanDormitory(row pgx.Row) (*domain.Dormitory, error) {
 	var dormType *string
 	err := row.Scan(
 		&d.ID, &d.Name, &d.Address, &d.Phone, &dormType, &d.FloorCount, &d.TotalRoomsTarget,
-		&d.TotalCapacity, &d.RoomsMale, &d.RoomsFemale, &d.RoomsMixed,
-		&d.MonthlyPayment, &d.YearlyPayment, &d.BuiltYear,
-		&d.CommissionedYear, &d.OwnershipForm, &d.ClosedForApplications,
+		&d.TotalCapacity,
+		&d.MonthlyPaymentBachelor, &d.MonthlyPaymentMaster, &d.MonthlyPaymentDoctorate,
+		&d.YearlyPaymentBachelor, &d.YearlyPaymentMaster, &d.YearlyPaymentDoctorate,
+		&d.BuiltYear, &d.CommissionedYear, &d.OwnershipForm, &d.ClosedForApplications,
 		&d.CreatedBy, &d.CreatedAt, &d.UpdatedAt,
 	)
 	if err != nil {
@@ -69,17 +71,19 @@ func (r *DormitoryRepo) Create(ctx context.Context, d *domain.Dormitory) error {
 	const q = `
 		INSERT INTO dormitories (
 			name, address, phone, dorm_type, floor_count, total_rooms_target,
-			total_capacity, rooms_male, rooms_female, rooms_mixed,
-			monthly_payment, yearly_payment, built_year,
-			commissioned_year, ownership_form, closed_for_applications, created_by
+			total_capacity,
+			monthly_payment_bachelor, monthly_payment_master, monthly_payment_doctorate,
+			yearly_payment_bachelor, yearly_payment_master, yearly_payment_doctorate,
+			built_year, commissioned_year, ownership_form, closed_for_applications, created_by
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 		RETURNING id, created_at, updated_at`
 	return r.db.QueryRow(ctx, q,
 		d.Name, d.Address, d.Phone, dormTypeToText(d.Type), d.FloorCount, d.TotalRoomsTarget,
-		d.TotalCapacity, d.RoomsMale, d.RoomsFemale, d.RoomsMixed,
-		d.MonthlyPayment, d.YearlyPayment, d.BuiltYear,
-		d.CommissionedYear, d.OwnershipForm, d.ClosedForApplications, d.CreatedBy,
+		d.TotalCapacity,
+		d.MonthlyPaymentBachelor, d.MonthlyPaymentMaster, d.MonthlyPaymentDoctorate,
+		d.YearlyPaymentBachelor, d.YearlyPaymentMaster, d.YearlyPaymentDoctorate,
+		d.BuiltYear, d.CommissionedYear, d.OwnershipForm, d.ClosedForApplications, d.CreatedBy,
 	).Scan(&d.ID, &d.CreatedAt, &d.UpdatedAt)
 }
 
@@ -127,17 +131,19 @@ func (r *DormitoryRepo) Update(ctx context.Context, d *domain.Dormitory) error {
 	const q = `
 		UPDATE dormitories
 		SET name = $2, address = $3, phone = $4, dorm_type = $5, floor_count = $6,
-			total_rooms_target = $7, total_capacity = $8, rooms_male = $9,
-			rooms_female = $10, rooms_mixed = $11, monthly_payment = $12,
-			yearly_payment = $13, built_year = $14, commissioned_year = $15,
-			ownership_form = $16, closed_for_applications = $17,
+			total_rooms_target = $7, total_capacity = $8,
+			monthly_payment_bachelor = $9, monthly_payment_master = $10, monthly_payment_doctorate = $11,
+			yearly_payment_bachelor = $12, yearly_payment_master = $13, yearly_payment_doctorate = $14,
+			built_year = $15, commissioned_year = $16,
+			ownership_form = $17, closed_for_applications = $18,
 			updated_at = now()
 		WHERE id = $1
 		RETURNING updated_at`
 	err := r.db.QueryRow(ctx, q,
 		d.ID, d.Name, d.Address, d.Phone, dormTypeToText(d.Type), d.FloorCount,
-		d.TotalRoomsTarget, d.TotalCapacity, d.RoomsMale, d.RoomsFemale, d.RoomsMixed,
-		d.MonthlyPayment, d.YearlyPayment,
+		d.TotalRoomsTarget, d.TotalCapacity,
+		d.MonthlyPaymentBachelor, d.MonthlyPaymentMaster, d.MonthlyPaymentDoctorate,
+		d.YearlyPaymentBachelor, d.YearlyPaymentMaster, d.YearlyPaymentDoctorate,
 		d.BuiltYear, d.CommissionedYear, d.OwnershipForm, d.ClosedForApplications,
 	).Scan(&d.UpdatedAt)
 	if err != nil {

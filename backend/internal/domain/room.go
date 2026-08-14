@@ -44,19 +44,12 @@ func (r RoomRestrictions) MarshalJSON() ([]byte, error) {
 }
 
 type Room struct {
-	ID          uuid.UUID
-	DormitoryID uuid.UUID
-	RoomNumber  string
-	Capacity    int
-	Floor       *int
-	Category    string
-	AreaSqM     *float64
-	Equipment   *string
-	// TopBeds + BottomBeds must equal Capacity whenever a caller sets them
-	// (validated in RoomService, not a DB constraint — existing rows predate
-	// this distinction and default to 0/0 until edited).
-	TopBeds      int
-	BottomBeds   int
+	ID           uuid.UUID
+	DormitoryID  uuid.UUID
+	RoomNumber   string
+	Capacity     int
+	Floor        *int
+	Category     string
 	Restrictions RoomRestrictions
 	CreatedAt    time.Time
 	UpdatedAt    time.Time

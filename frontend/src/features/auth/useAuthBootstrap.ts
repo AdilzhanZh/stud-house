@@ -5,7 +5,9 @@ import {
   setRefreshToken,
   clearRefreshToken,
   getStoredUser,
+  setStoredUser,
   clearStoredUser,
+  decodeAccessTokenClaims,
 } from '../../store/tokenStorage'
 import * as authApi from '../../api/authApi'
 
@@ -31,7 +33,23 @@ export function useAuthBootstrap(): boolean {
         const pair = await authApi.refresh(refreshToken)
         if (cancelled) return
         setRefreshToken(pair.refresh_token)
-        setSession(cachedUser, pair.access_token)
+
+        // The refresh response only carries tokens, not the user profile,
+        // but the new access token's claims are authoritative for role/
+        // committee flags — reconcile them onto the cached user so a
+        // promotion/demotion since the last login isn't silently ignored.
+        const claims = decodeAccessTokenClaims(pair.access_token)
+        const user = claims
+          ? {
+              ...cachedUser,
+              role: claims.role,
+              is_committee_member: claims.is_committee_member,
+              is_chairperson: claims.is_chairperson,
+            }
+          : cachedUser
+        if (claims) setStoredUser(user)
+
+        setSession(user, pair.access_token)
       } catch {
         clearRefreshToken()
         clearStoredUser()

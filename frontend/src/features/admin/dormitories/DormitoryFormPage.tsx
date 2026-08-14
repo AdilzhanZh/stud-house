@@ -36,11 +36,12 @@ export function DormitoryFormPage() {
   const [floorCount, setFloorCount] = useState('')
   const [totalRoomsTarget, setTotalRoomsTarget] = useState('')
   const [totalCapacity, setTotalCapacity] = useState('')
-  const [roomsMale, setRoomsMale] = useState('')
-  const [roomsFemale, setRoomsFemale] = useState('')
-  const [roomsMixed, setRoomsMixed] = useState('')
-  const [monthlyPayment, setMonthlyPayment] = useState('')
-  const [yearlyPayment, setYearlyPayment] = useState('')
+  const [monthlyPaymentBachelor, setMonthlyPaymentBachelor] = useState('')
+  const [monthlyPaymentMaster, setMonthlyPaymentMaster] = useState('')
+  const [monthlyPaymentDoctorate, setMonthlyPaymentDoctorate] = useState('')
+  const [yearlyPaymentBachelor, setYearlyPaymentBachelor] = useState('')
+  const [yearlyPaymentMaster, setYearlyPaymentMaster] = useState('')
+  const [yearlyPaymentDoctorate, setYearlyPaymentDoctorate] = useState('')
   const [builtYear, setBuiltYear] = useState('')
   const [commissionedYear, setCommissionedYear] = useState('')
   const [ownershipForm, setOwnershipForm] = useState('')
@@ -80,11 +81,12 @@ export function DormitoryFormPage() {
         setFloorCount(d.floor_count != null ? String(d.floor_count) : '')
         setTotalRoomsTarget(d.total_rooms_target != null ? String(d.total_rooms_target) : '')
         setTotalCapacity(String(d.total_capacity))
-        setRoomsMale(d.rooms_male != null ? String(d.rooms_male) : '')
-        setRoomsFemale(d.rooms_female != null ? String(d.rooms_female) : '')
-        setRoomsMixed(d.rooms_mixed != null ? String(d.rooms_mixed) : '')
-        setMonthlyPayment(d.monthly_payment != null ? String(d.monthly_payment) : '')
-        setYearlyPayment(d.yearly_payment != null ? String(d.yearly_payment) : '')
+        setMonthlyPaymentBachelor(d.monthly_payment_bachelor != null ? String(d.monthly_payment_bachelor) : '')
+        setMonthlyPaymentMaster(d.monthly_payment_master != null ? String(d.monthly_payment_master) : '')
+        setMonthlyPaymentDoctorate(d.monthly_payment_doctorate != null ? String(d.monthly_payment_doctorate) : '')
+        setYearlyPaymentBachelor(d.yearly_payment_bachelor != null ? String(d.yearly_payment_bachelor) : '')
+        setYearlyPaymentMaster(d.yearly_payment_master != null ? String(d.yearly_payment_master) : '')
+        setYearlyPaymentDoctorate(d.yearly_payment_doctorate != null ? String(d.yearly_payment_doctorate) : '')
         setBuiltYear(d.built_year?.slice(0, 10) ?? '')
         setCommissionedYear(d.commissioned_year?.slice(0, 10) ?? '')
         setOwnershipForm(d.ownership_form ?? '')
@@ -107,11 +109,12 @@ export function DormitoryFormPage() {
       floor_count: floorCount ? Number(floorCount) : null,
       total_rooms_target: totalRoomsTarget ? Number(totalRoomsTarget) : null,
       total_capacity: Number(totalCapacity),
-      rooms_male: roomsMale ? Number(roomsMale) : null,
-      rooms_female: roomsFemale ? Number(roomsFemale) : null,
-      rooms_mixed: roomsMixed ? Number(roomsMixed) : null,
-      monthly_payment: monthlyPayment ? Number(monthlyPayment) : null,
-      yearly_payment: yearlyPayment ? Number(yearlyPayment) : null,
+      monthly_payment_bachelor: monthlyPaymentBachelor ? Number(monthlyPaymentBachelor) : null,
+      monthly_payment_master: monthlyPaymentMaster ? Number(monthlyPaymentMaster) : null,
+      monthly_payment_doctorate: monthlyPaymentDoctorate ? Number(monthlyPaymentDoctorate) : null,
+      yearly_payment_bachelor: yearlyPaymentBachelor ? Number(yearlyPaymentBachelor) : null,
+      yearly_payment_master: yearlyPaymentMaster ? Number(yearlyPaymentMaster) : null,
+      yearly_payment_doctorate: yearlyPaymentDoctorate ? Number(yearlyPaymentDoctorate) : null,
       built_year: builtYear || null,
       commissioned_year: commissionedYear || null,
       ownership_form: ownershipForm.trim() || null,
@@ -247,44 +250,49 @@ export function DormitoryFormPage() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Input
-              label={t('admin.dormitories.roomsMale')}
+              label={t('admin.dormitories.monthlyPaymentBachelor')}
               type="number"
               min={0}
-              value={roomsMale}
-              onChange={(e) => setRoomsMale(e.target.value)}
-              required
+              value={monthlyPaymentBachelor}
+              onChange={(e) => setMonthlyPaymentBachelor(e.target.value)}
             />
             <Input
-              label={t('admin.dormitories.roomsFemale')}
+              label={t('admin.dormitories.monthlyPaymentMaster')}
               type="number"
               min={0}
-              value={roomsFemale}
-              onChange={(e) => setRoomsFemale(e.target.value)}
-              required
+              value={monthlyPaymentMaster}
+              onChange={(e) => setMonthlyPaymentMaster(e.target.value)}
             />
             <Input
-              label={t('admin.dormitories.roomsMixed')}
+              label={t('admin.dormitories.monthlyPaymentDoctorate')}
               type="number"
               min={0}
-              value={roomsMixed}
-              onChange={(e) => setRoomsMixed(e.target.value)}
+              value={monthlyPaymentDoctorate}
+              onChange={(e) => setMonthlyPaymentDoctorate(e.target.value)}
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Input
-              label={t('admin.dormitories.monthlyPayment')}
+              label={t('admin.dormitories.yearlyPaymentBachelor')}
               type="number"
               min={0}
-              value={monthlyPayment}
-              onChange={(e) => setMonthlyPayment(e.target.value)}
+              value={yearlyPaymentBachelor}
+              onChange={(e) => setYearlyPaymentBachelor(e.target.value)}
             />
             <Input
-              label={t('admin.dormitories.yearlyPayment')}
+              label={t('admin.dormitories.yearlyPaymentMaster')}
               type="number"
               min={0}
-              value={yearlyPayment}
-              onChange={(e) => setYearlyPayment(e.target.value)}
+              value={yearlyPaymentMaster}
+              onChange={(e) => setYearlyPaymentMaster(e.target.value)}
+            />
+            <Input
+              label={t('admin.dormitories.yearlyPaymentDoctorate')}
+              type="number"
+              min={0}
+              value={yearlyPaymentDoctorate}
+              onChange={(e) => setYearlyPaymentDoctorate(e.target.value)}
             />
           </div>
 

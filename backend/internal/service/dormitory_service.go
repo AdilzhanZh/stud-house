@@ -24,22 +24,23 @@ func NewDormitoryService(dormitories repository.DormitoryRepository, application
 // DormitoryInput bundles the admin "create/edit dormitory" form fields
 // (kept as a struct rather than growing the positional-arg list further).
 type DormitoryInput struct {
-	Name                  string
-	Address               string
-	Phone                 *string
-	Type                  *domain.DormitoryType
-	FloorCount            *int
-	TotalRoomsTarget      *int
-	TotalCapacity         int
-	RoomsMale             *int
-	RoomsFemale           *int
-	RoomsMixed            *int
-	MonthlyPayment        *float64
-	YearlyPayment         *float64
-	BuiltYear             *time.Time
-	CommissionedYear      *time.Time
-	OwnershipForm         *string
-	ClosedForApplications bool
+	Name                    string
+	Address                 string
+	Phone                   *string
+	Type                    *domain.DormitoryType
+	FloorCount              *int
+	TotalRoomsTarget        *int
+	TotalCapacity           int
+	MonthlyPaymentBachelor  *float64
+	MonthlyPaymentMaster    *float64
+	MonthlyPaymentDoctorate *float64
+	YearlyPaymentBachelor   *float64
+	YearlyPaymentMaster     *float64
+	YearlyPaymentDoctorate  *float64
+	BuiltYear               *time.Time
+	CommissionedYear        *time.Time
+	OwnershipForm           *string
+	ClosedForApplications   bool
 }
 
 func validateDormitoryInput(in DormitoryInput) error {
@@ -59,42 +60,28 @@ func validateDormitoryInput(in DormitoryInput) error {
 	if in.TotalRoomsTarget == nil {
 		return apperror.BadRequest("жалпы бөлме санын енгізу міндетті")
 	}
-	if in.RoomsMale == nil || in.RoomsFemale == nil {
-		return apperror.BadRequest("ерлерге және қыздарға арналған бөлме сандарын енгізу міндетті")
-	}
-	roomsSum := *in.RoomsMale + *in.RoomsFemale
-	for _, c := range []*int{in.RoomsMale, in.RoomsFemale, in.RoomsMixed} {
-		if c != nil && *c < 0 {
-			return apperror.BadRequest("ерлерге/қыздарға/ортаққа арналған бөлме саны теріс сан бола алмайды")
-		}
-	}
-	if in.RoomsMixed != nil {
-		roomsSum += *in.RoomsMixed
-	}
-	if roomsSum != *in.TotalRoomsTarget {
-		return apperror.BadRequest("ерлерге, қыздарға және ортаққа арналған бөлмелер қосындысы жалпы бөлме санына тең болуы керек")
-	}
 	return nil
 }
 
 func dormitoryFromInput(in DormitoryInput) *domain.Dormitory {
 	return &domain.Dormitory{
-		Name:                  in.Name,
-		Address:               in.Address,
-		Phone:                 in.Phone,
-		Type:                  in.Type,
-		FloorCount:            in.FloorCount,
-		TotalRoomsTarget:      in.TotalRoomsTarget,
-		TotalCapacity:         in.TotalCapacity,
-		RoomsMale:             in.RoomsMale,
-		RoomsFemale:           in.RoomsFemale,
-		RoomsMixed:            in.RoomsMixed,
-		MonthlyPayment:        in.MonthlyPayment,
-		YearlyPayment:         in.YearlyPayment,
-		BuiltYear:             in.BuiltYear,
-		CommissionedYear:      in.CommissionedYear,
-		OwnershipForm:         in.OwnershipForm,
-		ClosedForApplications: in.ClosedForApplications,
+		Name:                    in.Name,
+		Address:                 in.Address,
+		Phone:                   in.Phone,
+		Type:                    in.Type,
+		FloorCount:              in.FloorCount,
+		TotalRoomsTarget:        in.TotalRoomsTarget,
+		TotalCapacity:           in.TotalCapacity,
+		MonthlyPaymentBachelor:  in.MonthlyPaymentBachelor,
+		MonthlyPaymentMaster:    in.MonthlyPaymentMaster,
+		MonthlyPaymentDoctorate: in.MonthlyPaymentDoctorate,
+		YearlyPaymentBachelor:   in.YearlyPaymentBachelor,
+		YearlyPaymentMaster:     in.YearlyPaymentMaster,
+		YearlyPaymentDoctorate:  in.YearlyPaymentDoctorate,
+		BuiltYear:               in.BuiltYear,
+		CommissionedYear:        in.CommissionedYear,
+		OwnershipForm:           in.OwnershipForm,
+		ClosedForApplications:   in.ClosedForApplications,
 	}
 }
 

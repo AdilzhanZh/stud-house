@@ -8,9 +8,10 @@ import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
 import { extractErrorMessage } from '../../../api/client'
 import { getRoom, createRoom, updateRoom, updateRoomRestrictions } from '../../../api/roomApi'
-import type { Gender } from '../../../types/rooms'
+import type { AcademicDegree, Gender } from '../../../types/rooms'
 
 const ALL_COURSES = [1, 2, 3, 4, 5, 6]
+const ALL_DEGREES: AcademicDegree[] = ['bachelor', 'master', 'doctorate']
 
 export function RoomFormPage() {
   const { t } = useTranslation()
@@ -23,6 +24,7 @@ export function RoomFormPage() {
   const [capacity, setCapacity] = useState('')
   const [gender, setGender] = useState<Gender | 'any' | ''>('')
   const [courses, setCourses] = useState<number[]>([])
+  const [degrees, setDegrees] = useState<AcademicDegree[]>([])
 
   const [loadError, setLoadError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -38,6 +40,7 @@ export function RoomFormPage() {
         setCapacity(String(room.capacity))
         setGender(room.restrictions.gender ?? 'any')
         setCourses(room.restrictions.courses ?? [])
+        setDegrees(room.restrictions.degrees ?? [])
         setOwnerDormitoryId(room.dormitory_id)
       })
       .catch((err) => setLoadError(extractErrorMessage(err, t('admin.common.loadError'))))
@@ -46,6 +49,12 @@ export function RoomFormPage() {
   function toggleCourse(course: number) {
     setCourses((prev) =>
       prev.includes(course) ? prev.filter((c) => c !== course) : [...prev, course].sort(),
+    )
+  }
+
+  function toggleDegree(degree: AcademicDegree) {
+    setDegrees((prev) =>
+      prev.includes(degree) ? prev.filter((d) => d !== degree) : [...prev, degree],
     )
   }
 
@@ -69,6 +78,7 @@ export function RoomFormPage() {
       await updateRoomRestrictions(room.id, {
         gender: gender === 'any' ? null : gender || null,
         courses,
+        degrees,
         benefit_ids: room.restrictions?.benefit_ids ?? [],
       })
       navigate(`/admin/dormitories/${ownerDormitoryId ?? dormitoryId}`)
@@ -147,6 +157,25 @@ export function RoomFormPage() {
             ))}
           </div>
           <p className="text-xs text-sand-300">{t('admin.rooms.noCourseSelectedHint')}</p>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-sm font-medium text-sand-200">
+            {t('admin.rooms.degreeRestriction')}
+            <span className="ml-1 text-xs font-normal text-sand-400">{t('admin.common.optional')}</span>
+          </span>
+          <div className="flex flex-wrap gap-3">
+            {ALL_DEGREES.map((degree) => (
+              <label key={degree} className="flex items-center gap-1.5 text-sm text-sand-200">
+                <input
+                  type="checkbox"
+                  checked={degrees.includes(degree)}
+                  onChange={() => toggleDegree(degree)}
+                />
+                {t(`auth.${degree}`)}
+              </label>
+            ))}
+          </div>
+          <p className="text-xs text-sand-300">{t('admin.rooms.noDegreeSelectedHint')}</p>
         </div>
         <Button type="submit" isLoading={isSubmitting} className="self-start">
           {t('admin.common.save')}

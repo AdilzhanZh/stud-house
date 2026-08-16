@@ -37,7 +37,8 @@ export function RegisterPage() {
   } = useForm<RegisterFormValues>({ resolver: zodResolver(buildRegisterSchema(t)) })
 
   const academicDegree = watch('academic_degree')
-  const courseOptions = academicDegree === 'master' ? [1, 2] : [1, 2, 3, 4]
+  const courseOptions =
+    academicDegree === 'master' ? [1, 2] : academicDegree === 'doctorate' ? [1, 2, 3] : [1, 2, 3, 4]
 
   async function onSubmit(values: RegisterFormValues) {
     setServerError(null)
@@ -190,6 +191,7 @@ export function RegisterPage() {
           <option value="">{t('auth.selectPlaceholder')}</option>
           <option value="bachelor">{t('auth.bachelor')}</option>
           <option value="master">{t('auth.master')}</option>
+          <option value="doctorate">{t('auth.doctorate')}</option>
         </Select>
         <Select label={t('auth.course')} error={errors.course?.message} required {...register('course')}>
           <option value="">{t('auth.selectPlaceholder')}</option>

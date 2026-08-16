@@ -6,8 +6,11 @@ export async function listRequiredDocuments(): Promise<RequiredDocument[]> {
   return data.data
 }
 
-export async function createRequiredDocument(name: string): Promise<RequiredDocument> {
-  const { data } = await apiClient.post<{ data: RequiredDocument }>('/documents', { name })
+export async function createRequiredDocument(nameKk: string, nameRu: string): Promise<RequiredDocument> {
+  const { data } = await apiClient.post<{ data: RequiredDocument }>('/documents', {
+    name_kk: nameKk,
+    name_ru: nameRu,
+  })
   return data.data
 }
 

@@ -77,7 +77,7 @@ export function DormitoryDetailPage() {
   const activeFloorRooms = floorGroups.find(([floor]) => floor === activeFloor)?.[1] ?? []
 
   const bedsPercent = capacity.total_capacity > 0
-    ? Math.min(100, Math.round((capacity.allocated_beds / capacity.total_capacity) * 100))
+    ? Math.min(100, Math.round((capacity.provisioned_beds / capacity.total_capacity) * 100))
     : 0
   const roomsPercent = capacity.total_rooms_target && capacity.total_rooms_target > 0
     ? Math.min(100, Math.round((capacity.rooms_created / capacity.total_rooms_target) * 100))
@@ -99,7 +99,7 @@ export function DormitoryDetailPage() {
           <div className="mb-1 flex justify-between text-sm text-sand-300">
             <span>{t('admin.dormitories.bedsProgress')}</span>
             <span>
-              {capacity.total_capacity}/{capacity.allocated_beds}
+              {capacity.total_capacity}/{capacity.provisioned_beds}
             </span>
           </div>
           <div className="h-2 w-full rounded-full bg-navy-700">

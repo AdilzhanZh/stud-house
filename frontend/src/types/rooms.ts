@@ -1,12 +1,15 @@
 export type Gender = 'male' | 'female'
 
+export type AcademicDegree = 'bachelor' | 'master' | 'doctorate'
+
 // Mirrors internal/domain/room.go's RoomRestrictions: every field is
-// optional/omittable meaning "no restriction on this dimension". Courses is
-// a membership list (student's course must be IN this set), not a minimum
-// threshold.
+// optional/omittable meaning "no restriction on this dimension". Courses and
+// degrees are membership lists (student's course/degree must be IN the set),
+// not a minimum threshold.
 export interface RoomRestrictions {
   gender: Gender | null
   courses: number[]
+  degrees: AcademicDegree[]
   benefit_ids: string[]
 }
 

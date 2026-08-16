@@ -182,7 +182,7 @@ func (s *RoomService) UpdateRestrictions(ctx context.Context, roomID uuid.UUID, 
 }
 
 // checkStudentAgainstRestrictions returns an apperror.Conflict if the student
-// does not satisfy one of the restriction dimensions (gender/course/benefit).
+// does not satisfy one of the restriction dimensions (gender/course/degree/benefit).
 func (s *RoomService) checkStudentAgainstRestrictions(ctx context.Context, studentID uuid.UUID, restrictions domain.RoomRestrictions) error {
 	if restrictions.IsEmpty() {
 		return nil
@@ -209,6 +209,12 @@ func (s *RoomService) checkStudentAgainstRestrictions(ctx context.Context, stude
 		}
 	}
 
+	if len(restrictions.Degrees) > 0 {
+		if profile == nil || profile.AcademicDegree == nil || !containsDegree(restrictions.Degrees, *profile.AcademicDegree) {
+			return apperror.Conflict(fmt.Sprintf("%s студенті бөлменің оқу деңгейі шектеуіне сай келмейді", studentID))
+		}
+	}
+
 	if len(restrictions.BenefitIDs) > 0 {
 		studentBenefits, err := s.studentBenefits.ListByStudent(ctx, studentID)
 		if err != nil {
@@ -225,6 +231,15 @@ func (s *RoomService) checkStudentAgainstRestrictions(ctx context.Context, stude
 func containsCourse(courses []int16, course int16) bool {
 	for _, c := range courses {
 		if c == course {
+			return true
+		}
+	}
+	return false
+}
+
+func containsDegree(degrees []domain.AcademicDegree, degree domain.AcademicDegree) bool {
+	for _, d := range degrees {
+		if d == degree {
 			return true
 		}
 	}

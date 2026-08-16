@@ -35,7 +35,8 @@ export interface DormitoryRequiredDocument {
   id: string
   dormitory_id: string
   document_id: string
-  document_name: string
+  document_name_kk: string
+  document_name_ru: string
   created_at: string
 }
 
@@ -43,6 +44,7 @@ export interface DormitoryCapacity {
   dormitory_id: string
   total_capacity: number
   allocated_beds: number
+  provisioned_beds: number
   total_rooms_target: number | null
   rooms_created: number
 }

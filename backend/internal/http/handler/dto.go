@@ -136,6 +136,7 @@ type dormitoryCapacityResponse struct {
 	DormitoryID      uuid.UUID `json:"dormitory_id"`
 	TotalCapacity    int       `json:"total_capacity"`
 	AllocatedBeds    int       `json:"allocated_beds"`
+	ProvisionedBeds  int       `json:"provisioned_beds"`
 	TotalRoomsTarget *int      `json:"total_rooms_target"`
 	RoomsCreated     int       `json:"rooms_created"`
 }
@@ -145,6 +146,7 @@ func dormitoryCapacityDTO(c *domain.DormitoryCapacity) dormitoryCapacityResponse
 		DormitoryID:      c.DormitoryID,
 		TotalCapacity:    c.TotalCapacity,
 		AllocatedBeds:    c.AllocatedBeds,
+		ProvisionedBeds:  c.ProvisionedBeds,
 		TotalRoomsTarget: c.TotalRoomsTarget,
 		RoomsCreated:     c.RoomsCreated,
 	}
@@ -170,15 +172,16 @@ func dormitoryImagesDTO(list []*domain.DormitoryImage) []dormitoryImageResponse 
 }
 
 type dormitoryRequiredDocumentResponse struct {
-	ID           uuid.UUID `json:"id"`
-	DormitoryID  uuid.UUID `json:"dormitory_id"`
-	DocumentID   uuid.UUID `json:"document_id"`
-	DocumentName string    `json:"document_name"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID             uuid.UUID `json:"id"`
+	DormitoryID    uuid.UUID `json:"dormitory_id"`
+	DocumentID     uuid.UUID `json:"document_id"`
+	DocumentNameKk string    `json:"document_name_kk"`
+	DocumentNameRu string    `json:"document_name_ru"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 func dormitoryRequiredDocumentDTO(d *domain.DormitoryRequiredDocument) dormitoryRequiredDocumentResponse {
-	return dormitoryRequiredDocumentResponse{ID: d.ID, DormitoryID: d.DormitoryID, DocumentID: d.DocumentID, DocumentName: d.DocumentName, CreatedAt: d.CreatedAt}
+	return dormitoryRequiredDocumentResponse{ID: d.ID, DormitoryID: d.DormitoryID, DocumentID: d.DocumentID, DocumentNameKk: d.DocumentNameKk, DocumentNameRu: d.DocumentNameRu, CreatedAt: d.CreatedAt}
 }
 
 func dormitoryRequiredDocumentsDTO(list []*domain.DormitoryRequiredDocument) []dormitoryRequiredDocumentResponse {
@@ -191,12 +194,13 @@ func dormitoryRequiredDocumentsDTO(list []*domain.DormitoryRequiredDocument) []d
 
 type requiredDocumentResponse struct {
 	ID        uuid.UUID `json:"id"`
-	Name      string    `json:"name"`
+	NameKk    string    `json:"name_kk"`
+	NameRu    string    `json:"name_ru"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
 func requiredDocumentDTO(d *domain.RequiredDocument) requiredDocumentResponse {
-	return requiredDocumentResponse{ID: d.ID, Name: d.Name, CreatedAt: d.CreatedAt}
+	return requiredDocumentResponse{ID: d.ID, NameKk: d.NameKk, NameRu: d.NameRu, CreatedAt: d.CreatedAt}
 }
 
 func requiredDocumentsDTO(list []*domain.RequiredDocument) []requiredDocumentResponse {
@@ -262,17 +266,23 @@ func roomResidentsDTO(list []*domain.RoomResident) []roomResidentResponse {
 }
 
 type benefitResponse struct {
-	ID          uuid.UUID `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Priority    int       `json:"priority"`
-	CreatedBy   uuid.UUID `json:"created_by"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID            uuid.UUID `json:"id"`
+	NameKk        string    `json:"name_kk"`
+	NameRu        string    `json:"name_ru"`
+	DescriptionKk string    `json:"description_kk"`
+	DescriptionRu string    `json:"description_ru"`
+	Priority      int       `json:"priority"`
+	CreatedBy     uuid.UUID `json:"created_by"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 func benefitDTO(b *domain.Benefit) benefitResponse {
-	return benefitResponse{ID: b.ID, Name: b.Name, Description: b.Description, Priority: b.Priority, CreatedBy: b.CreatedBy, CreatedAt: b.CreatedAt, UpdatedAt: b.UpdatedAt}
+	return benefitResponse{
+		ID: b.ID, NameKk: b.NameKk, NameRu: b.NameRu,
+		DescriptionKk: b.DescriptionKk, DescriptionRu: b.DescriptionRu,
+		Priority: b.Priority, CreatedBy: b.CreatedBy, CreatedAt: b.CreatedAt, UpdatedAt: b.UpdatedAt,
+	}
 }
 
 func benefitsDTO(list []*domain.Benefit) []benefitResponse {
@@ -284,15 +294,16 @@ func benefitsDTO(list []*domain.Benefit) []benefitResponse {
 }
 
 type benefitRequiredDocumentResponse struct {
-	ID           uuid.UUID `json:"id"`
-	BenefitID    uuid.UUID `json:"benefit_id"`
-	DocumentID   uuid.UUID `json:"document_id"`
-	DocumentName string    `json:"document_name"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID             uuid.UUID `json:"id"`
+	BenefitID      uuid.UUID `json:"benefit_id"`
+	DocumentID     uuid.UUID `json:"document_id"`
+	DocumentNameKk string    `json:"document_name_kk"`
+	DocumentNameRu string    `json:"document_name_ru"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 func benefitRequiredDocumentDTO(d *domain.BenefitRequiredDocument) benefitRequiredDocumentResponse {
-	return benefitRequiredDocumentResponse{ID: d.ID, BenefitID: d.BenefitID, DocumentID: d.DocumentID, DocumentName: d.DocumentName, CreatedAt: d.CreatedAt}
+	return benefitRequiredDocumentResponse{ID: d.ID, BenefitID: d.BenefitID, DocumentID: d.DocumentID, DocumentNameKk: d.DocumentNameKk, DocumentNameRu: d.DocumentNameRu, CreatedAt: d.CreatedAt}
 }
 
 func benefitRequiredDocumentsDTO(list []*domain.BenefitRequiredDocument) []benefitRequiredDocumentResponse {

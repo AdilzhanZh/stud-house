@@ -12,8 +12,10 @@ export async function getBenefit(id: string): Promise<Benefit> {
 }
 
 export interface BenefitPayload {
-  name: string
-  description: string
+  name_kk: string
+  name_ru: string
+  description_kk: string
+  description_ru: string
   priority: number
 }
 

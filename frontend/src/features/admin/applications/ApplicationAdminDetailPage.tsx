@@ -16,6 +16,7 @@ import { listUsers } from '../../../api/adminUserApi'
 import { listBenefits, listStudentBenefits } from '../../../api/benefitApi'
 import { applicationStatusToJourneyStep } from '../../applications/statusHelpers'
 import { formatDateTime } from '../../../utils/dateFormat'
+import { bilingualField } from '../../../utils/bilingualField'
 import type { ApplicationDetail } from '../../../types/applications'
 import type { Dormitory } from '../../../types/dormitories'
 import type { Benefit } from '../../../types/benefits'
@@ -29,7 +30,7 @@ interface RoomWithOccupancy extends Room {
 type ActionPanel = 'reject' | 'correction' | null
 
 export function ApplicationAdminDetailPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
@@ -60,7 +61,9 @@ export function ApplicationAdminDetailPage() {
         ])
         setStudent(users.find((u) => u.id === app.student_id) ?? null)
         setDormitory(dorm)
-        const benefitNamesById = Object.fromEntries(benefits.map((b) => [b.id, b.name]))
+        const benefitNamesById = Object.fromEntries(
+          benefits.map((b) => [b.id, bilingualField(b.name_kk, b.name_ru, i18n.language)]),
+        )
         setStudentBenefitNames(studentBenefits.map((sb) => benefitNamesById[sb.benefit_id] ?? sb.benefit_id))
         const withOccupancy = await Promise.all(
           roomList.map(async (r) => {

@@ -21,9 +21,11 @@ func NewBenefitHandler(benefits *service.BenefitService) *BenefitHandler {
 }
 
 type createBenefitRequest struct {
-	Name        string `json:"name" binding:"required"`
-	Description string `json:"description"`
-	Priority    int    `json:"priority" binding:"required,min=1,max=10"`
+	NameKk        string `json:"name_kk"`
+	NameRu        string `json:"name_ru"`
+	DescriptionKk string `json:"description_kk"`
+	DescriptionRu string `json:"description_ru"`
+	Priority      int    `json:"priority" binding:"required,min=1,max=10"`
 }
 
 func (h *BenefitHandler) Create(c *gin.Context) {
@@ -33,7 +35,7 @@ func (h *BenefitHandler) Create(c *gin.Context) {
 		return
 	}
 	createdBy, _ := middleware.UserID(c)
-	b, err := h.benefits.Create(c.Request.Context(), req.Name, req.Description, req.Priority, createdBy)
+	b, err := h.benefits.Create(c.Request.Context(), req.NameKk, req.NameRu, req.DescriptionKk, req.DescriptionRu, req.Priority, createdBy)
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -65,9 +67,11 @@ func (h *BenefitHandler) Get(c *gin.Context) {
 }
 
 type updateBenefitRequest struct {
-	Name        string `json:"name" binding:"required"`
-	Description string `json:"description"`
-	Priority    int    `json:"priority" binding:"required,min=1,max=10"`
+	NameKk        string `json:"name_kk"`
+	NameRu        string `json:"name_ru"`
+	DescriptionKk string `json:"description_kk"`
+	DescriptionRu string `json:"description_ru"`
+	Priority      int    `json:"priority" binding:"required,min=1,max=10"`
 }
 
 func (h *BenefitHandler) Update(c *gin.Context) {
@@ -81,7 +85,7 @@ func (h *BenefitHandler) Update(c *gin.Context) {
 		response.Error(c, apperror.BadRequest(err.Error()))
 		return
 	}
-	b, err := h.benefits.Update(c.Request.Context(), id, req.Name, req.Description, req.Priority)
+	b, err := h.benefits.Update(c.Request.Context(), id, req.NameKk, req.NameRu, req.DescriptionKk, req.DescriptionRu, req.Priority)
 	if err != nil {
 		response.Error(c, err)
 		return

@@ -7,6 +7,7 @@ import { Alert } from '../../../components/Alert'
 import { ConfirmDialog } from '../../../components/ConfirmDialog'
 import { DeleteIconButton } from '../../../components/DeleteIconButton'
 import { extractErrorMessage } from '../../../api/client'
+import { bilingualField } from '../../../utils/bilingualField'
 import {
   createRequiredDocument,
   deleteRequiredDocument,
@@ -17,11 +18,12 @@ import type { RequiredDocument } from '../../../types/documents'
 import type { Benefit } from '../../../types/benefits'
 
 export function DocumentListPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
 
   const [documents, setDocuments] = useState<RequiredDocument[] | null>(null)
-  const [newDocumentName, setNewDocumentName] = useState('')
+  const [newDocumentNameKk, setNewDocumentNameKk] = useState('')
+  const [newDocumentNameRu, setNewDocumentNameRu] = useState('')
   const [documentError, setDocumentError] = useState<string | null>(null)
   const [deleteDocTarget, setDeleteDocTarget] = useState<RequiredDocument | null>(null)
   const [isDeletingDoc, setIsDeletingDoc] = useState(false)
@@ -49,11 +51,14 @@ export function DocumentListPage() {
   }, [])
 
   async function handleAddDocument() {
-    if (!newDocumentName.trim()) return
+    const nameKk = newDocumentNameKk.trim()
+    const nameRu = newDocumentNameRu.trim()
+    if (!nameKk && !nameRu) return
     setDocumentError(null)
     try {
-      await createRequiredDocument(newDocumentName.trim())
-      setNewDocumentName('')
+      await createRequiredDocument(nameKk, nameRu)
+      setNewDocumentNameKk('')
+      setNewDocumentNameRu('')
       loadDocuments()
     } catch (err) {
       setDocumentError(extractErrorMessage(err, t('admin.documents.addFailed')))
@@ -99,7 +104,7 @@ export function DocumentListPage() {
         <ul className="mb-4 flex flex-col gap-2">
           {documents?.map((d) => (
             <li key={d.id} className="flex items-center justify-between text-sm">
-              <span className="text-sand-100">{d.name}</span>
+              <span className="text-sand-100">{bilingualField(d.name_kk, d.name_ru, i18n.language)}</span>
               <DeleteIconButton onClick={() => setDeleteDocTarget(d)} />
             </li>
           ))}
@@ -108,12 +113,18 @@ export function DocumentListPage() {
           )}
           {!documents && !documentError && <p className="text-sm text-sand-300">{t('admin.common.loading')}</p>}
         </ul>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <input
-            placeholder={t('admin.documents.namePlaceholder')}
+            placeholder={t('admin.documents.namePlaceholderKk')}
             className="flex-1 rounded-[14px] border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sand-100 text-sm outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
-            value={newDocumentName}
-            onChange={(e) => setNewDocumentName(e.target.value)}
+            value={newDocumentNameKk}
+            onChange={(e) => setNewDocumentNameKk(e.target.value)}
+          />
+          <input
+            placeholder={t('admin.documents.namePlaceholderRu')}
+            className="flex-1 rounded-[14px] border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sand-100 text-sm outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
+            value={newDocumentNameRu}
+            onChange={(e) => setNewDocumentNameRu(e.target.value)}
           />
           <Button type="button" variant="secondary" onClick={handleAddDocument}>
             {t('admin.common.add')}
@@ -139,8 +150,10 @@ export function DocumentListPage() {
                   <span className="text-turquoise-300/70">{t('admin.benefits.priority')}</span>
                 </span>
                 <div>
-                  <p className="font-medium text-sand-100">{b.name}</p>
-                  <p className="text-sm text-sand-300">{b.description}</p>
+                  <p className="font-medium text-sand-100">{bilingualField(b.name_kk, b.name_ru, i18n.language)}</p>
+                  <p className="text-sm text-sand-300">
+                    {bilingualField(b.description_kk, b.description_ru, i18n.language)}
+                  </p>
                 </div>
               </div>
               <DeleteIconButton onClick={() => setDeleteBenefitTarget(b)} />
@@ -155,7 +168,9 @@ export function DocumentListPage() {
       <ConfirmDialog
         open={deleteDocTarget != null}
         title={t('admin.documents.deleteTitle')}
-        message={t('admin.documents.deleteConfirm', { name: deleteDocTarget?.name })}
+        message={t('admin.documents.deleteConfirm', {
+          name: deleteDocTarget && bilingualField(deleteDocTarget.name_kk, deleteDocTarget.name_ru, i18n.language),
+        })}
         danger
         isLoading={isDeletingDoc}
         onConfirm={handleDeleteDocument}
@@ -165,7 +180,11 @@ export function DocumentListPage() {
       <ConfirmDialog
         open={deleteBenefitTarget != null}
         title={t('admin.benefits.deleteTitle')}
-        message={t('admin.benefits.deleteConfirm', { name: deleteBenefitTarget?.name })}
+        message={t('admin.benefits.deleteConfirm', {
+          name:
+            deleteBenefitTarget &&
+            bilingualField(deleteBenefitTarget.name_kk, deleteBenefitTarget.name_ru, i18n.language),
+        })}
         danger
         isLoading={isDeletingBenefit}
         onConfirm={handleDeleteBenefit}

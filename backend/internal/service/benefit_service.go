@@ -28,14 +28,33 @@ func validateBenefitPriority(priority int) error {
 	return nil
 }
 
-func (s *BenefitService) Create(ctx context.Context, name, description string, priority int, createdBy uuid.UUID) (*domain.Benefit, error) {
-	if name == "" {
+// fallbackBilingual fills an empty side of a bilingual pair from the other
+// side, so an entry typed in only one language still shows for both locales
+// instead of appearing blank when the site is switched.
+func fallbackBilingual(kk, ru string) (string, string) {
+	if kk == "" {
+		kk = ru
+	}
+	if ru == "" {
+		ru = kk
+	}
+	return kk, ru
+}
+
+func (s *BenefitService) Create(ctx context.Context, nameKk, nameRu, descriptionKk, descriptionRu string, priority int, createdBy uuid.UUID) (*domain.Benefit, error) {
+	if nameKk == "" && nameRu == "" {
 		return nil, apperror.BadRequest("атауы міндетті")
 	}
 	if err := validateBenefitPriority(priority); err != nil {
 		return nil, err
 	}
-	b := &domain.Benefit{Name: name, Description: description, Priority: priority, CreatedBy: createdBy}
+	nameKk, nameRu = fallbackBilingual(nameKk, nameRu)
+	descriptionKk, descriptionRu = fallbackBilingual(descriptionKk, descriptionRu)
+	b := &domain.Benefit{
+		NameKk: nameKk, NameRu: nameRu,
+		DescriptionKk: descriptionKk, DescriptionRu: descriptionRu,
+		Priority: priority, CreatedBy: createdBy,
+	}
 	if err := s.benefits.Create(ctx, b); err != nil {
 		return nil, err
 	}
@@ -57,14 +76,20 @@ func (s *BenefitService) List(ctx context.Context) ([]*domain.Benefit, error) {
 	return s.benefits.List(ctx)
 }
 
-func (s *BenefitService) Update(ctx context.Context, id uuid.UUID, name, description string, priority int) (*domain.Benefit, error) {
-	if name == "" {
+func (s *BenefitService) Update(ctx context.Context, id uuid.UUID, nameKk, nameRu, descriptionKk, descriptionRu string, priority int) (*domain.Benefit, error) {
+	if nameKk == "" && nameRu == "" {
 		return nil, apperror.BadRequest("атауы міндетті")
 	}
 	if err := validateBenefitPriority(priority); err != nil {
 		return nil, err
 	}
-	b := &domain.Benefit{ID: id, Name: name, Description: description, Priority: priority}
+	nameKk, nameRu = fallbackBilingual(nameKk, nameRu)
+	descriptionKk, descriptionRu = fallbackBilingual(descriptionKk, descriptionRu)
+	b := &domain.Benefit{
+		ID: id, NameKk: nameKk, NameRu: nameRu,
+		DescriptionKk: descriptionKk, DescriptionRu: descriptionRu,
+		Priority: priority,
+	}
 	if err := s.benefits.Update(ctx, b); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return nil, apperror.NotFound("льгота табылмады")

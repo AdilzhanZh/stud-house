@@ -174,18 +174,39 @@ func (r *DormitoryRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-// GetCapacity returns total_capacity alongside the sum of all room capacities
-// currently provisioned in the dormitory (the "жиналған орын саны" progress
-// figure), and total_rooms_target alongside how many rooms actually exist yet.
+// GetCapacity returns total_capacity alongside the count of students actually
+// placed in the dormitory's rooms (AllocatedBeds, from active room_residents,
+// i.e. moved_out_at IS NULL), the sum of capacities across rooms already
+// created (ProvisionedBeds, "how many seats have been built so far"), and
+// total_rooms_target alongside how many rooms actually exist yet. Room
+// capacity only bounds how many residents a room can hold — it must not be
+// used as the occupancy count, or newly created empty rooms would look fully
+// occupied before any student moves in.
 func (r *DormitoryRepo) GetCapacity(ctx context.Context, id uuid.UUID) (*domain.DormitoryCapacity, error) {
+	// room_agg and resident_agg are aggregated separately (rather than one
+	// joined SELECT) because joining rooms straight to room_residents
+	// produces one row per resident, which would multiply-count a room's
+	// capacity into SUM(capacity) for every resident it houses.
 	const q = `
-		SELECT d.id, d.total_capacity, COALESCE(SUM(r.capacity), 0), d.total_rooms_target, COUNT(r.id)
+		WITH room_agg AS (
+			SELECT dormitory_id, COALESCE(SUM(capacity), 0) AS cap_sum, COUNT(*) AS room_cnt
+			FROM rooms
+			WHERE dormitory_id = $1
+			GROUP BY dormitory_id
+		), resident_agg AS (
+			SELECT rm.dormitory_id, COUNT(rr.id) AS resident_cnt
+			FROM rooms rm
+			JOIN room_residents rr ON rr.room_id = rm.id AND rr.moved_out_at IS NULL
+			WHERE rm.dormitory_id = $1
+			GROUP BY rm.dormitory_id
+		)
+		SELECT d.id, d.total_capacity, COALESCE(resident_agg.resident_cnt, 0), COALESCE(room_agg.cap_sum, 0), d.total_rooms_target, COALESCE(room_agg.room_cnt, 0)
 		FROM dormitories d
-		LEFT JOIN rooms r ON r.dormitory_id = d.id
-		WHERE d.id = $1
-		GROUP BY d.id, d.total_capacity, d.total_rooms_target`
+		LEFT JOIN room_agg ON room_agg.dormitory_id = d.id
+		LEFT JOIN resident_agg ON resident_agg.dormitory_id = d.id
+		WHERE d.id = $1`
 	c := &domain.DormitoryCapacity{}
-	err := r.db.QueryRow(ctx, q, id).Scan(&c.DormitoryID, &c.TotalCapacity, &c.AllocatedBeds, &c.TotalRoomsTarget, &c.RoomsCreated)
+	err := r.db.QueryRow(ctx, q, id).Scan(&c.DormitoryID, &c.TotalCapacity, &c.AllocatedBeds, &c.ProvisionedBeds, &c.TotalRoomsTarget, &c.RoomsCreated)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, repository.ErrNotFound
@@ -253,7 +274,7 @@ func (r *DormitoryRepo) AddRequiredDocument(ctx context.Context, d *domain.Dormi
 
 func (r *DormitoryRepo) ListRequiredDocuments(ctx context.Context, dormitoryID uuid.UUID) ([]*domain.DormitoryRequiredDocument, error) {
 	const q = `
-		SELECT drd.id, drd.dormitory_id, drd.document_id, rd.name, drd.created_at
+		SELECT drd.id, drd.dormitory_id, drd.document_id, rd.name_kk, rd.name_ru, drd.created_at
 		FROM dormitory_required_documents drd
 		JOIN required_documents rd ON rd.id = drd.document_id
 		WHERE drd.dormitory_id = $1 ORDER BY drd.created_at`
@@ -266,7 +287,7 @@ func (r *DormitoryRepo) ListRequiredDocuments(ctx context.Context, dormitoryID u
 	var out []*domain.DormitoryRequiredDocument
 	for rows.Next() {
 		d := &domain.DormitoryRequiredDocument{}
-		if err := rows.Scan(&d.ID, &d.DormitoryID, &d.DocumentID, &d.DocumentName, &d.CreatedAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.DormitoryID, &d.DocumentID, &d.DocumentNameKk, &d.DocumentNameRu, &d.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, d)

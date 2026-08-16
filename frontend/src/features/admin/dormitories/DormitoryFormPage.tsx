@@ -20,11 +20,12 @@ import {
 } from '../../../api/dormitoryApi'
 import { listRequiredDocuments } from '../../../api/documentApi'
 import { uploadFile } from '../../../api/uploadApi'
+import { bilingualField } from '../../../utils/bilingualField'
 import type { DormitoryImage, DormitoryRequiredDocument, DormitoryType } from '../../../types/dormitories'
 import type { RequiredDocument } from '../../../types/documents'
 
 export function DormitoryFormPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const isEdit = Boolean(id)
   const navigate = useNavigate()
@@ -409,7 +410,7 @@ export function DormitoryFormPage() {
                       disabled={togglingDocId === doc.id}
                       onChange={(e) => handleToggleDocument(doc.id, e.target.checked)}
                     />
-                    {doc.name}
+                    {bilingualField(doc.name_kk, doc.name_ru, i18n.language)}
                   </label>
                 </li>
               )

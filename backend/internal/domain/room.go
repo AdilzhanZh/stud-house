@@ -10,13 +10,14 @@ import (
 // RoomRestrictions is the typed shape stored in rooms.restrictions (JSONB).
 // Every field is optional: a nil/empty field means "no restriction on this dimension".
 type RoomRestrictions struct {
-	Gender     *Gender     `json:"gender,omitempty"`
-	Courses    []int16     `json:"courses"`
-	BenefitIDs []uuid.UUID `json:"benefit_ids"`
+	Gender     *Gender          `json:"gender,omitempty"`
+	Courses    []int16          `json:"courses"`
+	Degrees    []AcademicDegree `json:"degrees"`
+	BenefitIDs []uuid.UUID      `json:"benefit_ids"`
 }
 
 func (r RoomRestrictions) IsEmpty() bool {
-	return r.Gender == nil && len(r.Courses) == 0 && len(r.BenefitIDs) == 0
+	return r.Gender == nil && len(r.Courses) == 0 && len(r.Degrees) == 0 && len(r.BenefitIDs) == 0
 }
 
 // MarshalJSON normalizes nil Courses/BenefitIDs to empty slices so they
@@ -31,16 +32,21 @@ func (r RoomRestrictions) MarshalJSON() ([]byte, error) {
 	if courses == nil {
 		courses = []int16{}
 	}
+	degrees := r.Degrees
+	if degrees == nil {
+		degrees = []AcademicDegree{}
+	}
 	benefitIDs := r.BenefitIDs
 	if benefitIDs == nil {
 		benefitIDs = []uuid.UUID{}
 	}
 	type alias struct {
-		Gender     *Gender     `json:"gender,omitempty"`
-		Courses    []int16     `json:"courses"`
-		BenefitIDs []uuid.UUID `json:"benefit_ids"`
+		Gender     *Gender          `json:"gender,omitempty"`
+		Courses    []int16          `json:"courses"`
+		Degrees    []AcademicDegree `json:"degrees"`
+		BenefitIDs []uuid.UUID      `json:"benefit_ids"`
 	}
-	return json.Marshal(alias{Gender: r.Gender, Courses: courses, BenefitIDs: benefitIDs})
+	return json.Marshal(alias{Gender: r.Gender, Courses: courses, Degrees: degrees, BenefitIDs: benefitIDs})
 }
 
 type Room struct {

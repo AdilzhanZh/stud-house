@@ -12,6 +12,7 @@ import (
 // instead of every benefit/dormitory re-typing the same document name.
 type RequiredDocument struct {
 	ID        uuid.UUID
-	Name      string
+	NameKk    string
+	NameRu    string
 	CreatedAt time.Time
 }

@@ -21,7 +21,7 @@ export interface User {
 
 export type Gender = 'male' | 'female'
 
-export type AcademicDegree = 'bachelor' | 'master'
+export type AcademicDegree = 'bachelor' | 'master' | 'doctorate'
 
 export interface StudentProfile {
   user_id: string

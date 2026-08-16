@@ -21,6 +21,7 @@ import { getStudentProfile } from '../../api/profileApi'
 import { uploadFile } from '../../api/uploadApi'
 import { generatePetitionPdfBlob } from '../../utils/petitionPdf'
 import { formatTenge } from '../../utils/dormitoryLabels'
+import { bilingualField } from '../../utils/bilingualField'
 import { FloorCorridorMap } from '../../components/FloorCorridorMap'
 import { useDormitoriesWithMeta } from '../dormitories/useDormitoriesWithMeta'
 import { useAuth } from '../auth/useAuth'
@@ -99,7 +100,7 @@ function DocumentCard({
 }
 
 export function NewApplicationPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -258,12 +259,16 @@ export function NewApplicationPage() {
     setServerError(null)
     const missingDoc = allRequiredDocs.find((doc) => !docFiles[doc.id])
     if (missingDoc) {
-      setServerError(t('wizard.missingDocError', { doc: missingDoc.document_name }))
+      setServerError(
+        t('wizard.missingDocError', { doc: bilingualField(missingDoc.document_name_kk, missingDoc.document_name_ru, i18n.language) }),
+      )
       return
     }
     const invalidDoc = allRequiredDocs.find((doc) => docFiles[doc.id]?.type !== 'application/pdf')
     if (invalidDoc) {
-      setServerError(t('wizard.invalidDocError', { doc: invalidDoc.document_name }))
+      setServerError(
+        t('wizard.invalidDocError', { doc: bilingualField(invalidDoc.document_name_kk, invalidDoc.document_name_ru, i18n.language) }),
+      )
       return
     }
     if (!studyGroup.trim() || !hometown.trim() || !parentContact.trim()) {
@@ -520,7 +525,7 @@ export function NewApplicationPage() {
             {dormitoryRequiredDocs.map((doc) => (
               <DocumentCard
                 key={doc.id}
-                name={doc.document_name}
+                name={bilingualField(doc.document_name_kk, doc.document_name_ru, i18n.language)}
                 file={docFiles[doc.id] ?? null}
                 onChange={(file) => setDocFiles((prev) => ({ ...prev, [doc.id]: file }))}
                 t={t}
@@ -552,8 +557,12 @@ export function NewApplicationPage() {
                             onChange={() => toggleBenefit(b.id)}
                           />
                           <span>
-                            {b.name}
-                            {b.description && <span className="block text-xs text-sand-300">{b.description}</span>}
+                            {bilingualField(b.name_kk, b.name_ru, i18n.language)}
+                            {(b.description_kk || b.description_ru) && (
+                              <span className="block text-xs text-sand-300">
+                                {bilingualField(b.description_kk, b.description_ru, i18n.language)}
+                              </span>
+                            )}
                           </span>
                         </label>
                         {selectedBenefitIds.includes(b.id) && (requiredDocsByBenefit[b.id]?.length ?? 0) > 0 && (
@@ -561,7 +570,7 @@ export function NewApplicationPage() {
                             {requiredDocsByBenefit[b.id].map((doc) => (
                               <DocumentCard
                                 key={doc.id}
-                                name={doc.document_name}
+                                name={bilingualField(doc.document_name_kk, doc.document_name_ru, i18n.language)}
                                 file={docFiles[doc.id] ?? null}
                                 onChange={(file) => setDocFiles((prev) => ({ ...prev, [doc.id]: file }))}
                                 t={t}
@@ -619,7 +628,7 @@ export function NewApplicationPage() {
                     key={doc.id}
                     className={`mt-1.5 text-sm font-semibold ${docFiles[doc.id] ? 'text-mint-400' : 'text-sand-300'}`}
                   >
-                    {docFiles[doc.id] ? '✓' : '–'} {doc.document_name}
+                    {docFiles[doc.id] ? '✓' : '–'} {bilingualField(doc.document_name_kk, doc.document_name_ru, i18n.language)}
                   </p>
                 ))
               )}

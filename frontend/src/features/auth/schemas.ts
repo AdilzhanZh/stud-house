@@ -21,7 +21,9 @@ export function buildRegisterSchema(t: TFunction) {
       iin: z.string().regex(/^\d{12}$/, t('validation.iinFormat')),
       gender: z.enum(['male', 'female'], { message: t('validation.genderRequired') }),
       course: z.enum(['1', '2', '3', '4', '5', '6'], { message: t('validation.courseRequired') }),
-      academic_degree: z.enum(['bachelor', 'master'], { message: t('validation.degreeRequired') }),
+      academic_degree: z.enum(['bachelor', 'master', 'doctorate'], {
+        message: t('validation.degreeRequired'),
+      }),
       password: z.string().min(8, t('validation.passwordMin')),
       password_confirm: z.string().min(1, t('validation.passwordConfirmRequired')),
     })
@@ -31,7 +33,8 @@ export function buildRegisterSchema(t: TFunction) {
     })
     .refine(
       (data) => {
-        const maxCourse = data.academic_degree === 'master' ? 2 : 4
+        const maxCourse =
+          data.academic_degree === 'master' ? 2 : data.academic_degree === 'doctorate' ? 3 : 4
         return Number(data.course) <= maxCourse
       },
       {

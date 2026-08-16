@@ -23,16 +23,17 @@ func NewBenefitRepo(db *pgxpool.Pool) *BenefitRepo {
 
 func (r *BenefitRepo) Create(ctx context.Context, b *domain.Benefit) error {
 	const q = `
-		INSERT INTO benefits (name, description, priority, created_by)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO benefits (name_kk, name_ru, description_kk, description_ru, priority, created_by)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, created_at, updated_at`
-	return r.db.QueryRow(ctx, q, b.Name, b.Description, b.Priority, b.CreatedBy).Scan(&b.ID, &b.CreatedAt, &b.UpdatedAt)
+	return r.db.QueryRow(ctx, q, b.NameKk, b.NameRu, b.DescriptionKk, b.DescriptionRu, b.Priority, b.CreatedBy).
+		Scan(&b.ID, &b.CreatedAt, &b.UpdatedAt)
 }
 
 func (r *BenefitRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Benefit, error) {
-	const q = `SELECT id, name, description, priority, created_by, created_at, updated_at FROM benefits WHERE id = $1`
+	const q = `SELECT id, name_kk, name_ru, description_kk, description_ru, priority, created_by, created_at, updated_at FROM benefits WHERE id = $1`
 	b := &domain.Benefit{}
-	err := r.db.QueryRow(ctx, q, id).Scan(&b.ID, &b.Name, &b.Description, &b.Priority, &b.CreatedBy, &b.CreatedAt, &b.UpdatedAt)
+	err := r.db.QueryRow(ctx, q, id).Scan(&b.ID, &b.NameKk, &b.NameRu, &b.DescriptionKk, &b.DescriptionRu, &b.Priority, &b.CreatedBy, &b.CreatedAt, &b.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, repository.ErrNotFound
@@ -43,7 +44,7 @@ func (r *BenefitRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Benefi
 }
 
 func (r *BenefitRepo) List(ctx context.Context) ([]*domain.Benefit, error) {
-	const q = `SELECT id, name, description, priority, created_by, created_at, updated_at FROM benefits ORDER BY priority DESC, name`
+	const q = `SELECT id, name_kk, name_ru, description_kk, description_ru, priority, created_by, created_at, updated_at FROM benefits ORDER BY priority DESC, name_kk`
 	rows, err := r.db.Query(ctx, q)
 	if err != nil {
 		return nil, err
@@ -53,7 +54,7 @@ func (r *BenefitRepo) List(ctx context.Context) ([]*domain.Benefit, error) {
 	var out []*domain.Benefit
 	for rows.Next() {
 		b := &domain.Benefit{}
-		if err := rows.Scan(&b.ID, &b.Name, &b.Description, &b.Priority, &b.CreatedBy, &b.CreatedAt, &b.UpdatedAt); err != nil {
+		if err := rows.Scan(&b.ID, &b.NameKk, &b.NameRu, &b.DescriptionKk, &b.DescriptionRu, &b.Priority, &b.CreatedBy, &b.CreatedAt, &b.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, b)
@@ -63,10 +64,10 @@ func (r *BenefitRepo) List(ctx context.Context) ([]*domain.Benefit, error) {
 
 func (r *BenefitRepo) Update(ctx context.Context, b *domain.Benefit) error {
 	const q = `
-		UPDATE benefits SET name = $2, description = $3, priority = $4, updated_at = now()
+		UPDATE benefits SET name_kk = $2, name_ru = $3, description_kk = $4, description_ru = $5, priority = $6, updated_at = now()
 		WHERE id = $1
 		RETURNING updated_at`
-	err := r.db.QueryRow(ctx, q, b.ID, b.Name, b.Description, b.Priority).Scan(&b.UpdatedAt)
+	err := r.db.QueryRow(ctx, q, b.ID, b.NameKk, b.NameRu, b.DescriptionKk, b.DescriptionRu, b.Priority).Scan(&b.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return repository.ErrNotFound
@@ -110,7 +111,7 @@ func (r *BenefitRepo) AddRequiredDocument(ctx context.Context, d *domain.Benefit
 
 func (r *BenefitRepo) ListRequiredDocuments(ctx context.Context, benefitID uuid.UUID) ([]*domain.BenefitRequiredDocument, error) {
 	const q = `
-		SELECT brd.id, brd.benefit_id, brd.document_id, rd.name, brd.created_at
+		SELECT brd.id, brd.benefit_id, brd.document_id, rd.name_kk, rd.name_ru, brd.created_at
 		FROM benefit_required_documents brd
 		JOIN required_documents rd ON rd.id = brd.document_id
 		WHERE brd.benefit_id = $1 ORDER BY brd.created_at`
@@ -123,7 +124,7 @@ func (r *BenefitRepo) ListRequiredDocuments(ctx context.Context, benefitID uuid.
 	var out []*domain.BenefitRequiredDocument
 	for rows.Next() {
 		d := &domain.BenefitRequiredDocument{}
-		if err := rows.Scan(&d.ID, &d.BenefitID, &d.DocumentID, &d.DocumentName, &d.CreatedAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.BenefitID, &d.DocumentID, &d.DocumentNameKk, &d.DocumentNameRu, &d.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, d)

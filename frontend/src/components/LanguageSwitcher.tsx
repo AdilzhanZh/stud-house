@@ -14,9 +14,14 @@ interface LanguageSwitcherProps {
   // only exposes kk/ru, unlike the full kk/ru/en student-facing switcher).
   // Defaults to all three.
   languages?: SupportedLanguage[]
+  // Opens the menu above the button instead of below. Needed wherever the
+  // switcher sits at the bottom of the screen (e.g. the admin sidebar
+  // footer) — opening downward there pushes the menu past the viewport
+  // edge, clipping every option but the first.
+  dropUp?: boolean
 }
 
-export function LanguageSwitcher({ languages }: LanguageSwitcherProps = {}) {
+export function LanguageSwitcher({ languages, dropUp = false }: LanguageSwitcherProps = {}) {
   const { i18n } = useTranslation()
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -56,7 +61,9 @@ export function LanguageSwitcher({ languages }: LanguageSwitcherProps = {}) {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 z-20 mt-2 w-40 overflow-hidden rounded-2xl border border-navy-700 bg-navy-900 py-1.5 shadow-[var(--shadow-card)]"
+          className={`absolute right-0 z-20 w-40 overflow-hidden rounded-2xl border border-navy-700 bg-navy-900 py-1.5 shadow-[var(--shadow-card)] ${
+            dropUp ? 'bottom-full mb-2' : 'mt-2'
+          }`}
         >
           {LANGUAGES.map((lang) => (
             <button

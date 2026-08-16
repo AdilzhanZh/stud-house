@@ -22,7 +22,8 @@ func NewDocumentHandler(documents *service.DocumentService) *DocumentHandler {
 }
 
 type createDocumentRequest struct {
-	Name string `json:"name" binding:"required"`
+	NameKk string `json:"name_kk"`
+	NameRu string `json:"name_ru"`
 }
 
 func (h *DocumentHandler) Create(c *gin.Context) {
@@ -31,7 +32,7 @@ func (h *DocumentHandler) Create(c *gin.Context) {
 		response.Error(c, apperror.BadRequest(err.Error()))
 		return
 	}
-	d, err := h.documents.Create(c.Request.Context(), req.Name)
+	d, err := h.documents.Create(c.Request.Context(), req.NameKk, req.NameRu)
 	if err != nil {
 		response.Error(c, err)
 		return

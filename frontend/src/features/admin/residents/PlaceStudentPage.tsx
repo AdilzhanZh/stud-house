@@ -36,6 +36,12 @@ function ineligibilityReason(
   if (r.courses.length > 0 && (profile?.course == null || !r.courses.includes(profile.course))) {
     return t('admin.placeStudent.roomCourseMismatch')
   }
+  if (
+    r.degrees.length > 0 &&
+    (profile?.academic_degree == null || !r.degrees.includes(profile.academic_degree))
+  ) {
+    return t('admin.placeStudent.roomDegreeMismatch')
+  }
   if (r.benefit_ids.length > 0 && !r.benefit_ids.some((id) => benefitIds.includes(id))) {
     return t('admin.placeStudent.roomBenefitMismatch')
   }

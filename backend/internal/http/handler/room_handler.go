@@ -118,9 +118,10 @@ func (h *RoomHandler) Delete(c *gin.Context) {
 }
 
 type updateRestrictionsRequest struct {
-	Gender     *domain.Gender `json:"gender"`
-	Courses    []int16        `json:"courses"`
-	BenefitIDs []uuid.UUID    `json:"benefit_ids"`
+	Gender     *domain.Gender          `json:"gender"`
+	Courses    []int16                 `json:"courses"`
+	Degrees    []domain.AcademicDegree `json:"degrees"`
+	BenefitIDs []uuid.UUID             `json:"benefit_ids"`
 }
 
 // UpdateRestrictions rejects the change (409) if any current resident would
@@ -136,7 +137,13 @@ func (h *RoomHandler) UpdateRestrictions(c *gin.Context) {
 		response.Error(c, apperror.BadRequest(err.Error()))
 		return
 	}
-	restrictions := domain.RoomRestrictions{Gender: req.Gender, Courses: req.Courses, BenefitIDs: req.BenefitIDs}
+	for _, d := range req.Degrees {
+		if !d.Valid() {
+			response.Error(c, apperror.BadRequest("жарамсыз оқу деңгейі: "+string(d)))
+			return
+		}
+	}
+	restrictions := domain.RoomRestrictions{Gender: req.Gender, Courses: req.Courses, Degrees: req.Degrees, BenefitIDs: req.BenefitIDs}
 	room, err := h.rooms.UpdateRestrictions(c.Request.Context(), id, restrictions)
 	if err != nil {
 		response.Error(c, err)

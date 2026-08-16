@@ -77,13 +77,14 @@ func (g Gender) Valid() bool {
 type AcademicDegree string
 
 const (
-	DegreeBachelor AcademicDegree = "bachelor"
-	DegreeMaster   AcademicDegree = "master"
+	DegreeBachelor  AcademicDegree = "bachelor"
+	DegreeMaster    AcademicDegree = "master"
+	DegreeDoctorate AcademicDegree = "doctorate"
 )
 
 func (d AcademicDegree) Valid() bool {
 	switch d {
-	case DegreeBachelor, DegreeMaster:
+	case DegreeBachelor, DegreeMaster, DegreeDoctorate:
 		return true
 	default:
 		return false
@@ -91,12 +92,16 @@ func (d AcademicDegree) Valid() bool {
 }
 
 // MaxCourse returns the highest valid course number for this degree:
-// bachelor's programs run 4 years, master's run 2.
+// bachelor's programs run 4 years, master's run 2, doctoral run 3.
 func (d AcademicDegree) MaxCourse() int16 {
-	if d == DegreeMaster {
+	switch d {
+	case DegreeMaster:
 		return 2
+	case DegreeDoctorate:
+		return 3
+	default:
+		return 4
 	}
-	return 4
 }
 
 // StudentProfile holds the attributes (gender, course, academic degree) that

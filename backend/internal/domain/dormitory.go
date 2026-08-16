@@ -43,14 +43,16 @@ type Dormitory struct {
 	UpdatedAt             time.Time
 }
 
-// DormitoryCapacity reports how many beds have been allocated across a
-// dormitory's rooms versus its declared total_capacity, alongside the
-// declared total_rooms_target versus how many rooms actually exist yet
-// (the "256/32" progress figure from the spec, for both dimensions).
+// DormitoryCapacity reports how many students are actually placed in a
+// dormitory's rooms (AllocatedBeds) versus its declared total_capacity, how
+// many bed-slots have been provisioned by creating rooms (ProvisionedBeds),
+// and the declared total_rooms_target versus how many rooms actually exist
+// yet (the "256/32" progress figure from the spec, for both dimensions).
 type DormitoryCapacity struct {
 	DormitoryID      uuid.UUID
 	TotalCapacity    int
 	AllocatedBeds    int
+	ProvisionedBeds  int
 	TotalRoomsTarget *int
 	RoomsCreated     int
 }
@@ -65,13 +67,14 @@ type DormitoryImage struct {
 // DormitoryRequiredDocument links a dormitory to one entry in the shared
 // RequiredDocument catalog — a document every applicant to this dormitory
 // must upload (e.g. a fluorography certificate), independent of any
-// benefit-specific required documents. DocumentName is denormalized (joined
-// in) purely for convenient display — the catalog entry (DocumentID) is the
-// source of truth.
+// benefit-specific required documents. DocumentName{Kk,Ru} is denormalized
+// (joined in) purely for convenient display — the catalog entry (DocumentID)
+// is the source of truth.
 type DormitoryRequiredDocument struct {
-	ID           uuid.UUID
-	DormitoryID  uuid.UUID
-	DocumentID   uuid.UUID
-	DocumentName string
-	CreatedAt    time.Time
+	ID             uuid.UUID
+	DormitoryID    uuid.UUID
+	DocumentID     uuid.UUID
+	DocumentNameKk string
+	DocumentNameRu string
+	CreatedAt      time.Time
 }

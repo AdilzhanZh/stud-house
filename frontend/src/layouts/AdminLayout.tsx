@@ -92,7 +92,7 @@ export function AdminLayout() {
               <FileText className="h-4.5 w-4.5 shrink-0" />
               {t('admin.layout.contracts')}
             </NavLink>
-            <NavLink to="/admin/residents" className={navLinkClass}>
+            <NavLink to="/admin/residents" end className={navLinkClass}>
               <Users className="h-4.5 w-4.5 shrink-0" />
               {t('admin.layout.residents')}
             </NavLink>
@@ -154,7 +154,7 @@ export function AdminLayout() {
               {user?.role === 'manager' ? t('admin.layout.managerRole') : t('admin.layout.adminRole')}
             </p>
           </div>
-          <LanguageSwitcher languages={['kk', 'ru']} />
+          <LanguageSwitcher languages={['kk', 'ru']} dropUp />
           <ThemeToggle />
         </div>
         <button

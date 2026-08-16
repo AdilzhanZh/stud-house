@@ -21,6 +21,7 @@ export function ProfilePage() {
   const degreeLabels: Record<NonNullable<StudentProfile['academic_degree']>, string> = {
     bachelor: t('auth.bachelor'),
     master: t('auth.master'),
+    doctorate: t('auth.doctorate'),
   }
 
   const genderLabels: Record<NonNullable<StudentProfile['gender']>, string> = {

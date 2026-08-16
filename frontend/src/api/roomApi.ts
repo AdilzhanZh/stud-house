@@ -38,6 +38,7 @@ export async function updateRoomRestrictions(
   const { data } = await apiClient.patch<{ data: Room }>(`/rooms/${id}/restrictions`, {
     gender: restrictions.gender,
     courses: restrictions.courses,
+    degrees: restrictions.degrees,
     benefit_ids: restrictions.benefit_ids,
   })
   return data.data

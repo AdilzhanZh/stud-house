@@ -15,17 +15,20 @@ import {
   updateBenefit,
 } from '../../../api/benefitApi'
 import { listRequiredDocuments } from '../../../api/documentApi'
+import { bilingualField } from '../../../utils/bilingualField'
 import type { BenefitRequiredDocument } from '../../../types/benefits'
 import type { RequiredDocument } from '../../../types/documents'
 
 export function BenefitFormPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const isEdit = Boolean(id)
   const navigate = useNavigate()
 
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
+  const [nameKk, setNameKk] = useState('')
+  const [nameRu, setNameRu] = useState('')
+  const [descriptionKk, setDescriptionKk] = useState('')
+  const [descriptionRu, setDescriptionRu] = useState('')
   const [priority, setPriority] = useState('1')
   const [loadError, setLoadError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -45,8 +48,10 @@ export function BenefitFormPage() {
     if (!id) return
     getBenefit(id)
       .then((b) => {
-        setName(b.name)
-        setDescription(b.description)
+        setNameKk(b.name_kk)
+        setNameRu(b.name_ru)
+        setDescriptionKk(b.description_kk)
+        setDescriptionRu(b.description_ru)
         setPriority(String(b.priority))
       })
       .catch((err) => setLoadError(extractErrorMessage(err, t('admin.common.loadError'))))
@@ -58,7 +63,13 @@ export function BenefitFormPage() {
     setSubmitError(null)
     setIsSubmitting(true)
     try {
-      const payload = { name, description, priority: Number(priority) }
+      const payload = {
+        name_kk: nameKk,
+        name_ru: nameRu,
+        description_kk: descriptionKk,
+        description_ru: descriptionRu,
+        priority: Number(priority),
+      }
       if (isEdit && id) {
         await updateBenefit(id, payload)
         navigate('/admin/documents')
@@ -103,11 +114,17 @@ export function BenefitFormPage() {
       <Card title={isEdit ? t('admin.benefits.editTitle') : t('admin.benefits.newTitle')}>
         <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
           {submitError && <Alert variant="error" message={submitError} />}
-          <Input label={t('admin.dormitories.name')} value={name} onChange={(e) => setName(e.target.value)} required />
+          <Input label={t('admin.benefits.nameKk')} value={nameKk} onChange={(e) => setNameKk(e.target.value)} />
+          <Input label={t('admin.benefits.nameRu')} value={nameRu} onChange={(e) => setNameRu(e.target.value)} />
           <Input
-            label={t('admin.benefits.description')}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            label={t('admin.benefits.descriptionKk')}
+            value={descriptionKk}
+            onChange={(e) => setDescriptionKk(e.target.value)}
+          />
+          <Input
+            label={t('admin.benefits.descriptionRu')}
+            value={descriptionRu}
+            onChange={(e) => setDescriptionRu(e.target.value)}
           />
           <Input
             label={t('admin.benefits.priorityLabel')}
@@ -142,7 +159,7 @@ export function BenefitFormPage() {
                       disabled={togglingDocId === doc.id}
                       onChange={(e) => handleToggleDocument(doc.id, e.target.checked)}
                     />
-                    {doc.name}
+                    {bilingualField(doc.name_kk, doc.name_ru, i18n.language)}
                   </label>
                 </li>
               )

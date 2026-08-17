@@ -177,12 +177,13 @@ func (r *UserRepo) ListByRole(ctx context.Context, role domain.Role) ([]*domain.
 	return users, rows.Err()
 }
 
-// List is the admin panel's general roster. A self-registered student who
-// hasn't confirmed their email yet isn't a real user of the site — just an
-// unproven registration attempt — so those rows are excluded here (as well
-// as from ListPendingStudents) until email_verified_at is set.
+// List is the admin panel's general roster: only real, active users of the
+// site. A self-registered student isn't one of those until they've both
+// confirmed their email AND been approved by a manager/admin — until then
+// they're excluded here (as well as from ListPendingStudents, which has its
+// own narrower "awaiting decision" filter).
 func (r *UserRepo) List(ctx context.Context, role *domain.Role) ([]*domain.User, error) {
-	baseQ := `SELECT ` + userColumns + ` FROM users WHERE NOT (role = 'student' AND email_verified_at IS NULL)`
+	baseQ := `SELECT ` + userColumns + ` FROM users WHERE NOT (role = 'student' AND (email_verified_at IS NULL OR approval_status <> 'approved'))`
 	var rows pgx.Rows
 	var err error
 	if role != nil {

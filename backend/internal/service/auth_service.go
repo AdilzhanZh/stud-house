@@ -66,11 +66,12 @@ func (s *AuthService) sendVerificationEmail(user *domain.User, code string) {
 // isReplaceableStudent reports whether an existing user row is a student
 // registration that never became a real, usable account and can therefore be
 // silently discarded by a new registration attempt reusing the same
-// email/IIN. This covers two cases:
-//   - a rejected registration (the applicant was reviewed and declined), and
-//   - an unverified registration (the applicant never confirmed their email,
-//     so approval_status is stuck at pending and they can neither log in nor
-//     be seen by a manager — see UserRepo.ListPendingStudents).
+// email/IIN: an unverified registration (the applicant never confirmed their
+// email, so approval_status is stuck at pending and they can neither log in
+// nor be seen by a manager — see UserRepo.ListPendingStudents). The
+// ApprovalRejected check is defensive/historical — DecideStudentApproval now
+// deletes a rejected row outright rather than leaving one behind, but old
+// rows created before that change may still have this status.
 //
 // Either way the row never granted login access, so its email/IIN must not
 // stay permanently reserved.

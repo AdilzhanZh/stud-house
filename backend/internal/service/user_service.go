@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -26,16 +27,17 @@ func NewUserService(users repository.UserRepository, profiles repository.Student
 }
 
 // CreateUser is admin-only: it can create admin/manager, but never student —
-// students only ever self-register via AuthService.RegisterStudent, per spec
-// ("Админ студенттен басқа рөлдерге жататын пайдаланушыларды жүйеге өзі
-// тіркейді"). Committee membership isn't set here — admin elects a manager
-// onto the committee afterward via SetCommitteeMember.
+// a student account is created either by the student themself via
+// AuthService.RegisterStudent, or by an admin/manager via CreateStudent
+// below (which, unlike this method, also collects the student-only profile
+// fields). Committee membership isn't set here — admin elects a manager onto
+// the committee afterward via SetCommitteeMember.
 func (s *UserService) CreateUser(ctx context.Context, fullName, email, phone, password string, role domain.Role) (*domain.User, error) {
 	if !role.Valid() {
 		return nil, apperror.BadRequest("рөл жарамсыз")
 	}
 	if role == domain.RoleStudent {
-		return nil, apperror.BadRequest("студенттер бұл арқылы емес, /auth/register арқылы өздері тіркелуі керек")
+		return nil, apperror.BadRequest("студентті осы арқылы емес, «студент қосу» формасы арқылы жасаңыз")
 	}
 	if role == domain.RoleAdmin {
 		exists, err := s.adminAlreadyExists(ctx, nil)
@@ -79,6 +81,20 @@ func (s *UserService) CreateUser(ctx context.Context, fullName, email, phone, pa
 		return nil, err
 	}
 	return user, nil
+}
+
+// CreateStudent is admin/manager-only: it creates a student account directly,
+// with the same fields collected during self-registration (see
+// AuthService.RegisterStudent), but skips the email-confirmation step —
+// the account is created already approved and email-verified, since a
+// manager/admin vouching for the student in person is itself the proof that
+// self-registration's email-confirmation step exists to establish.
+func (s *UserService) CreateStudent(ctx context.Context, fullName, email, phone, password, iin string, gender domain.Gender, course int16, academicDegree domain.AcademicDegree) (*domain.User, error) {
+	now := time.Now()
+	return createStudentAccount(ctx, s.users, s.profiles, studentRegistrationInput{
+		FullName: fullName, Email: email, Phone: phone, Password: password, IIN: iin,
+		Gender: gender, Course: course, AcademicDegree: academicDegree,
+	}, domain.ApprovalApproved, &now, nil, nil)
 }
 
 func (s *UserService) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {

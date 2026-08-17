@@ -27,6 +27,7 @@ import { UserListPage } from './features/admin/users/UserListPage'
 import { UserRegisterFormPage } from './features/admin/users/UserRegisterFormPage'
 import { RoleAssignPage } from './features/admin/users/RoleAssignPage'
 import { PendingStudentsPage } from './features/admin/users/PendingStudentsPage'
+import { StudentRegisterFormPage } from './features/admin/users/StudentRegisterFormPage'
 import { DashboardPage } from './features/admin/dashboard/DashboardPage'
 import { ResidentsPage } from './features/admin/residents/ResidentsPage'
 import { PlaceStudentPage } from './features/admin/residents/PlaceStudentPage'
@@ -100,6 +101,7 @@ function App() {
           <Route path="/admin/benefits/new" element={<BenefitFormPage />} />
           <Route path="/admin/benefits/:id/edit" element={<BenefitFormPage />} />
           <Route path="/admin/students/pending" element={<PendingStudentsPage />} />
+          <Route path="/admin/students/new" element={<StudentRegisterFormPage />} />
 
           <Route path="/admin/applications" element={<ApplicationQueuePage />} />
           <Route path="/admin/applications/petition-template" element={<PetitionTemplatePage />} />

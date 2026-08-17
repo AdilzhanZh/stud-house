@@ -183,6 +183,7 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 				mgmt.DELETE("/students/:id/benefits/:benefitId", h.Benefit.RevokeBenefit)
 
 				mgmt.GET("/admin/users", h.User.List)
+				mgmt.POST("/admin/students", h.User.CreateStudent)
 				mgmt.GET("/admin/students/pending", h.User.ListPendingStudents)
 				mgmt.PATCH("/admin/students/:id/approval", h.User.DecideStudentApproval)
 				mgmt.GET("/admin/students/unhoused", h.User.ListUnhoused)

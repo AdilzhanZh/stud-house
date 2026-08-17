@@ -42,6 +42,35 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 	response.Created(c, userDTO(user))
 }
 
+type createStudentRequest struct {
+	FullName       string                `json:"full_name" binding:"required"`
+	Email          string                `json:"email" binding:"required,email"`
+	Phone          string                `json:"phone"`
+	Password       string                `json:"password" binding:"required"`
+	IIN            string                `json:"iin" binding:"required"`
+	Gender         domain.Gender         `json:"gender" binding:"required"`
+	Course         int16                 `json:"course" binding:"required"`
+	AcademicDegree domain.AcademicDegree `json:"academic_degree" binding:"required"`
+}
+
+// CreateStudent is admin/manager-only: creates a student account directly,
+// with the same fields the public self-registration form collects, but
+// already approved and email-verified — there's no confirmation email to
+// wait on since the manager/admin is vouching for the student in person.
+func (h *UserHandler) CreateStudent(c *gin.Context) {
+	var req createStudentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.BadRequest(err.Error()))
+		return
+	}
+	user, err := h.users.CreateStudent(c.Request.Context(), req.FullName, req.Email, req.Phone, req.Password, req.IIN, req.Gender, req.Course, req.AcademicDegree)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.Created(c, userDTO(user))
+}
+
 type updateRoleRequest struct {
 	Role domain.Role `json:"role" binding:"required"`
 }

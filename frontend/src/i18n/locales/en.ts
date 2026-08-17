@@ -807,6 +807,10 @@ export const en: typeof kk = {
       patronymic: 'Patronymic',
       password: 'Password',
       register: 'Register',
+      registerStudent: 'Add student',
+      registerStudentHint:
+        "The student's account is created already approved and active — no email confirmation is required.",
+      registerStudentFailed: 'Failed to add student',
     },
   },
 }

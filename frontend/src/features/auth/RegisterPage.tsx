@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
@@ -15,6 +15,8 @@ import { buildRegisterSchema, type RegisterFormValues } from './schemas'
 
 type Step = 'form' | 'verify' | 'done'
 
+const RESEND_COOLDOWN_SECONDS = 120
+
 export function RegisterPage() {
   const { t } = useTranslation()
   const { register: registerStudent } = useAuth()
@@ -27,6 +29,23 @@ export function RegisterPage() {
   const [isVerifying, setIsVerifying] = useState(false)
   const [resendMessage, setResendMessage] = useState<string | null>(null)
   const [isResending, setIsResending] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(0)
+
+  // A code is sent as soon as the verify step is shown (by registerStudent)
+  // and again on every successful resend, so the button starts cooling down
+  // both times.
+  useEffect(() => {
+    if (step !== 'verify') return
+    setResendCooldown(RESEND_COOLDOWN_SECONDS)
+  }, [step])
+
+  useEffect(() => {
+    if (step !== 'verify') return
+    const timer = setInterval(() => {
+      setResendCooldown((s) => Math.max(0, s - 1))
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [step])
 
   const {
     register,
@@ -84,12 +103,14 @@ export function RegisterPage() {
   }
 
   async function handleResend() {
+    if (resendCooldown > 0) return
     setVerifyError(null)
     setResendMessage(null)
     setIsResending(true)
     try {
       await resendVerification(email)
       setResendMessage(t('auth.resendSuccess'))
+      setResendCooldown(RESEND_COOLDOWN_SECONDS)
     } catch (error) {
       setVerifyError(extractErrorMessage(error, t('auth.resendFailed')))
     } finally {
@@ -129,8 +150,16 @@ export function RegisterPage() {
           <Button type="submit" isLoading={isVerifying}>
             {t('auth.verifyButton')}
           </Button>
-          <Button type="button" variant="secondary" isLoading={isResending} onClick={handleResend}>
-            {t('auth.resendButton')}
+          <Button
+            type="button"
+            variant="secondary"
+            isLoading={isResending}
+            disabled={resendCooldown > 0}
+            onClick={handleResend}
+          >
+            {resendCooldown > 0
+              ? t('auth.resendButtonCooldown', { seconds: resendCooldown })
+              : t('auth.resendButton')}
           </Button>
         </form>
       </Card>

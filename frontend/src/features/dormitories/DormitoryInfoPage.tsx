@@ -9,6 +9,7 @@ import { extractErrorMessage } from '../../api/client'
 import { getDormitory, getDormitoryCapacity, listDormitoryImages } from '../../api/dormitoryApi'
 import { dormTypeLabel, formatTenge } from '../../utils/dormitoryLabels'
 import type { Dormitory, DormitoryCapacity, DormitoryImage } from '../../types/dormitories'
+import { DormitoryImageSlideshow } from './DormitoryImageSlideshow'
 
 function formatYear(value: string | null): string {
   return value ? value.slice(0, 4) : '—'
@@ -52,19 +53,7 @@ export function DormitoryInfoPage() {
         <ChevronLeft className="h-4 w-4" /> {t('dorm.title')}
       </button>
 
-      {images.length > 0 ? (
-        <img src={images[0].image_url} alt={dormitory.name} className="h-40 w-full rounded-[20px] object-cover" />
-      ) : (
-        <div
-          className="flex h-40 w-full items-center justify-center rounded-[20px]"
-          style={{
-            backgroundImage:
-              'repeating-linear-gradient(45deg, var(--color-navy-800) 0 8px, var(--color-navy-950) 8px 16px)',
-          }}
-        >
-          <span className="font-mono text-[10px] text-sand-400">{t('dorm.photoPlaceholder')}</span>
-        </div>
-      )}
+      <DormitoryImageSlideshow images={images} alt={dormitory.name} />
 
       <div className="flex items-start justify-between gap-3">
         <div>

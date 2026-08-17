@@ -266,10 +266,11 @@ func (s *UserService) ListUnhoused(ctx context.Context) ([]*domain.User, error) 
 	return s.users.ListUnhoused(ctx)
 }
 
-// DecideStudentApproval is manager/admin-only. approve grants login access;
-// reject blocks it and the account row stays (for audit/history), but its
-// email/IIN is freed up again — AuthService.RegisterStudent silently
-// replaces a rejected row rather than treating the email/IIN as taken.
+// DecideStudentApproval is manager/admin-only. approve grants login access.
+// reject deletes the account row outright rather than keeping a "rejected"
+// record — a student who was never approved never became a real user of the
+// system, so their data (and their email/IIN) shouldn't linger in the
+// database at all once a manager has turned them down.
 func (s *UserService) DecideStudentApproval(ctx context.Context, id uuid.UUID, approve bool) error {
 	user, err := s.GetByID(ctx, id)
 	if err != nil {
@@ -281,12 +282,15 @@ func (s *UserService) DecideStudentApproval(ctx context.Context, id uuid.UUID, a
 	if user.ApprovalStatus != domain.ApprovalPending {
 		return apperror.Conflict("бұл тіркелу әлдеқашан қаралған")
 	}
-	status := domain.ApprovalRejected
+
 	if approve {
-		status = domain.ApprovalApproved
-	}
-	if err := s.users.UpdateApprovalStatus(ctx, id, status); err != nil {
-		return err
+		if err := s.users.UpdateApprovalStatus(ctx, id, domain.ApprovalApproved); err != nil {
+			return err
+		}
+	} else {
+		if err := s.users.Delete(ctx, id); err != nil {
+			return err
+		}
 	}
 
 	// Email is best-effort: a slow/failing SMTP send must never fail (or even

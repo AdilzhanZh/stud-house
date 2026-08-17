@@ -239,6 +239,12 @@ func (h *UserHandler) DecideStudentApproval(c *gin.Context) {
 		response.Error(c, err)
 		return
 	}
+	// A rejected student's row is deleted outright (see DecideStudentApproval),
+	// so there's nothing left to fetch and return in that case.
+	if !approve {
+		response.OK(c, gin.H{"deleted": true})
+		return
+	}
 	user, err := h.users.GetByID(c.Request.Context(), id)
 	if err != nil {
 		response.Error(c, err)

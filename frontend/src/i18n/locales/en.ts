@@ -62,6 +62,7 @@ export const en: typeof kk = {
     verifyCodeLabel: 'Verification code',
     verifyButton: 'Verify',
     resendButton: 'Resend code',
+    resendButtonCooldown: 'Resend code ({{seconds}}s)',
     resendSuccess: 'Code resent',
     resendFailed: 'Failed to resend the code',
     verifyFailed: 'The code is incorrect or has expired',

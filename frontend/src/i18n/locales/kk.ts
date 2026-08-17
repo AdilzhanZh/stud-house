@@ -59,6 +59,7 @@ export const kk = {
     verifyCodeLabel: 'Растау коды',
     verifyButton: 'Растау',
     resendButton: 'Кодты қайта жіберу',
+    resendButtonCooldown: 'Кодты қайта жіберу ({{seconds}}с)',
     resendSuccess: 'Код қайта жіберілді',
     resendFailed: 'Кодты қайта жіберу сәтсіз аяқталды',
     verifyFailed: 'Код қате немесе мерзімі өткен',

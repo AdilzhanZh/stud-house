@@ -62,6 +62,7 @@ export const ru: typeof kk = {
     verifyCodeLabel: 'Код подтверждения',
     verifyButton: 'Подтвердить',
     resendButton: 'Отправить код повторно',
+    resendButtonCooldown: 'Отправить код повторно ({{seconds}}с)',
     resendSuccess: 'Код отправлен повторно',
     resendFailed: 'Не удалось отправить код повторно',
     verifyFailed: 'Код неверный или истёк срок действия',

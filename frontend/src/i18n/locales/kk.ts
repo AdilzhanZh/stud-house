@@ -807,6 +807,10 @@ export const kk = {
       patronymic: 'Тегі',
       password: 'Құпия сөз',
       register: 'Тіркеу',
+      registerStudent: 'Студент қосу',
+      registerStudentHint:
+        'Студенттің тіркелгісі бірден расталған және белсенді түрде жасалады — email растауы қажет емес.',
+      registerStudentFailed: 'Студентті қосу сәтсіз аяқталды',
     },
   },
 }

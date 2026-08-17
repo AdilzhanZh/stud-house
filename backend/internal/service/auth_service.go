@@ -63,13 +63,22 @@ func (s *AuthService) sendVerificationEmail(user *domain.User, code string) {
 	}
 }
 
-// isReplaceableRejectedStudent reports whether an existing user row is a
-// rejected self-registration and can therefore be silently discarded by a
-// new registration attempt reusing the same email/IIN — a rejected applicant
-// never became a real account (couldn't log in), so their email/IIN
-// shouldn't stay permanently reserved.
-func isReplaceableRejectedStudent(u *domain.User) bool {
-	return u.Role == domain.RoleStudent && u.ApprovalStatus == domain.ApprovalRejected
+// isReplaceableStudent reports whether an existing user row is a student
+// registration that never became a real, usable account and can therefore be
+// silently discarded by a new registration attempt reusing the same
+// email/IIN. This covers two cases:
+//   - a rejected registration (the applicant was reviewed and declined), and
+//   - an unverified registration (the applicant never confirmed their email,
+//     so approval_status is stuck at pending and they can neither log in nor
+//     be seen by a manager — see UserRepo.ListPendingStudents).
+//
+// Either way the row never granted login access, so its email/IIN must not
+// stay permanently reserved.
+func isReplaceableStudent(u *domain.User) bool {
+	if u.Role != domain.RoleStudent {
+		return false
+	}
+	return u.ApprovalStatus == domain.ApprovalRejected || u.EmailVerifiedAt == nil
 }
 
 func isValidIIN(iin string) bool {
@@ -84,96 +93,141 @@ func isValidIIN(iin string) bool {
 	return true
 }
 
-// RegisterStudent is the only public, unauthenticated registration path.
-// Every other role must be created by an admin via UserService.CreateUser.
-// The new account starts ApprovalPending — it cannot log in (see Login)
-// until a manager/admin approves it via UserService.DecideStudentApproval.
-// If the email/IIN belongs to a previously rejected student registration,
-// that stale row is replaced rather than blocking the new attempt (see
-// isReplaceableRejectedStudent).
-func (s *AuthService) RegisterStudent(ctx context.Context, fullName, email, phone, password, iin string, gender domain.Gender, course int16, academicDegree domain.AcademicDegree) (*domain.User, error) {
-	if fullName == "" || email == "" || password == "" || iin == "" {
+// studentRegistrationInput bundles the fields collected by both the public
+// self-registration form (AuthService.RegisterStudent) and the admin/manager
+// "create student" form (UserService.CreateStudent) — the two flows share
+// every validation and duplicate-check rule and differ only in how the
+// resulting account gets its email-verified/approval state.
+type studentRegistrationInput struct {
+	FullName       string
+	Email          string
+	Phone          string
+	Password       string
+	IIN            string
+	Gender         domain.Gender
+	Course         int16
+	AcademicDegree domain.AcademicDegree
+}
+
+// createStudentAccount validates in, frees up any stale rejected/unverified
+// row reusing the same email/IIN (see isReplaceableStudent), and creates the
+// user + student_profiles rows. approvalStatus/emailVerifiedAt/
+// verificationCode/verificationExpiresAt are set on the row as given — the
+// one thing the two call sites (self-registration vs. admin/manager
+// creation) disagree about.
+func createStudentAccount(
+	ctx context.Context,
+	users repository.UserRepository,
+	profiles repository.StudentProfileRepository,
+	in studentRegistrationInput,
+	approvalStatus domain.ApprovalStatus,
+	emailVerifiedAt *time.Time,
+	verificationCode *string,
+	verificationExpiresAt *time.Time,
+) (*domain.User, error) {
+	if in.FullName == "" || in.Email == "" || in.Password == "" || in.IIN == "" {
 		return nil, apperror.BadRequest("аты-жөні, email, ЖСН (ИИН) және құпия сөз міндетті")
 	}
-	if len(password) < 8 {
+	if len(in.Password) < 8 {
 		return nil, apperror.BadRequest("құпия сөз кемінде 8 таңбадан тұруы керек")
 	}
-	if !isValidIIN(iin) {
+	if !isValidIIN(in.IIN) {
 		return nil, apperror.BadRequest("ЖСН (ИИН) 12 таңбалы сан болуы керек")
 	}
-	if !gender.Valid() {
+	if !in.Gender.Valid() {
 		return nil, apperror.BadRequest("жынысын таңдаңыз")
 	}
-	if !academicDegree.Valid() {
+	if !in.AcademicDegree.Valid() {
 		return nil, apperror.BadRequest("оқу деңгейін (бакалавриат/магистратура) таңдаңыз")
 	}
-	if course < 1 || course > academicDegree.MaxCourse() {
-		return nil, apperror.BadRequest(fmt.Sprintf("курс 1 мен %d аралығында болуы керек", academicDegree.MaxCourse()))
+	if in.Course < 1 || in.Course > in.AcademicDegree.MaxCourse() {
+		return nil, apperror.BadRequest(fmt.Sprintf("курс 1 мен %d аралығында болуы керек", in.AcademicDegree.MaxCourse()))
 	}
 
-	existingByEmail, err := s.users.GetByEmail(ctx, email)
+	existingByEmail, err := users.GetByEmail(ctx, in.Email)
 	if err == nil {
-		if !isReplaceableRejectedStudent(existingByEmail) {
+		if !isReplaceableStudent(existingByEmail) {
 			return nil, apperror.Conflict("бұл email-мен пайдаланушы бұрыннан бар")
 		}
 	} else if !errors.Is(err, repository.ErrNotFound) {
 		return nil, err
 	}
 
-	existingByIIN, err := s.users.GetByIIN(ctx, iin)
+	existingByIIN, err := users.GetByIIN(ctx, in.IIN)
 	if err == nil {
-		if !isReplaceableRejectedStudent(existingByIIN) {
+		if !isReplaceableStudent(existingByIIN) {
 			return nil, apperror.Conflict("бұл ЖСН (ИИН) бұрыннан тіркелген")
 		}
 	} else if !errors.Is(err, repository.ErrNotFound) {
 		return nil, err
 	}
 
-	// A rejected self-registration never gained login access, so it must not
-	// permanently squat the email/IIN it used — clear it out so the applicant
-	// can try again instead of being told the email/IIN "already exists".
+	// A rejected or never-verified self-registration never gained login
+	// access, so it must not permanently squat the email/IIN it used — clear
+	// it out so the applicant can try again instead of being told the
+	// email/IIN "already exists".
 	if existingByEmail != nil {
-		if err := s.users.Delete(ctx, existingByEmail.ID); err != nil {
+		if err := users.Delete(ctx, existingByEmail.ID); err != nil {
 			return nil, err
 		}
 	}
 	if existingByIIN != nil && (existingByEmail == nil || existingByIIN.ID != existingByEmail.ID) {
-		if err := s.users.Delete(ctx, existingByIIN.ID); err != nil {
+		if err := users.Delete(ctx, existingByIIN.ID); err != nil {
 			return nil, err
 		}
 	}
 
-	passwordHash, err := hasher.HashPassword(password)
+	passwordHash, err := hasher.HashPassword(in.Password)
 	if err != nil {
 		return nil, err
 	}
 
+	gender, course, academicDegree := in.Gender, in.Course, in.AcademicDegree
+	user := &domain.User{
+		FullName:                   in.FullName,
+		Email:                      in.Email,
+		Phone:                      in.Phone,
+		IIN:                        &in.IIN,
+		PasswordHash:               passwordHash,
+		Role:                       domain.RoleStudent,
+		ApprovalStatus:             approvalStatus,
+		EmailVerifiedAt:            emailVerifiedAt,
+		EmailVerificationCode:      verificationCode,
+		EmailVerificationExpiresAt: verificationExpiresAt,
+	}
+	if err := users.Create(ctx, user); err != nil {
+		if errors.Is(err, repository.ErrConflict) {
+			return nil, apperror.Conflict("бұл email немесе ЖСН (ИИН) бұрыннан тіркелген")
+		}
+		return nil, err
+	}
+	if err := profiles.Upsert(ctx, &domain.StudentProfile{UserID: user.ID, Gender: &gender, Course: &course, AcademicDegree: &academicDegree}); err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+// RegisterStudent is the public, unauthenticated registration path (there is
+// also UserService.CreateStudent, for an admin/manager creating an
+// already-verified account directly). The new account starts ApprovalPending
+// and unverified — it cannot log in (see Login) until both the email is
+// confirmed (see VerifyEmail) and a manager/admin approves it via
+// UserService.DecideStudentApproval.
+func (s *AuthService) RegisterStudent(ctx context.Context, fullName, email, phone, password, iin string, gender domain.Gender, course int16, academicDegree domain.AcademicDegree) (*domain.User, error) {
 	code, err := generateVerificationCode()
 	if err != nil {
 		return nil, err
 	}
 	expiresAt := time.Now().Add(emailVerificationTTL)
 
-	user := &domain.User{
-		FullName:                   fullName,
-		Email:                      email,
-		Phone:                      phone,
-		IIN:                        &iin,
-		PasswordHash:               passwordHash,
-		Role:                       domain.RoleStudent,
-		ApprovalStatus:             domain.ApprovalPending,
-		EmailVerificationCode:      &code,
-		EmailVerificationExpiresAt: &expiresAt,
-	}
-	if err := s.users.Create(ctx, user); err != nil {
-		if errors.Is(err, repository.ErrConflict) {
-			return nil, apperror.Conflict("бұл email немесе ЖСН (ИИН) бұрыннан тіркелген")
-		}
+	user, err := createStudentAccount(ctx, s.users, s.profiles, studentRegistrationInput{
+		FullName: fullName, Email: email, Phone: phone, Password: password, IIN: iin,
+		Gender: gender, Course: course, AcademicDegree: academicDegree,
+	}, domain.ApprovalPending, nil, &code, &expiresAt)
+	if err != nil {
 		return nil, err
 	}
-	if err := s.profiles.Upsert(ctx, &domain.StudentProfile{UserID: user.ID, Gender: &gender, Course: &course, AcademicDegree: &academicDegree}); err != nil {
-		return nil, err
-	}
+
 	s.sendVerificationEmail(user, code)
 	return user, nil
 }

@@ -810,6 +810,10 @@ export const ru: typeof kk = {
       patronymic: 'Отчество',
       password: 'Пароль',
       register: 'Зарегистрировать',
+      registerStudent: 'Добавить студента',
+      registerStudentHint:
+        'Аккаунт студента создаётся сразу подтверждённым и активным — подтверждение email не требуется.',
+      registerStudentFailed: 'Не удалось добавить студента',
     },
   },
 }

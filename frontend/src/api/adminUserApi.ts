@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Role, User } from '../types'
+import type { AcademicDegree, Gender, Role, User } from '../types'
 
 export async function listUsers(role?: Role): Promise<User[]> {
   const { data } = await apiClient.get<{ data: User[] }>('/admin/users', {
@@ -18,6 +18,25 @@ export interface CreateUserPayload {
 
 export async function createUser(payload: CreateUserPayload): Promise<User> {
   const { data } = await apiClient.post<{ data: User }>('/admin/users', payload)
+  return data.data
+}
+
+export interface CreateStudentPayload {
+  full_name: string
+  email: string
+  phone: string
+  password: string
+  iin: string
+  gender: Gender
+  course: number
+  academic_degree: AcademicDegree
+}
+
+// Admin/manager creates a student account directly — same fields as public
+// self-registration, but the account is already approved and email-verified
+// (no confirmation step to wait on).
+export async function createStudent(payload: CreateStudentPayload): Promise<User> {
+  const { data } = await apiClient.post<{ data: User }>('/admin/students', payload)
   return data.data
 }
 

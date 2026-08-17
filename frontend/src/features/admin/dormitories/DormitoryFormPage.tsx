@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { Maximize2 } from 'lucide-react'
 import { Card } from '../../../components/Card'
 import { Input } from '../../../components/Input'
 import { Select } from '../../../components/Select'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
+import { ImageLightbox } from '../../../components/ImageLightbox'
 import { extractErrorMessage } from '../../../api/client'
 import {
   addDormitoryImage,
@@ -56,6 +58,7 @@ export function DormitoryFormPage() {
   const [newImageFile, setNewImageFile] = useState<File | null>(null)
   const [imageError, setImageError] = useState<string | null>(null)
   const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
 
   const [catalog, setCatalog] = useState<RequiredDocument[]>([])
   const [assignedDocs, setAssignedDocs] = useState<DormitoryRequiredDocument[]>([])
@@ -339,28 +342,45 @@ export function DormitoryFormPage() {
       {isEdit && id && (
         <Card title={t('admin.dormitories.images')}>
           {imageError && <Alert variant="error" message={imageError} />}
-          <ul className="mb-4 flex flex-col gap-2">
-            {images.map((img) => (
-              <li key={img.id} className="flex items-center justify-between gap-3 text-sm">
-                <a
-                  href={img.image_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="truncate text-turquoise-400 hover:underline"
-                >
-                  {img.image_url}
-                </a>
-                <button
-                  type="button"
-                  className="text-clay-400 hover:underline"
-                  onClick={() => handleDeleteImage(img.id)}
-                >
-                  {t('common.delete')}
-                </button>
-              </li>
-            ))}
-            {images.length === 0 && <p className="text-sm text-sand-300">{t('admin.dormitories.noImages')}</p>}
-          </ul>
+          {images.length === 0 ? (
+            <p className="mb-4 text-sm text-sand-300">{t('admin.dormitories.noImages')}</p>
+          ) : (
+            <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+              {images.map((img, i) => (
+                <div key={img.id} className="group relative h-24 overflow-hidden rounded-[14px]">
+                  <img
+                    src={img.image_url}
+                    alt=""
+                    className="h-full w-full cursor-pointer object-cover"
+                    onClick={() => setLightboxIndex(i)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setLightboxIndex(i)}
+                    aria-label={t('dorm.viewInFull')}
+                    className="absolute top-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-navy-950/60 text-sand-100 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 hover:bg-navy-950/80"
+                  >
+                    <Maximize2 className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteImage(img.id)}
+                    className="absolute bottom-1.5 right-1.5 rounded-full bg-navy-950/60 px-2 py-1 text-xs font-semibold text-clay-400 backdrop-blur-sm hover:bg-navy-950/80"
+                  >
+                    {t('common.delete')}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {lightboxIndex != null && (
+            <ImageLightbox
+              imageUrls={images.map((img) => img.image_url)}
+              initialIndex={lightboxIndex}
+              alt={t('admin.dormitories.images')}
+              onClose={() => setLightboxIndex(null)}
+            />
+          )}
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-sand-200">
               {t('admin.dormitories.image')}

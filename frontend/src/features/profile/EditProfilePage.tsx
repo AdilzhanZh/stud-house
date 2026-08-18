@@ -9,7 +9,7 @@ import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import { useAuth } from '../auth/useAuth'
 import { uploadFile } from '../../api/uploadApi'
-import { updateAvatar, changeOwnPassword } from '../../api/userApi'
+import { updateAvatar, changeOwnPassword, changeOwnEmail } from '../../api/userApi'
 import { extractErrorMessage } from '../../api/client'
 
 export function EditProfilePage() {
@@ -27,6 +27,11 @@ export function EditProfilePage() {
   const [passwordError, setPasswordError] = useState<string | null>(null)
   const [passwordSuccess, setPasswordSuccess] = useState(false)
   const [isChangingPassword, setIsChangingPassword] = useState(false)
+
+  const [newEmail, setNewEmail] = useState('')
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [emailSuccess, setEmailSuccess] = useState(false)
+  const [isChangingEmail, setIsChangingEmail] = useState(false)
 
   if (!user) return null
 
@@ -73,6 +78,23 @@ export function EditProfilePage() {
     }
   }
 
+  async function handleChangeEmail(e: React.FormEvent) {
+    e.preventDefault()
+    setEmailError(null)
+    setEmailSuccess(false)
+    setIsChangingEmail(true)
+    try {
+      const updated = await changeOwnEmail(newEmail)
+      updateUser(updated)
+      setNewEmail('')
+      setEmailSuccess(true)
+    } catch (err) {
+      setEmailError(extractErrorMessage(err, t('profile.editProfile.emailChangeFailed')))
+    } finally {
+      setIsChangingEmail(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-3.5">
       <div className="flex items-center gap-3">
@@ -110,6 +132,26 @@ export function EditProfilePage() {
           <p className="text-sm text-sand-300">{t('profile.editProfile.avatarHint')}</p>
         </div>
         {avatarError && <Alert variant="error" message={avatarError} />}
+      </Card>
+
+      <Card>
+        <p className="mb-3 text-[15px] font-bold text-sand-100">{t('profile.editProfile.emailTitle')}</p>
+        <form className="flex flex-col gap-3" onSubmit={handleChangeEmail}>
+          {emailError && <Alert variant="error" message={emailError} />}
+          {emailSuccess && <Alert variant="success" message={t('profile.editProfile.emailChanged')} />}
+          <Input
+            id="new-email"
+            label={t('profile.editProfile.newEmail')}
+            type="email"
+            autoComplete="email"
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            required
+          />
+          <Button type="submit" isLoading={isChangingEmail} className="self-start">
+            {t('profile.editProfile.changeEmailButton')}
+          </Button>
+        </form>
       </Card>
 
       <Card>

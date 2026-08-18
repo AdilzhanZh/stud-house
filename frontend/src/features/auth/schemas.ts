@@ -3,7 +3,7 @@ import type { TFunction } from 'i18next'
 
 export function buildLoginSchema(t: TFunction) {
   return z.object({
-    email: z.string().email(t('validation.emailInvalid')),
+    login: z.string().min(1, t('validation.loginRequired')),
     password: z.string().min(1, t('validation.passwordRequired')),
   })
 }
@@ -14,8 +14,8 @@ export function buildRegisterSchema(t: TFunction) {
   return z
     .object({
       aty: z.string().min(1, t('validation.nameRequired')),
-      familiya: z.string().optional(),
-      tegi: z.string().optional(),
+      familiya: z.string().min(1, t('validation.lastNameRequired')),
+      tegi: z.string().min(1, t('validation.patronymicRequired')),
       email: z.string().email(t('validation.emailInvalid')),
       phone: z.string().min(1, t('validation.phoneRequired')),
       iin: z.string().regex(/^\d{12}$/, t('validation.iinFormat')),

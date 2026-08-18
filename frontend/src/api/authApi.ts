@@ -10,24 +10,20 @@ export interface RegisterPayload {
   gender: Gender
   course: number
   academic_degree: AcademicDegree
+  // Set when the applicant chose "continue anyway" after being warned their
+  // email looked unreachable (see the "email_unverifiable" error code).
+  skip_email_check?: boolean
 }
 
 export interface LoginPayload {
-  email: string
+  // Either a 12-digit IIN (students) or an email (admin/manager).
+  login: string
   password: string
 }
 
 export async function register(payload: RegisterPayload): Promise<User> {
   const { data } = await apiClient.post<{ data: User }>('/auth/register', payload)
   return data.data
-}
-
-export async function verifyEmail(email: string, code: string): Promise<void> {
-  await apiClient.post('/auth/verify-email', { email, code })
-}
-
-export async function resendVerification(email: string): Promise<void> {
-  await apiClient.post('/auth/resend-verification', { email })
 }
 
 export async function login(payload: LoginPayload): Promise<LoginResponse> {

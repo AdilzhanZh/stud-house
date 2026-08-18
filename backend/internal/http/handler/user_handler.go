@@ -383,6 +383,27 @@ func (h *UserHandler) ChangeOwnPassword(c *gin.Context) {
 	response.OK(c, gin.H{"updated": true})
 }
 
+type changeOwnEmailRequest struct {
+	NewEmail string `json:"new_email" binding:"required,email"`
+}
+
+// ChangeOwnEmail is available to any authenticated user: changes the
+// caller's own email. No confirmation is required — see UserService.ChangeOwnEmail.
+func (h *UserHandler) ChangeOwnEmail(c *gin.Context) {
+	var req changeOwnEmailRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.BadRequest(err.Error()))
+		return
+	}
+	userID, _ := middleware.UserID(c)
+	user, err := h.users.ChangeOwnEmail(c.Request.Context(), userID, req.NewEmail)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, userDTO(user))
+}
+
 // DeleteUser is admin-only. An admin cannot delete their own account.
 func (h *UserHandler) DeleteUser(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))

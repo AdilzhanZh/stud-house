@@ -46,15 +46,12 @@ type User struct {
 	// committee membership is an elected flag on top of the manager role,
 	// not a separate role. IsChairperson is a further flag on top of that
 	// (at most one true at a time, enforced by a DB partial unique index).
-	IsCommitteeMember          bool
-	IsChairperson              bool
-	ApprovalStatus             ApprovalStatus
-	AvatarURL                  *string
-	EmailVerifiedAt            *time.Time
-	EmailVerificationCode      *string
-	EmailVerificationExpiresAt *time.Time
-	CreatedAt                  time.Time
-	UpdatedAt                  time.Time
+	IsCommitteeMember bool
+	IsChairperson     bool
+	ApprovalStatus    ApprovalStatus
+	AvatarURL         *string
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 }
 
 type Gender string

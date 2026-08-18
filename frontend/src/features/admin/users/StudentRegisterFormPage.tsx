@@ -72,8 +72,19 @@ export function StudentRegisterFormPage() {
             required
             {...register('aty')}
           />
-          <Input label={t('auth.lastName')} autoComplete="family-name" {...register('familiya')} />
-          <Input label={t('auth.patronymic')} {...register('tegi')} />
+          <Input
+            label={t('auth.lastName')}
+            autoComplete="family-name"
+            error={errors.familiya?.message}
+            required
+            {...register('familiya')}
+          />
+          <Input
+            label={t('auth.patronymic')}
+            error={errors.tegi?.message}
+            required
+            {...register('tegi')}
+          />
           <Input
             label={t('auth.email')}
             type="email"

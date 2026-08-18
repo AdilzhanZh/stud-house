@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"time"
 
 	"github.com/google/uuid"
 
@@ -85,16 +84,14 @@ func (s *UserService) CreateUser(ctx context.Context, fullName, email, phone, pa
 
 // CreateStudent is admin/manager-only: it creates a student account directly,
 // with the same fields collected during self-registration (see
-// AuthService.RegisterStudent), but skips the email-confirmation step —
-// the account is created already approved and email-verified, since a
-// manager/admin vouching for the student in person is itself the proof that
-// self-registration's email-confirmation step exists to establish.
+// AuthService.RegisterStudent), already approved — a manager/admin vouching
+// for the student in person is itself the trust self-registration otherwise
+// has to earn through the manager-approval queue.
 func (s *UserService) CreateStudent(ctx context.Context, fullName, email, phone, password, iin string, gender domain.Gender, course int16, academicDegree domain.AcademicDegree) (*domain.User, error) {
-	now := time.Now()
 	return createStudentAccount(ctx, s.users, s.profiles, studentRegistrationInput{
 		FullName: fullName, Email: email, Phone: phone, Password: password, IIN: iin,
 		Gender: gender, Course: course, AcademicDegree: academicDegree,
-	}, domain.ApprovalApproved, &now, nil, nil)
+	}, domain.ApprovalApproved)
 }
 
 func (s *UserService) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
@@ -355,6 +352,27 @@ func (s *UserService) ChangeOwnPassword(ctx context.Context, id uuid.UUID, curre
 		return err
 	}
 	return s.users.UpdatePassword(ctx, id, passwordHash)
+}
+
+// ChangeOwnEmail lets any authenticated user change their own email from
+// their profile — email is no longer verified at registration, so this is
+// the only way to fix a typo'd or outdated one after the fact.
+func (s *UserService) ChangeOwnEmail(ctx context.Context, id uuid.UUID, newEmail string) (*domain.User, error) {
+	if _, err := s.GetByID(ctx, id); err != nil {
+		return nil, err
+	}
+	if existing, err := s.users.GetByEmail(ctx, newEmail); err == nil && existing.ID != id {
+		return nil, apperror.Conflict("бұл email-мен пайдаланушы бұрыннан бар")
+	} else if err != nil && !errors.Is(err, repository.ErrNotFound) {
+		return nil, err
+	}
+	if err := s.users.UpdateEmail(ctx, id, newEmail); err != nil {
+		if errors.Is(err, repository.ErrConflict) {
+			return nil, apperror.Conflict("бұл email-мен пайдаланушы бұрыннан бар")
+		}
+		return nil, err
+	}
+	return s.GetByID(ctx, id)
 }
 
 // DeleteUser is admin-only. Callers must reject self-deletion before calling

@@ -47,8 +47,6 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 		authGroup := api.Group("/auth")
 		{
 			authGroup.POST("/register", h.Auth.Register)
-			authGroup.POST("/verify-email", h.Auth.VerifyEmail)
-			authGroup.POST("/resend-verification", h.Auth.ResendVerification)
 			authGroup.POST("/login", h.Auth.Login)
 			authGroup.POST("/refresh", h.Auth.Refresh)
 			authGroup.POST("/logout", h.Auth.Logout)
@@ -91,8 +89,9 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 			protected.GET("/students/:id/residence", h.Room.GetMyResidence)
 			protected.PATCH("/users/:id/avatar", h.User.UpdateAvatar)
 
-			// Any authenticated user: their own password.
+			// Any authenticated user: their own password/email.
 			protected.PATCH("/users/me/password", h.User.ChangeOwnPassword)
+			protected.PATCH("/users/me/email", h.User.ChangeOwnEmail)
 
 			// Any authenticated user: send a bug report/suggestion to the admins.
 			protected.POST("/feedback", h.Feedback.Send)

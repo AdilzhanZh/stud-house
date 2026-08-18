@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -24,21 +23,19 @@ func NewUserRepo(db *pgxpool.Pool) *UserRepo {
 
 const userColumns = `
 	id, full_name, email, phone, iin, password_hash, role, is_committee_member,
-	is_chairperson, approval_status, avatar_url, email_verified_at, email_verification_code,
-	email_verification_expires_at, created_at, updated_at`
+	is_chairperson, approval_status, avatar_url, created_at, updated_at`
 
 func (r *UserRepo) Create(ctx context.Context, u *domain.User) error {
 	const q = `
 		INSERT INTO users (
 			full_name, email, phone, iin, password_hash, role, is_committee_member,
-			is_chairperson, approval_status, email_verified_at, email_verification_code,
-			email_verification_expires_at
+			is_chairperson, approval_status
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id, created_at, updated_at`
 	err := r.db.QueryRow(ctx, q,
 		u.FullName, u.Email, u.Phone, u.IIN, u.PasswordHash, string(u.Role), u.IsCommitteeMember, u.IsChairperson,
-		string(u.ApprovalStatus), u.EmailVerifiedAt, u.EmailVerificationCode, u.EmailVerificationExpiresAt,
+		string(u.ApprovalStatus),
 	).Scan(&u.ID, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -178,12 +175,12 @@ func (r *UserRepo) ListByRole(ctx context.Context, role domain.Role) ([]*domain.
 }
 
 // List is the admin panel's general roster: only real, active users of the
-// site. A self-registered student isn't one of those until they've both
-// confirmed their email AND been approved by a manager/admin — until then
-// they're excluded here (as well as from ListPendingStudents, which has its
-// own narrower "awaiting decision" filter).
+// site. A self-registered student isn't one of those until a manager/admin
+// approves them — until then they're excluded here (as well as from
+// ListPendingStudents, which has its own narrower "awaiting decision"
+// filter).
 func (r *UserRepo) List(ctx context.Context, role *domain.Role) ([]*domain.User, error) {
-	baseQ := `SELECT ` + userColumns + ` FROM users WHERE NOT (role = 'student' AND (email_verified_at IS NULL OR approval_status <> 'approved'))`
+	baseQ := `SELECT ` + userColumns + ` FROM users WHERE NOT (role = 'student' AND approval_status <> 'approved')`
 	var rows pgx.Rows
 	var err error
 	if role != nil {
@@ -207,11 +204,10 @@ func (r *UserRepo) List(ctx context.Context, role *domain.Role) ([]*domain.User,
 	return users, rows.Err()
 }
 
-// ListPendingStudents excludes unverified registrations (email_verified_at
-// IS NULL) — a manager should only see applications once the applicant has
-// proven ownership of the email, not the moment the form is submitted.
+// ListPendingStudents is the manager/admin queue of self-registered students
+// awaiting a decision.
 func (r *UserRepo) ListPendingStudents(ctx context.Context) ([]*domain.User, error) {
-	q := `SELECT ` + userColumns + ` FROM users WHERE role = 'student' AND approval_status = 'pending' AND email_verified_at IS NOT NULL ORDER BY created_at`
+	q := `SELECT ` + userColumns + ` FROM users WHERE role = 'student' AND approval_status = 'pending' ORDER BY created_at`
 	rows, err := r.db.Query(ctx, q)
 	if err != nil {
 		return nil, err
@@ -229,17 +225,15 @@ func (r *UserRepo) ListPendingStudents(ctx context.Context) ([]*domain.User, err
 	return users, rows.Err()
 }
 
-// ListUnhoused is students approved and email-verified who have no active
-// room_residents row (moved_out_at IS NULL) — the counterpart to
-// room_repo's "who's in this room" queries, but "which students are in
-// none".
+// ListUnhoused is approved students who have no active room_residents row
+// (moved_out_at IS NULL) — the counterpart to room_repo's "who's in this
+// room" queries, but "which students are in none".
 func (r *UserRepo) ListUnhoused(ctx context.Context) ([]*domain.User, error) {
 	q := `
 		SELECT ` + userColumns + `
 		FROM users u
 		WHERE u.role = 'student'
 			AND u.approval_status = 'approved'
-			AND u.email_verified_at IS NOT NULL
 			AND NOT EXISTS (
 				SELECT 1 FROM room_residents rr
 				WHERE rr.student_id = u.id AND rr.moved_out_at IS NULL
@@ -302,37 +296,6 @@ func (r *UserRepo) UpdateEmail(ctx context.Context, id uuid.UUID, email string) 
 	return nil
 }
 
-func (r *UserRepo) SetEmailVerificationCode(ctx context.Context, id uuid.UUID, code string, expiresAt time.Time) error {
-	const q = `
-		UPDATE users
-		SET email_verification_code = $2, email_verification_expires_at = $3, updated_at = now()
-		WHERE id = $1`
-	tag, err := r.db.Exec(ctx, q, id, code, expiresAt)
-	if err != nil {
-		return err
-	}
-	if tag.RowsAffected() == 0 {
-		return repository.ErrNotFound
-	}
-	return nil
-}
-
-func (r *UserRepo) MarkEmailVerified(ctx context.Context, id uuid.UUID) error {
-	const q = `
-		UPDATE users
-		SET email_verified_at = now(), email_verification_code = NULL,
-			email_verification_expires_at = NULL, updated_at = now()
-		WHERE id = $1`
-	tag, err := r.db.Exec(ctx, q, id)
-	if err != nil {
-		return err
-	}
-	if tag.RowsAffected() == 0 {
-		return repository.ErrNotFound
-	}
-	return nil
-}
-
 // Delete returns repository.ErrConflict if the user is still referenced
 // elsewhere (applications, contracts, votes, etc. have no ON DELETE clause on
 // their user FKs, so Postgres rejects the delete with a foreign_key_violation).
@@ -365,8 +328,7 @@ func scanUserRow(row rowScanner) (*domain.User, error) {
 	var approvalStatus string
 	err := row.Scan(
 		&u.ID, &u.FullName, &u.Email, &u.Phone, &u.IIN, &u.PasswordHash, &role, &u.IsCommitteeMember,
-		&u.IsChairperson, &approvalStatus, &u.AvatarURL, &u.EmailVerifiedAt, &u.EmailVerificationCode, &u.EmailVerificationExpiresAt,
-		&u.CreatedAt, &u.UpdatedAt,
+		&u.IsChairperson, &approvalStatus, &u.AvatarURL, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

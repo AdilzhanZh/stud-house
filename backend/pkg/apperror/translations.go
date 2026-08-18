@@ -36,8 +36,7 @@ func Translate(msg, lang string) string {
 type translation struct{ ru, en string }
 
 var staticTranslations = map[string]translation{
-	"email бұрыннан расталған":    {"Email уже подтверждён", "Email is already verified"},
-	"email немесе құпия сөз қате": {"Неверный email или пароль", "Incorrect email or password"},
+	"логин немесе құпия сөз қате": {"Неверный логин или пароль", "Incorrect login or password"},
 	"refresh token жарамсыз":      {"Недействительный refresh-токен", "Invalid refresh token"},
 	"refresh token мерзімі өткен немесе кері қайтарылған": {
 		"Срок действия refresh-токена истёк или он отозван",
@@ -48,7 +47,6 @@ var staticTranslations = map[string]translation{
 		"IIN must be a 12-digit number",
 	},
 	"авторизация қажет":             {"Требуется авторизация", "Authorization required"},
-	"алдымен email-ды растаңыз":     {"Сначала подтвердите email", "Please verify your email first"},
 	"атауы және мекенжайы міндетті": {"Название и адрес обязательны", "Name and address are required"},
 	"атауы міндетті":                {"Название обязательно", "Name is required"},
 	"аты-жөні, email және құпия сөз міндетті": {
@@ -246,7 +244,6 @@ var staticTranslations = map[string]translation{
 		"Необходимо выбрать хотя бы один столбец",
 		"At least one column must be selected",
 	},
-	"код қате немесе мерзімі өткен": {"Код неверный или истёк", "The code is incorrect or has expired"},
 	"комиссия мүшелігі тек менеджерге ғана тағайындалады": {
 		"Членство в комиссии назначается только менеджеру",
 		"Committee membership can only be assigned to a manager",
@@ -262,12 +259,12 @@ var staticTranslations = map[string]translation{
 		"Льготу можно назначить только пользователю с ролью студента",
 		"A benefit can only be assigned to a user with the student role",
 	},
-	"мақұлдау үшін бөлме міндетті": {"Для одобрения необходима комната", "A room is required to approve"},
-	"мұндай email-мен пайдаланушы табылмады": {
-		"Пользователь с таким email не найден",
-		"No user found with this email",
+	"көрсетілген email мекенжайы табылмады, тексеріңіз": {
+		"Указанный email не найден, проверьте адрес",
+		"The specified email could not be found, please check it",
 	},
-	"оқу деңгейі жарамсыз": {"Недопустимый уровень образования", "Invalid academic degree"},
+	"мақұлдау үшін бөлме міндетті": {"Для одобрения необходима комната", "A room is required to approve"},
+	"оқу деңгейі жарамсыз":         {"Недопустимый уровень образования", "Invalid academic degree"},
 	"оқу деңгейін (бакалавриат/магистратура) таңдаңыз": {
 		"Выберите уровень образования (бакалавриат/магистратура)",
 		"Please select an academic degree (bachelor's/master's)",

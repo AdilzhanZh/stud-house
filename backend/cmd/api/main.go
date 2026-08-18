@@ -63,7 +63,7 @@ func main() {
 		log.Print("SMTP not configured (SMTP_USERNAME/SMTP_PASSWORD empty) — approval emails will be skipped")
 	}
 
-	authService := service.NewAuthService(userRepo, studentProfileRepo, refreshTokenRepo, mailerService, cfg.JWTSecret, cfg.AccessTokenTTL, cfg.RefreshTokenTTL)
+	authService := service.NewAuthService(userRepo, studentProfileRepo, refreshTokenRepo, cfg.JWTSecret, cfg.AccessTokenTTL, cfg.RefreshTokenTTL)
 	userService := service.NewUserService(userRepo, studentProfileRepo, mailerService)
 	dormitoryService := service.NewDormitoryService(dormitoryRepo, applicationRepo)
 	notifierService := notifier.New(notificationRepo, userRepo, mailerService)

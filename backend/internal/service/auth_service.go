@@ -2,10 +2,11 @@ package service
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 	"fmt"
-	"log"
+	"net"
+	"net/http"
+	"strings"
 	"time"
 	"unicode"
 
@@ -14,72 +15,67 @@ import (
 	"student-house/pkg/apperror"
 	"student-house/pkg/hasher"
 	"student-house/pkg/jwtutil"
-	"student-house/pkg/mailer"
 )
 
-const emailVerificationTTL = 15 * time.Minute
+// emailCheckTimeout bounds how long a registration request will wait on the
+// email-domain-reachability DNS lookup before giving up — a slow or
+// unreachable DNS server must never hang the registration endpoint.
+const emailCheckTimeout = 3 * time.Second
 
 type AuthService struct {
 	users         repository.UserRepository
 	profiles      repository.StudentProfileRepository
 	refreshTokens repository.RefreshTokenRepository
-	mailer        *mailer.Mailer
 	jwtSecret     string
 	accessTTL     time.Duration
 	refreshTTL    time.Duration
 }
 
-func NewAuthService(users repository.UserRepository, profiles repository.StudentProfileRepository, refreshTokens repository.RefreshTokenRepository, m *mailer.Mailer, jwtSecret string, accessTTL, refreshTTL time.Duration) *AuthService {
+func NewAuthService(users repository.UserRepository, profiles repository.StudentProfileRepository, refreshTokens repository.RefreshTokenRepository, jwtSecret string, accessTTL, refreshTTL time.Duration) *AuthService {
 	return &AuthService{
 		users:         users,
 		profiles:      profiles,
 		refreshTokens: refreshTokens,
-		mailer:        m,
 		jwtSecret:     jwtSecret,
 		accessTTL:     accessTTL,
 		refreshTTL:    refreshTTL,
 	}
 }
 
-// generateVerificationCode returns a random 6-digit numeric code as a
-// zero-padded string (e.g. "004821") using a CSPRNG — this is emailed to the
-// student and must be guessed-resistant, unlike a plain math/rand sequence.
-func generateVerificationCode() (string, error) {
-	buf := make([]byte, 4)
-	if _, err := rand.Read(buf); err != nil {
-		return "", err
-	}
-	n := (uint32(buf[0])<<24 | uint32(buf[1])<<16 | uint32(buf[2])<<8 | uint32(buf[3])) % 1000000
-	return fmt.Sprintf("%06d", n), nil
-}
-
-func (s *AuthService) sendVerificationEmail(user *domain.User, code string) {
-	subject := "Email-ды растау коды — Student House"
-	body := "Құрметті " + user.FullName + ",\n\n" +
-		"Student House жүйесінде тіркелу үшін растау коды: " + code + "\n\n" +
-		"Код 15 минут ішінде жарамды.\n\nСтудент House"
-	if err := s.mailer.Send(user.Email, subject, body); err != nil {
-		log.Printf("failed to send verification email to %s: %v", user.Email, err)
-	}
-}
-
-// isReplaceableStudent reports whether an existing user row is a student
-// registration that never became a real, usable account and can therefore be
-// silently discarded by a new registration attempt reusing the same
-// email/IIN: an unverified registration (the applicant never confirmed their
-// email, so approval_status is stuck at pending and they can neither log in
-// nor be seen by a manager — see UserRepo.ListPendingStudents). The
-// ApprovalRejected check is defensive/historical — DecideStudentApproval now
-// deletes a rejected row outright rather than leaving one behind, but old
-// rows created before that change may still have this status.
-//
-// Either way the row never granted login access, so its email/IIN must not
-// stay permanently reserved.
-func isReplaceableStudent(u *domain.User) bool {
-	if u.Role != domain.RoleStudent {
+// emailDomainReachable is a best-effort check that an email's domain can
+// plausibly receive mail: it looks for an MX record, falling back to a plain
+// A/AAAA record (mail can be delivered there per RFC 5321 when no MX
+// exists). It does not (and cannot, without actually sending mail) confirm
+// the mailbox itself exists — this only catches typo'd/nonexistent domains,
+// which is what RegisterStudent uses it for.
+func emailDomainReachable(ctx context.Context, email string) bool {
+	at := strings.LastIndexByte(email, '@')
+	if at < 0 || at == len(email)-1 {
 		return false
 	}
-	return u.ApprovalStatus == domain.ApprovalRejected || u.EmailVerifiedAt == nil
+	emailDomain := email[at+1:]
+
+	checkCtx, cancel := context.WithTimeout(ctx, emailCheckTimeout)
+	defer cancel()
+
+	if records, err := net.DefaultResolver.LookupMX(checkCtx, emailDomain); err == nil && len(records) > 0 {
+		return true
+	}
+	if _, err := net.DefaultResolver.LookupHost(checkCtx, emailDomain); err == nil {
+		return true
+	}
+	return false
+}
+
+// isReplaceableStudent reports whether an existing user row is a rejected
+// student registration and can therefore be silently discarded by a new
+// registration attempt reusing the same email/IIN. DecideStudentApproval
+// deletes a rejected row outright rather than leaving one behind, so this is
+// defensive/historical — it only matters for rows created before that
+// behavior existed. Either way a rejected row never granted login access, so
+// its email/IIN must not stay permanently reserved.
+func isReplaceableStudent(u *domain.User) bool {
+	return u.Role == domain.RoleStudent && u.ApprovalStatus == domain.ApprovalRejected
 }
 
 func isValidIIN(iin string) bool {
@@ -97,8 +93,8 @@ func isValidIIN(iin string) bool {
 // studentRegistrationInput bundles the fields collected by both the public
 // self-registration form (AuthService.RegisterStudent) and the admin/manager
 // "create student" form (UserService.CreateStudent) — the two flows share
-// every validation and duplicate-check rule and differ only in how the
-// resulting account gets its email-verified/approval state.
+// every validation and duplicate-check rule and differ only in the
+// approval_status the resulting account gets.
 type studentRegistrationInput struct {
 	FullName       string
 	Email          string
@@ -110,21 +106,17 @@ type studentRegistrationInput struct {
 	AcademicDegree domain.AcademicDegree
 }
 
-// createStudentAccount validates in, frees up any stale rejected/unverified
-// row reusing the same email/IIN (see isReplaceableStudent), and creates the
-// user + student_profiles rows. approvalStatus/emailVerifiedAt/
-// verificationCode/verificationExpiresAt are set on the row as given — the
-// one thing the two call sites (self-registration vs. admin/manager
-// creation) disagree about.
+// createStudentAccount validates in, frees up any stale rejected row reusing
+// the same email/IIN (see isReplaceableStudent), and creates the user +
+// student_profiles rows with the given approvalStatus — the one thing the
+// two call sites (self-registration vs. admin/manager creation) disagree
+// about.
 func createStudentAccount(
 	ctx context.Context,
 	users repository.UserRepository,
 	profiles repository.StudentProfileRepository,
 	in studentRegistrationInput,
 	approvalStatus domain.ApprovalStatus,
-	emailVerifiedAt *time.Time,
-	verificationCode *string,
-	verificationExpiresAt *time.Time,
 ) (*domain.User, error) {
 	if in.FullName == "" || in.Email == "" || in.Password == "" || in.IIN == "" {
 		return nil, apperror.BadRequest("аты-жөні, email, ЖСН (ИИН) және құпия сөз міндетті")
@@ -163,10 +155,9 @@ func createStudentAccount(
 		return nil, err
 	}
 
-	// A rejected or never-verified self-registration never gained login
-	// access, so it must not permanently squat the email/IIN it used — clear
-	// it out so the applicant can try again instead of being told the
-	// email/IIN "already exists".
+	// A rejected self-registration never gained login access, so it must not
+	// permanently squat the email/IIN it used — clear it out so the applicant
+	// can try again instead of being told the email/IIN "already exists".
 	if existingByEmail != nil {
 		if err := users.Delete(ctx, existingByEmail.ID); err != nil {
 			return nil, err
@@ -185,16 +176,13 @@ func createStudentAccount(
 
 	gender, course, academicDegree := in.Gender, in.Course, in.AcademicDegree
 	user := &domain.User{
-		FullName:                   in.FullName,
-		Email:                      in.Email,
-		Phone:                      in.Phone,
-		IIN:                        &in.IIN,
-		PasswordHash:               passwordHash,
-		Role:                       domain.RoleStudent,
-		ApprovalStatus:             approvalStatus,
-		EmailVerifiedAt:            emailVerifiedAt,
-		EmailVerificationCode:      verificationCode,
-		EmailVerificationExpiresAt: verificationExpiresAt,
+		FullName:       in.FullName,
+		Email:          in.Email,
+		Phone:          in.Phone,
+		IIN:            &in.IIN,
+		PasswordHash:   passwordHash,
+		Role:           domain.RoleStudent,
+		ApprovalStatus: approvalStatus,
 	}
 	if err := users.Create(ctx, user); err != nil {
 		if errors.Is(err, repository.ErrConflict) {
@@ -209,74 +197,27 @@ func createStudentAccount(
 }
 
 // RegisterStudent is the public, unauthenticated registration path (there is
-// also UserService.CreateStudent, for an admin/manager creating an
-// already-verified account directly). The new account starts ApprovalPending
-// and unverified — it cannot log in (see Login) until both the email is
-// confirmed (see VerifyEmail) and a manager/admin approves it via
+// also UserService.CreateStudent, for an admin/manager creating an account
+// directly). The new account starts ApprovalPending — it cannot log in (see
+// Login) until a manager/admin approves it via
 // UserService.DecideStudentApproval.
-func (s *AuthService) RegisterStudent(ctx context.Context, fullName, email, phone, password, iin string, gender domain.Gender, course int16, academicDegree domain.AcademicDegree) (*domain.User, error) {
-	code, err := generateVerificationCode()
-	if err != nil {
-		return nil, err
+//
+// Unless skipEmailCheck is set, the email's domain is checked for
+// reachability first (see emailDomainReachable) and a distinct
+// apperror.Code "email_unverifiable" is returned if it looks bogus — the
+// frontend offers the applicant a choice to go back and fix it, or resubmit
+// with skipEmailCheck=true to register anyway. This is a best-effort typo
+// catcher, not a mailbox-existence check, and registration is never blocked
+// on it if the applicant insists.
+func (s *AuthService) RegisterStudent(ctx context.Context, fullName, email, phone, password, iin string, gender domain.Gender, course int16, academicDegree domain.AcademicDegree, skipEmailCheck bool) (*domain.User, error) {
+	if !skipEmailCheck && email != "" && !emailDomainReachable(ctx, email) {
+		return nil, apperror.New(http.StatusUnprocessableEntity, "email_unverifiable", "көрсетілген email мекенжайы табылмады, тексеріңіз")
 	}
-	expiresAt := time.Now().Add(emailVerificationTTL)
 
-	user, err := createStudentAccount(ctx, s.users, s.profiles, studentRegistrationInput{
+	return createStudentAccount(ctx, s.users, s.profiles, studentRegistrationInput{
 		FullName: fullName, Email: email, Phone: phone, Password: password, IIN: iin,
 		Gender: gender, Course: course, AcademicDegree: academicDegree,
-	}, domain.ApprovalPending, nil, &code, &expiresAt)
-	if err != nil {
-		return nil, err
-	}
-
-	s.sendVerificationEmail(user, code)
-	return user, nil
-}
-
-// VerifyEmail checks the code emailed at registration (or by
-// ResendVerificationCode) and marks the account verified. Login is blocked
-// until this succeeds, independently of the manager-approval gate.
-func (s *AuthService) VerifyEmail(ctx context.Context, email, code string) error {
-	user, err := s.users.GetByEmail(ctx, email)
-	if err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
-			return apperror.BadRequest("мұндай email-мен пайдаланушы табылмады")
-		}
-		return err
-	}
-	if user.EmailVerifiedAt != nil {
-		return apperror.Conflict("email бұрыннан расталған")
-	}
-	if user.EmailVerificationCode == nil || user.EmailVerificationExpiresAt == nil ||
-		code != *user.EmailVerificationCode || time.Now().After(*user.EmailVerificationExpiresAt) {
-		return apperror.BadRequest("код қате немесе мерзімі өткен")
-	}
-	return s.users.MarkEmailVerified(ctx, user.ID)
-}
-
-// ResendVerificationCode issues and emails a fresh code, replacing any
-// previous one (e.g. the first email was lost or the old code expired).
-func (s *AuthService) ResendVerificationCode(ctx context.Context, email string) error {
-	user, err := s.users.GetByEmail(ctx, email)
-	if err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
-			return apperror.BadRequest("мұндай email-мен пайдаланушы табылмады")
-		}
-		return err
-	}
-	if user.EmailVerifiedAt != nil {
-		return apperror.Conflict("email бұрыннан расталған")
-	}
-	code, err := generateVerificationCode()
-	if err != nil {
-		return err
-	}
-	expiresAt := time.Now().Add(emailVerificationTTL)
-	if err := s.users.SetEmailVerificationCode(ctx, user.ID, code, expiresAt); err != nil {
-		return err
-	}
-	s.sendVerificationEmail(user, code)
-	return nil
+	}, domain.ApprovalPending)
 }
 
 type TokenPair struct {
@@ -284,26 +225,33 @@ type TokenPair struct {
 	RefreshToken string
 }
 
-func (s *AuthService) Login(ctx context.Context, email, password string) (*TokenPair, *domain.User, error) {
-	user, err := s.users.GetByEmail(ctx, email)
+// Login accepts either a 12-digit IIN (how students log in — an IIN is the
+// one identifier every student is guaranteed to have, since email is no
+// longer verified at registration) or an email (how admin/manager log in,
+// since they have no IIN).
+func (s *AuthService) Login(ctx context.Context, login, password string) (*TokenPair, *domain.User, error) {
+	var user *domain.User
+	var err error
+	if isValidIIN(login) {
+		user, err = s.users.GetByIIN(ctx, login)
+	} else {
+		user, err = s.users.GetByEmail(ctx, login)
+	}
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, nil, apperror.Unauthorized("email немесе құпия сөз қате")
+			return nil, nil, apperror.Unauthorized("логин немесе құпия сөз қате")
 		}
 		return nil, nil, err
 	}
 
 	if err := hasher.ComparePassword(user.PasswordHash, password); err != nil {
-		return nil, nil, apperror.Unauthorized("email немесе құпия сөз қате")
+		return nil, nil, apperror.Unauthorized("логин немесе құпия сөз қате")
 	}
 
-	// Only role=student is gated by email verification/approval —
-	// admin/manager accounts are always created directly by an admin,
-	// already trusted and marked verified/approved at creation.
+	// Only role=student is gated by manager approval — admin/manager accounts
+	// are always created directly by an admin, already trusted and approved
+	// at creation.
 	if user.Role == domain.RoleStudent {
-		if user.EmailVerifiedAt == nil {
-			return nil, nil, apperror.Forbidden("алдымен email-ды растаңыз")
-		}
 		switch user.ApprovalStatus {
 		case domain.ApprovalPending:
 			return nil, nil, apperror.Forbidden("тіркелуіңіз әлі менеджердің растауын күтуде")

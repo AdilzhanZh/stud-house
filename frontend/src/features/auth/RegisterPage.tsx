@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
@@ -8,44 +8,23 @@ import { Input } from '../../components/Input'
 import { Select } from '../../components/Select'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
-import { extractErrorMessage } from '../../api/client'
-import { resendVerification, verifyEmail } from '../../api/authApi'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { extractErrorMessage, getErrorCode } from '../../api/client'
 import { useAuth } from './useAuth'
 import { buildRegisterSchema, type RegisterFormValues } from './schemas'
 
-type Step = 'form' | 'verify' | 'done'
-
-const RESEND_COOLDOWN_SECONDS = 120
+type Step = 'form' | 'done'
 
 export function RegisterPage() {
   const { t } = useTranslation()
   const { register: registerStudent } = useAuth()
   const [serverError, setServerError] = useState<string | null>(null)
   const [step, setStep] = useState<Step>('form')
-  const [email, setEmail] = useState('')
 
-  const [code, setCode] = useState('')
-  const [verifyError, setVerifyError] = useState<string | null>(null)
-  const [isVerifying, setIsVerifying] = useState(false)
-  const [resendMessage, setResendMessage] = useState<string | null>(null)
-  const [isResending, setIsResending] = useState(false)
-  const [resendCooldown, setResendCooldown] = useState(0)
-
-  // A code is sent as soon as the verify step is shown (by registerStudent)
-  // and again on every successful resend, so the button starts cooling down
-  // both times.
-  useEffect(() => {
-    if (step !== 'verify') return
-    setResendCooldown(RESEND_COOLDOWN_SECONDS)
-  }, [step])
-
-  useEffect(() => {
-    if (step !== 'verify') return
-    const timer = setInterval(() => {
-      setResendCooldown((s) => Math.max(0, s - 1))
-    }, 1000)
-    return () => clearInterval(timer)
-  }, [step])
+  // Set when the backend flags the email as unreachable — offers the
+  // applicant a choice between fixing it and registering anyway.
+  const [pendingValues, setPendingValues] = useState<RegisterFormValues | null>(null)
+  const [isContinuing, setIsContinuing] = useState(false)
 
   const {
     register,
@@ -59,62 +38,50 @@ export function RegisterPage() {
   const courseOptions =
     academicDegree === 'master' ? [1, 2] : academicDegree === 'doctorate' ? [1, 2, 3] : [1, 2, 3, 4]
 
+  function payloadFrom(values: RegisterFormValues, skipEmailCheck: boolean) {
+    const fullName = [values.aty, values.familiya, values.tegi]
+      .map((part) => part?.trim())
+      .filter(Boolean)
+      .join(' ')
+    return {
+      full_name: fullName,
+      email: values.email,
+      phone: values.phone,
+      iin: values.iin,
+      password: values.password,
+      gender: values.gender,
+      course: Number(values.course),
+      academic_degree: values.academic_degree,
+      skip_email_check: skipEmailCheck,
+    }
+  }
+
   async function onSubmit(values: RegisterFormValues) {
     setServerError(null)
     try {
-      const fullName = [values.aty, values.familiya, values.tegi]
-        .map((part) => part?.trim())
-        .filter(Boolean)
-        .join(' ')
-      await registerStudent({
-        full_name: fullName,
-        email: values.email,
-        phone: values.phone,
-        iin: values.iin,
-        password: values.password,
-        gender: values.gender,
-        course: Number(values.course),
-        academic_degree: values.academic_degree,
-      })
-      // Email must be verified with the code just sent before the account
-      // even reaches the manager-approval stage.
-      setEmail(values.email)
-      setStep('verify')
+      await registerStudent(payloadFrom(values, false))
+      setStep('done')
     } catch (error) {
+      if (getErrorCode(error) === 'email_unverifiable') {
+        setPendingValues(values)
+        return
+      }
       setServerError(extractErrorMessage(error, t('auth.registerFailed')))
     }
   }
 
-  async function handleVerify(e: React.FormEvent) {
-    e.preventDefault()
-    setVerifyError(null)
-    setIsVerifying(true)
+  async function handleContinueAnyway() {
+    if (!pendingValues) return
+    setIsContinuing(true)
     try {
-      await verifyEmail(email, code)
-      // No auto-login: a newly registered student must wait for a
-      // manager/admin to approve the account (backend blocks login until
-      // approval_status=approved) before they can access the dashboard.
+      await registerStudent(payloadFrom(pendingValues, true))
+      setPendingValues(null)
       setStep('done')
     } catch (error) {
-      setVerifyError(extractErrorMessage(error, t('auth.verifyFailed')))
+      setPendingValues(null)
+      setServerError(extractErrorMessage(error, t('auth.registerFailed')))
     } finally {
-      setIsVerifying(false)
-    }
-  }
-
-  async function handleResend() {
-    if (resendCooldown > 0) return
-    setVerifyError(null)
-    setResendMessage(null)
-    setIsResending(true)
-    try {
-      await resendVerification(email)
-      setResendMessage(t('auth.resendSuccess'))
-      setResendCooldown(RESEND_COOLDOWN_SECONDS)
-    } catch (error) {
-      setVerifyError(extractErrorMessage(error, t('auth.resendFailed')))
-    } finally {
-      setIsResending(false)
+      setIsContinuing(false)
     }
   }
 
@@ -131,41 +98,6 @@ export function RegisterPage() {
     )
   }
 
-  if (step === 'verify') {
-    return (
-      <Card title={t('auth.verifyTitle')}>
-        <p className="mb-4 text-sm text-sand-300/70">{t('auth.verifyPrompt', { email })}</p>
-        <form className="flex flex-col gap-4" onSubmit={handleVerify} noValidate>
-          {verifyError && <Alert variant="error" message={verifyError} />}
-          {resendMessage && <Alert variant="success" message={resendMessage} />}
-          <Input
-            label={t('auth.verifyCodeLabel')}
-            inputMode="numeric"
-            maxLength={6}
-            placeholder="123456"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            required
-          />
-          <Button type="submit" isLoading={isVerifying}>
-            {t('auth.verifyButton')}
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            isLoading={isResending}
-            disabled={resendCooldown > 0}
-            onClick={handleResend}
-          >
-            {resendCooldown > 0
-              ? t('auth.resendButtonCooldown', { seconds: resendCooldown })
-              : t('auth.resendButton')}
-          </Button>
-        </form>
-      </Card>
-    )
-  }
-
   return (
     <Card title={t('auth.registerTitle')}>
       <form className="flex flex-col gap-4" onSubmit={handleSubmit(onSubmit)} noValidate>
@@ -177,8 +109,19 @@ export function RegisterPage() {
           required
           {...register('aty')}
         />
-        <Input label={t('auth.lastName')} autoComplete="family-name" {...register('familiya')} />
-        <Input label={t('auth.patronymic')} {...register('tegi')} />
+        <Input
+          label={t('auth.lastName')}
+          autoComplete="family-name"
+          error={errors.familiya?.message}
+          required
+          {...register('familiya')}
+        />
+        <Input
+          label={t('auth.patronymic')}
+          error={errors.tegi?.message}
+          required
+          {...register('tegi')}
+        />
         <Input
           label={t('auth.email')}
           type="email"
@@ -256,6 +199,17 @@ export function RegisterPage() {
           </Link>
         </p>
       </form>
+
+      <ConfirmDialog
+        open={pendingValues != null}
+        title={t('auth.emailCheckTitle')}
+        message={t('auth.emailCheckMessage', { email: pendingValues?.email })}
+        cancelLabel={t('auth.emailCheckChange')}
+        confirmLabel={t('auth.emailCheckContinue')}
+        isLoading={isContinuing}
+        onCancel={() => setPendingValues(null)}
+        onConfirm={handleContinueAnyway}
+      />
     </Card>
   )
 }

@@ -26,7 +26,10 @@ services:
     volumes:
       - ./backend/migrations:/migrations
     command: ["-path", "/migrations", "-database", "${DATABASE_URL}", "up"]
-    restart: "no"
+    # on-failure: retries a few times (Docker backs off between attempts) so a
+    # transient bind-mount race on deploy (host checkout not fully synced yet
+    # when this container starts) self-heals instead of blocking backend/frontend.
+    restart: "on-failure:5"
     networks:
       - app-network
 

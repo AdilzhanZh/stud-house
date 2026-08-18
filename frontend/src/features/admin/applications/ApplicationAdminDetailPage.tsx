@@ -303,7 +303,7 @@ export function ApplicationAdminDetailPage() {
                     rel="noreferrer"
                     className="flex-1 text-sm text-sand-100 hover:text-turquoise-400"
                   >
-                    {doc.display_name}
+                    {bilingualField(doc.display_name_kk, doc.display_name_ru, i18n.language)}
                   </a>
                 </div>
               ))}

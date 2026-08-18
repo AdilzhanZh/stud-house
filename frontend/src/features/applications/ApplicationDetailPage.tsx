@@ -14,12 +14,13 @@ import { addApplicationDocument, deleteApplication, getApplication, resubmitAppl
 import { getDormitory } from '../../api/dormitoryApi'
 import { getRoom } from '../../api/roomApi'
 import { formatDateTime } from '../../utils/dateFormat'
+import { bilingualField } from '../../utils/bilingualField'
 import { useApplicationJourneys } from './useApplicationJourneys'
 import type { ApplicationDetail } from '../../types/applications'
 import type { Room } from '../../types/rooms'
 
 export function ApplicationDetailPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [application, setApplication] = useState<ApplicationDetail | null>(null)
@@ -170,7 +171,9 @@ export function ApplicationDetailPage() {
                   <span className="flex h-7.5 w-7.5 shrink-0 items-center justify-center rounded-full bg-mint-500/15">
                     <Check className="h-3.5 w-3.5 text-mint-400" strokeWidth={2.5} />
                   </span>
-                  <span className="flex-1 text-sm text-sand-100">{doc.display_name}</span>
+                  <span className="flex-1 text-sm text-sand-100">
+                    {bilingualField(doc.display_name_kk, doc.display_name_ru, i18n.language)}
+                  </span>
                   <a
                     href={doc.file_url}
                     target="_blank"

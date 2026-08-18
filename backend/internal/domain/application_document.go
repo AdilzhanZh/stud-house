@@ -21,9 +21,10 @@ type ApplicationDocument struct {
 	DocumentName                *string
 	FileURL                     string
 	UploadedAt                  time.Time
-	// DisplayName is always resolvable to a readable label — DocumentName for
-	// a free-form upload, or the linked benefit's/dormitory's required
-	// document name otherwise. Populated by ListByApplication's join; empty
-	// on the object returned by Add (never displayed directly).
-	DisplayName string
+	// DisplayNameKk/DisplayNameRu are always resolvable to a readable label —
+	// DocumentName for a free-form upload, or the linked benefit's/dormitory's
+	// required document name otherwise. Populated by ListByApplication's join;
+	// empty on the object returned by Add (never displayed directly).
+	DisplayNameKk string
+	DisplayNameRu string
 }

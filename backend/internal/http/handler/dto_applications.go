@@ -93,7 +93,8 @@ type applicationDocumentResponse struct {
 	BenefitRequiredDocumentID   *uuid.UUID `json:"benefit_required_document_id"`
 	DormitoryRequiredDocumentID *uuid.UUID `json:"dormitory_required_document_id"`
 	DocumentName                *string    `json:"document_name"`
-	DisplayName                 string     `json:"display_name"`
+	DisplayNameKk               string     `json:"display_name_kk"`
+	DisplayNameRu               string     `json:"display_name_ru"`
 	FileURL                     string     `json:"file_url"`
 	UploadedAt                  time.Time  `json:"uploaded_at"`
 }
@@ -105,7 +106,8 @@ func applicationDocumentDTO(d *domain.ApplicationDocument) applicationDocumentRe
 		BenefitRequiredDocumentID:   d.BenefitRequiredDocumentID,
 		DormitoryRequiredDocumentID: d.DormitoryRequiredDocumentID,
 		DocumentName:                d.DocumentName,
-		DisplayName:                 d.DisplayName,
+		DisplayNameKk:               d.DisplayNameKk,
+		DisplayNameRu:               d.DisplayNameRu,
 		FileURL:                     d.FileURL,
 		UploadedAt:                  d.UploadedAt,
 	}

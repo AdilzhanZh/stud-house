@@ -41,7 +41,8 @@ func (r *ApplicationDocumentRepo) ListByApplication(ctx context.Context, applica
 		SELECT
 			ad.id, ad.application_id, ad.benefit_required_document_id, ad.dormitory_required_document_id,
 			ad.document_name, ad.file_url, ad.uploaded_at,
-			COALESCE(ad.document_name, brd_doc.name, drd_doc.name) AS display_name
+			COALESCE(ad.document_name, brd_doc.name_kk, drd_doc.name_kk, '') AS display_name_kk,
+			COALESCE(ad.document_name, brd_doc.name_ru, drd_doc.name_ru, '') AS display_name_ru
 		FROM application_documents ad
 		LEFT JOIN benefit_required_documents brd ON brd.id = ad.benefit_required_document_id
 		LEFT JOIN required_documents brd_doc ON brd_doc.id = brd.document_id
@@ -57,7 +58,7 @@ func (r *ApplicationDocumentRepo) ListByApplication(ctx context.Context, applica
 	var out []*domain.ApplicationDocument
 	for rows.Next() {
 		d := &domain.ApplicationDocument{}
-		if err := rows.Scan(&d.ID, &d.ApplicationID, &d.BenefitRequiredDocumentID, &d.DormitoryRequiredDocumentID, &d.DocumentName, &d.FileURL, &d.UploadedAt, &d.DisplayName); err != nil {
+		if err := rows.Scan(&d.ID, &d.ApplicationID, &d.BenefitRequiredDocumentID, &d.DormitoryRequiredDocumentID, &d.DocumentName, &d.FileURL, &d.UploadedAt, &d.DisplayNameKk, &d.DisplayNameRu); err != nil {
 			return nil, err
 		}
 		out = append(out, d)

@@ -46,7 +46,8 @@ export interface ApplicationDocument {
   benefit_required_document_id: string | null
   dormitory_required_document_id: string | null
   document_name: string | null
-  display_name: string
+  display_name_kk: string
+  display_name_ru: string
   file_url: string
   uploaded_at: string
 }

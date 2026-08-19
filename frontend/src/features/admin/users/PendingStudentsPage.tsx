@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+import { Search } from 'lucide-react'
 import { Card } from '../../../components/Card'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
@@ -12,6 +13,7 @@ export function PendingStudentsPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [students, setStudents] = useState<User[] | null>(null)
+  const [search, setSearch] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [submittingId, setSubmittingId] = useState<string | null>(null)
@@ -23,6 +25,15 @@ export function PendingStudentsPage() {
   }
 
   useEffect(load, [])
+
+  const visibleStudents = useMemo(() => {
+    if (!students) return null
+    const q = search.trim().toLowerCase()
+    if (!q) return students
+    return students.filter(
+      (s) => s.full_name.toLowerCase().includes(q) || (s.iin ?? '').includes(q),
+    )
+  }, [students, search])
 
   async function handleDecision(id: string, action: 'approve' | 'reject') {
     setActionError(null)
@@ -48,8 +59,20 @@ export function PendingStudentsPage() {
       {actionError && <Alert variant="error" message={actionError} />}
       {!error && !students && <p className="text-sm text-sand-300">{t('admin.common.loading')}</p>}
 
+      {students && students.length > 0 && (
+        <div className="flex max-w-80 items-center gap-2 rounded-full border border-navy-700 bg-navy-900 px-4 py-2.5">
+          <Search className="h-4 w-4 shrink-0 text-sand-300" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t('admin.users.pendingSearchPlaceholder')}
+            className="w-full bg-transparent text-sm text-sand-100 outline-none placeholder:text-sand-400"
+          />
+        </div>
+      )}
+
       <div className="flex flex-col gap-3">
-        {students?.map((s) => (
+        {visibleStudents?.map((s) => (
           <Card key={s.id}>
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -78,6 +101,9 @@ export function PendingStudentsPage() {
         ))}
         {students && students.length === 0 && (
           <p className="text-sm text-sand-300">{t('admin.users.noPendingStudents')}</p>
+        )}
+        {students && students.length > 0 && visibleStudents?.length === 0 && (
+          <p className="text-sm text-sand-300">{t('admin.users.noPendingSearchResults')}</p>
         )}
       </div>
     </div>

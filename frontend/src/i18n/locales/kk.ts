@@ -808,6 +808,8 @@ export const kk = {
       newPassword: 'Жаңа құпия сөз',
       loadPendingError: 'Тіркелгілерді жүктеу сәтсіз аяқталды',
       noPendingStudents: 'Күтіп тұрған тіркелгі жоқ',
+      pendingSearchPlaceholder: 'Аты-жөні немесе ЖСН бойынша іздеу...',
+      noPendingSearchResults: 'Іздеу нәтижесі табылмады',
       notFound: 'Пайдаланушы табылмады',
       assignCommitteeTitle: 'Комиссия тағайындау — {{name}}',
       chairpersonHint: '(тек комиссия мүшесіне)',

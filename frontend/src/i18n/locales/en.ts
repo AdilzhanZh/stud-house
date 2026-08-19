@@ -807,6 +807,8 @@ export const en: typeof kk = {
       newPassword: 'New password',
       loadPendingError: 'Failed to load pending accounts',
       noPendingStudents: 'No pending accounts',
+      pendingSearchPlaceholder: 'Search by name or IIN...',
+      noPendingSearchResults: 'No results found',
       notFound: 'User not found',
       assignCommitteeTitle: 'Assign committee — {{name}}',
       chairpersonHint: '(committee members only)',

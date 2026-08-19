@@ -811,6 +811,8 @@ export const ru: typeof kk = {
       newPassword: 'Новый пароль',
       loadPendingError: 'Не удалось загрузить заявки на регистрацию',
       noPendingStudents: 'Ожидающих регистраций нет',
+      pendingSearchPlaceholder: 'Поиск по ФИО или ИИН...',
+      noPendingSearchResults: 'По запросу ничего не найдено',
       notFound: 'Пользователь не найден',
       assignCommitteeTitle: 'Назначение комиссии — {{name}}',
       chairpersonHint: '(только для члена комиссии)',

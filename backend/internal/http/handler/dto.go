@@ -22,7 +22,6 @@ type userResponse struct {
 	IsChairperson     bool      `json:"is_chairperson"`
 	ApprovalStatus    string    `json:"approval_status"`
 	AvatarURL         *string   `json:"avatar_url"`
-	EmailVerified     bool      `json:"email_verified"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 }
@@ -39,7 +38,6 @@ func userDTO(u *domain.User) userResponse {
 		IsChairperson:     u.IsChairperson,
 		ApprovalStatus:    string(u.ApprovalStatus),
 		AvatarURL:         u.AvatarURL,
-		EmailVerified:     u.EmailVerifiedAt != nil,
 		CreatedAt:         u.CreatedAt,
 		UpdatedAt:         u.UpdatedAt,
 	}

@@ -26,7 +26,7 @@ export function LoginPage() {
   async function onSubmit(values: LoginFormValues) {
     setServerError(null)
     try {
-      await login(values.email, values.password)
+      await login(values.login, values.password)
       const from = (location.state as { from?: Location } | null)?.from
       // "/" (not a hardcoded student path) so RoleBasedRedirect sends
       // admin/manager to their own panel instead of the student home page.
@@ -50,12 +50,12 @@ export function LoginPage() {
         {serverError && <Alert variant="error" message={serverError} />}
 
         <Input
-          label={t('auth.email')}
-          type="email"
-          autoComplete="email"
+          label={t('auth.loginField')}
+          type="text"
+          autoComplete="username"
           required
-          error={errors.email?.message}
-          {...register('email')}
+          error={errors.login?.message}
+          {...register('login')}
         />
         <Input
           label={t('auth.password')}

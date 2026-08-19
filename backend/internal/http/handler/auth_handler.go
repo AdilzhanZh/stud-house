@@ -28,6 +28,10 @@ type registerRequest struct {
 	Gender         domain.Gender         `json:"gender" binding:"required"`
 	Course         int16                 `json:"course" binding:"required"`
 	AcademicDegree domain.AcademicDegree `json:"academic_degree" binding:"required"`
+	// SkipEmailCheck bypasses the email-domain-reachability check (see
+	// AuthService.RegisterStudent) — set when the applicant chose "continue
+	// anyway" after being warned the email looked unreachable.
+	SkipEmailCheck bool `json:"skip_email_check"`
 }
 
 func (h *AuthHandler) Register(c *gin.Context) {
@@ -36,7 +40,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		response.Error(c, apperror.BadRequest(err.Error()))
 		return
 	}
-	user, err := h.auth.RegisterStudent(c.Request.Context(), req.FullName, req.Email, req.Phone, req.Password, req.IIN, req.Gender, req.Course, req.AcademicDegree)
+	user, err := h.auth.RegisterStudent(c.Request.Context(), req.FullName, req.Email, req.Phone, req.Password, req.IIN, req.Gender, req.Course, req.AcademicDegree, req.SkipEmailCheck)
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -44,43 +48,10 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	response.Created(c, userDTO(user))
 }
 
-type verifyEmailRequest struct {
-	Email string `json:"email" binding:"required,email"`
-	Code  string `json:"code" binding:"required"`
-}
-
-func (h *AuthHandler) VerifyEmail(c *gin.Context) {
-	var req verifyEmailRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, apperror.BadRequest(err.Error()))
-		return
-	}
-	if err := h.auth.VerifyEmail(c.Request.Context(), req.Email, req.Code); err != nil {
-		response.Error(c, err)
-		return
-	}
-	response.OK(c, gin.H{"verified": true})
-}
-
-type resendVerificationRequest struct {
-	Email string `json:"email" binding:"required,email"`
-}
-
-func (h *AuthHandler) ResendVerification(c *gin.Context) {
-	var req resendVerificationRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, apperror.BadRequest(err.Error()))
-		return
-	}
-	if err := h.auth.ResendVerificationCode(c.Request.Context(), req.Email); err != nil {
-		response.Error(c, err)
-		return
-	}
-	response.OK(c, gin.H{"sent": true})
-}
-
 type loginRequest struct {
-	Email    string `json:"email" binding:"required,email"`
+	// Login is either a 12-digit IIN (students) or an email (admin/manager) —
+	// see AuthService.Login.
+	Login    string `json:"login" binding:"required"`
 	Password string `json:"password" binding:"required"`
 }
 
@@ -96,7 +67,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		response.Error(c, apperror.BadRequest(err.Error()))
 		return
 	}
-	pair, user, err := h.auth.Login(c.Request.Context(), req.Email, req.Password)
+	pair, user, err := h.auth.Login(c.Request.Context(), req.Login, req.Password)
 	if err != nil {
 		response.Error(c, err)
 		return

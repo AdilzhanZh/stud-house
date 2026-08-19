@@ -14,3 +14,8 @@ export async function changeOwnPassword(currentPassword: string, newPassword: st
     new_password: newPassword,
   })
 }
+
+export async function changeOwnEmail(newEmail: string): Promise<User> {
+  const { data } = await apiClient.patch<{ data: User }>('/users/me/email', { new_email: newEmail })
+  return data.data
+}

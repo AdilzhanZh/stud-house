@@ -87,6 +87,16 @@ const FILE_TOO_LARGE: Record<string, string> = {
   en: 'The file is too large (15 MB max), please choose a smaller file',
 }
 
+// getErrorCode reads the backend's apperror.Code off an axios error (e.g.
+// "email_unverifiable"), so callers can branch on the specific failure
+// instead of just displaying its message.
+export function getErrorCode(error: unknown): string | undefined {
+  if (axios.isAxiosError(error)) {
+    return (error.response?.data as { error?: { code?: string } } | undefined)?.error?.code
+  }
+  return undefined
+}
+
 export function extractErrorMessage(error: unknown, fallback: string): string {
   if (axios.isAxiosError(error)) {
     if (error.response?.status === 413) {

@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/google/uuid"
 
@@ -42,13 +41,11 @@ type UserRepository interface {
 	UpdateApprovalStatus(ctx context.Context, id uuid.UUID, status domain.ApprovalStatus) error
 	UpdatePassword(ctx context.Context, id uuid.UUID, passwordHash string) error
 	// UpdateEmail is used by cmd/seed to repoint the single admin account at
-	// a new login email instead of creating a second admin row.
+	// a new login email instead of creating a second admin row, and by
+	// UserService.ChangeOwnEmail for a user changing their own email from
+	// their profile.
 	UpdateEmail(ctx context.Context, id uuid.UUID, email string) error
 	Delete(ctx context.Context, id uuid.UUID) error
-	// SetEmailVerificationCode stores a fresh code+expiry (registration or
-	// resend); MarkEmailVerified clears it and stamps email_verified_at.
-	SetEmailVerificationCode(ctx context.Context, id uuid.UUID, code string, expiresAt time.Time) error
-	MarkEmailVerified(ctx context.Context, id uuid.UUID) error
 }
 
 type StudentProfileRepository interface {

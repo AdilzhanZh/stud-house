@@ -18,8 +18,8 @@ export function useAuth() {
   const clear = useAuthStore((s) => s.clear)
 
   const login = useCallback(
-    async (email: string, password: string) => {
-      const result = await authApi.login({ email, password })
+    async (loginValue: string, password: string) => {
+      const result = await authApi.login({ login: loginValue, password })
       setRefreshToken(result.refresh_token)
       setStoredUser(result.user)
       setSession(result.user, result.access_token)

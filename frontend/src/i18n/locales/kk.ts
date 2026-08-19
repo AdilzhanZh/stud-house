@@ -28,7 +28,7 @@ export const kk = {
     welcome: 'Қош келдің!',
     tagline: 'Жатақханаға өтініш беру мен бақылау — бір жерде.',
     email: 'Email',
-    loginField: 'ЖСН (студент) немесе email (әкімші/менеджер)',
+    loginField: 'ЖСН немесе email',
     password: 'Құпия сөз',
     loginButton: 'Кіру',
     noAccount: 'Аккаунт жоқ па?',

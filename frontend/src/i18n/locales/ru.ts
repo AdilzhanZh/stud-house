@@ -826,6 +826,8 @@ export const ru: typeof kk = {
       registerStudentHint:
         'Аккаунт студента создаётся сразу подтверждённым и активным — подтверждение email не требуется.',
       registerStudentFailed: 'Не удалось добавить студента',
+      searchPlaceholder: 'Поиск по ФИО или ИИН...',
+      noSearchResults: 'По запросу ничего не найдено',
     },
   },
 }

@@ -822,6 +822,8 @@ export const en: typeof kk = {
       registerStudentHint:
         "The student's account is created already approved and active — no email confirmation is required.",
       registerStudentFailed: 'Failed to add student',
+      searchPlaceholder: 'Search by name or IIN...',
+      noSearchResults: 'No results found',
     },
   },
 }

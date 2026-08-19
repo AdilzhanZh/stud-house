@@ -132,12 +132,10 @@ export function AdminLayout() {
               <ArrowLeftRight className="h-4.5 w-4.5 shrink-0" />
               {t('admin.layout.transferRequests')}
             </NavLink>
-            {user?.role === 'admin' && (
-              <NavLink to="/admin/users" className={navLinkClass}>
-                <UserCog className="h-4.5 w-4.5 shrink-0" />
-                {t('admin.layout.users')}
-              </NavLink>
-            )}
+            <NavLink to="/admin/users" className={navLinkClass}>
+              <UserCog className="h-4.5 w-4.5 shrink-0" />
+              {t('admin.layout.users')}
+            </NavLink>
             <NavLink to="/admin/students/pending" className={navLinkClass}>
               <UserPlus className="h-4.5 w-4.5 shrink-0" />
               {t('admin.layout.pendingStudents')}

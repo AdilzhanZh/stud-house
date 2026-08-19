@@ -823,6 +823,8 @@ export const kk = {
       registerStudentHint:
         'Студенттің тіркелгісі бірден расталған және белсенді түрде жасалады — email растауы қажет емес.',
       registerStudentFailed: 'Студентті қосу сәтсіз аяқталды',
+      searchPlaceholder: 'Аты-жөні немесе ЖСН бойынша іздеу...',
+      noSearchResults: 'Іздеу нәтижесі табылмады',
     },
   },
 }

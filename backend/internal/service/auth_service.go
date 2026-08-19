@@ -228,11 +228,15 @@ type TokenPair struct {
 // Login accepts either a 12-digit IIN (how students log in — an IIN is the
 // one identifier every student is guaranteed to have, since email is no
 // longer verified at registration) or an email (how admin/manager log in,
-// since they have no IIN).
+// since they have no IIN). A student logging in with their email is
+// rejected even if the password is correct — email is unverified for
+// students, so it isn't trusted as a login identifier for them the way an
+// IIN is.
 func (s *AuthService) Login(ctx context.Context, login, password string) (*TokenPair, *domain.User, error) {
+	usedIIN := isValidIIN(login)
 	var user *domain.User
 	var err error
-	if isValidIIN(login) {
+	if usedIIN {
 		user, err = s.users.GetByIIN(ctx, login)
 	} else {
 		user, err = s.users.GetByEmail(ctx, login)
@@ -246,6 +250,10 @@ func (s *AuthService) Login(ctx context.Context, login, password string) (*Token
 
 	if err := hasher.ComparePassword(user.PasswordHash, password); err != nil {
 		return nil, nil, apperror.Unauthorized("логин немесе құпия сөз қате")
+	}
+
+	if !usedIIN && user.Role == domain.RoleStudent {
+		return nil, nil, apperror.Forbidden("студенттер тек ЖСН (ИИН) арқылы кіре алады")
 	}
 
 	// Only role=student is gated by manager approval — admin/manager accounts

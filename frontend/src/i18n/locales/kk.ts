@@ -28,7 +28,7 @@ export const kk = {
     welcome: 'Қош келдің!',
     tagline: 'Жатақханаға өтініш беру мен бақылау — бір жерде.',
     email: 'Email',
-    loginField: 'ЖСН немесе email',
+    loginField: 'ЖСН',
     password: 'Құпия сөз',
     loginButton: 'Кіру',
     noAccount: 'Аккаунт жоқ па?',
@@ -67,7 +67,7 @@ export const kk = {
   validation: {
     emailInvalid: 'Email форматы дұрыс емес',
     passwordRequired: 'Құпия сөзді енгізіңіз',
-    loginRequired: 'ЖСН немесе email енгізіңіз',
+    loginRequired: 'ЖСН енгізіңіз',
     nameRequired: 'Атын енгізіңіз',
     lastNameRequired: 'Фамилияны енгізіңіз',
     patronymicRequired: 'Тегіңізді енгізіңіз',

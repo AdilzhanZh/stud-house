@@ -318,6 +318,10 @@ var staticTranslations = map[string]translation{
 		"Студенты должны регистрироваться самостоятельно через /auth/register, а не таким образом",
 		"Students must register themselves via /auth/register, not through this endpoint",
 	},
+	"студенттер тек ЖСН (ИИН) арқылы кіре алады": {
+		"Студенты могут войти только по ИИН",
+		"Students can only log in with their IIN",
+	},
 	"сурет идентификаторы дұрыс емес": {"Неверный идентификатор изображения", "Invalid image identifier"},
 	"сурет сілтемесі міндетті":        {"Ссылка на изображение обязательна", "Image URL is required"},
 	"сурет табылмады":                 {"Изображение не найдено", "Image not found"},

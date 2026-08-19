@@ -453,6 +453,11 @@ export const en: typeof kk = {
       approve: 'Approve',
       rejectReason: 'Rejection reason',
       correctionRequest: 'Correction request',
+      cancelApproved: 'Cancel application',
+      cancelApprovedReason: 'Cancellation reason',
+      cancelApprovedHint:
+        'This application cannot move forward (e.g. no committee members are configured). Cancelling it lets the student submit a new one.',
+      cancelApprovedFailed: 'Failed to cancel the application',
       aboutStudent: 'About the student',
       phone: 'Phone',
       iin: 'IIN',

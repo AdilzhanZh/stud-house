@@ -189,6 +189,7 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 
 				mgmt.GET("/applications", h.Application.List)
 				mgmt.PATCH("/applications/:id/decision", h.Application.Decide)
+				mgmt.PATCH("/applications/:id/cancel-approved", h.Application.CancelApproved)
 
 				mgmt.GET("/petition-template", h.PetitionTemplate.Get)
 				mgmt.PUT("/petition-template", h.PetitionTemplate.Update)

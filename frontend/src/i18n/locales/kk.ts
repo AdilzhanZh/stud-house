@@ -453,6 +453,11 @@ export const kk = {
       approve: 'Мақұлдау',
       rejectReason: 'Қабылдамау себебі',
       correctionRequest: 'Түзету талабы',
+      cancelApproved: 'Өтінішті болдырмау',
+      cancelApprovedReason: 'Болдырмау себебі',
+      cancelApprovedHint:
+        'Бұл өтініш комиссия мүшелерінің болмауы немесе басқа себеппен алға баса алмай тұр. Болдырмасаңыз, студент қайта өтініш бере алмайды.',
+      cancelApprovedFailed: 'Өтінішті болдырмау сәтсіз аяқталды',
       aboutStudent: 'Студент туралы',
       phone: 'Телефон',
       iin: 'ИИН',

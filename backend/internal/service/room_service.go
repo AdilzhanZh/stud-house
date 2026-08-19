@@ -269,10 +269,14 @@ func (s *RoomService) CheckAssignable(ctx context.Context, roomID, studentID uui
 	return s.checkStudentAgainstRestrictions(ctx, studentID, room.Restrictions)
 }
 
-// AddResident assigns a student to a room. It enforces that the student has
-// no other active room, that the room still has free capacity, and that the
-// student satisfies the room's current restrictions.
-func (s *RoomService) AddResident(ctx context.Context, roomID, studentID uuid.UUID) (*domain.RoomResident, error) {
+// ValidateAssignable checks that studentID could be placed in roomID right
+// now — room exists, student is a student, has no other active room, the
+// room still has free capacity, and the student satisfies the room's current
+// restrictions — without creating the room_residents row. Used at
+// manager-approval time (ApplicationService.Decide), before the student has
+// accepted a contract: the seat itself is only claimed later, in
+// ContractService.Respond's accept branch, via AddResident below.
+func (s *RoomService) ValidateAssignable(ctx context.Context, roomID, studentID uuid.UUID) (*domain.Room, error) {
 	room, err := s.GetByID(ctx, roomID)
 	if err != nil {
 		return nil, err
@@ -304,6 +308,16 @@ func (s *RoomService) AddResident(ctx context.Context, roomID, studentID uuid.UU
 	}
 
 	if err := s.checkStudentAgainstRestrictions(ctx, studentID, room.Restrictions); err != nil {
+		return nil, err
+	}
+
+	return room, nil
+}
+
+// AddResident assigns a student to a room, claiming the seat immediately
+// (see ValidateAssignable for the checks it runs first).
+func (s *RoomService) AddResident(ctx context.Context, roomID, studentID uuid.UUID) (*domain.RoomResident, error) {
+	if _, err := s.ValidateAssignable(ctx, roomID, studentID); err != nil {
 		return nil, err
 	}
 

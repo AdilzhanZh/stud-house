@@ -23,6 +23,7 @@ type ContractService struct {
 	applications     repository.ApplicationRepository
 	protocols        repository.ProtocolRepository
 	users            repository.UserRepository
+	rooms            *RoomService
 	notifier         *notifier.Notifier
 	responseDeadline time.Duration
 	reminderWindow   time.Duration
@@ -33,6 +34,7 @@ func NewContractService(
 	applications repository.ApplicationRepository,
 	protocols repository.ProtocolRepository,
 	users repository.UserRepository,
+	rooms *RoomService,
 	notifier *notifier.Notifier,
 	responseDeadline time.Duration,
 	reminderWindow time.Duration,
@@ -42,6 +44,7 @@ func NewContractService(
 		applications:     applications,
 		protocols:        protocols,
 		users:            users,
+		rooms:            rooms,
 		notifier:         notifier,
 		responseDeadline: responseDeadline,
 		reminderWindow:   reminderWindow,
@@ -113,9 +116,13 @@ func (s *ContractService) GetByApplicationID(ctx context.Context, applicationID 
 }
 
 // Respond lets the owning student accept or decline a contract while it is
-// still 'sent' and before its deadline. accept settles the underlying
-// application immediately — there is no separate payment-confirmation step;
-// decline rejects the underlying application and frees the student's room.
+// still 'sent' and before its deadline. accept claims the student's seat in
+// their assigned room (this is the moment they actually become a resident —
+// not manager approval, which only earmarks AssignedRoomID) and settles the
+// underlying application immediately — there is no separate
+// payment-confirmation step; decline rejects the underlying application and
+// frees the student's room (a no-op if accept was never reached, since no
+// seat was claimed yet).
 func (s *ContractService) Respond(ctx context.Context, actorStudentID, contractID uuid.UUID, action string) (*domain.Contract, error) {
 	err := s.contracts.WithLock(ctx, contractID, func(ctx context.Context, contract *domain.Contract, tx repository.ContractTx) error {
 		app, err := s.applications.GetByID(ctx, contract.ApplicationID)
@@ -139,6 +146,11 @@ func (s *ContractService) Respond(ctx context.Context, actorStudentID, contractI
 		now := time.Now()
 		switch action {
 		case "accept":
+			if app.AssignedRoomID != nil {
+				if _, err := s.rooms.AddResident(ctx, *app.AssignedRoomID, actorStudentID); err != nil {
+					return err
+				}
+			}
 			if err := tx.SetStatus(ctx, contractID, domain.ContractAccepted, &now); err != nil {
 				return err
 			}

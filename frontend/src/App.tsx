@@ -118,8 +118,9 @@ function App() {
           <Route path="/admin/exit-requests" element={<ExitRequestListPage />} />
           <Route path="/admin/transfer-requests" element={<TransferRequestListPage />} />
 
+          <Route path="/admin/users" element={<UserListPage />} />
+
           <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-            <Route path="/admin/users" element={<UserListPage />} />
             <Route path="/admin/users/new" element={<UserRegisterFormPage />} />
             <Route path="/admin/users/:id/role" element={<RoleAssignPage />} />
           </Route>

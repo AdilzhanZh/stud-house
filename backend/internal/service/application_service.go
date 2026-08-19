@@ -27,6 +27,7 @@ type ApplicationService struct {
 	dormitories  repository.DormitoryRepository
 	roomRepo     repository.RoomRepository
 	rooms        *RoomService
+	users        repository.UserRepository
 	notifier     *notifier.Notifier
 }
 
@@ -36,6 +37,7 @@ func NewApplicationService(
 	dormitories repository.DormitoryRepository,
 	roomRepo repository.RoomRepository,
 	rooms *RoomService,
+	users repository.UserRepository,
 	notifier *notifier.Notifier,
 ) *ApplicationService {
 	return &ApplicationService{
@@ -44,6 +46,7 @@ func NewApplicationService(
 		dormitories:  dormitories,
 		roomRepo:     roomRepo,
 		rooms:        rooms,
+		users:        users,
 		notifier:     notifier,
 	}
 }
@@ -68,6 +71,17 @@ func (s *ApplicationService) Create(ctx context.Context, studentID, dormitoryID 
 	}
 	if dormitory.ClosedForApplications {
 		return nil, apperror.BadRequest("бұл жатақхана қазір өтініш қабылдамайды")
+	}
+
+	// An approved application can only turn into a contract once a protocol
+	// (commission review) reaches unanimous approval, and a protocol can't
+	// even be created with zero committee members (ProtocolService.Create).
+	// Block submission at the source instead of letting it dead-end after a
+	// manager approves it with nowhere left to go.
+	if members, err := s.users.ListCommitteeMembers(ctx); err != nil {
+		return nil, err
+	} else if len(members) == 0 {
+		return nil, apperror.BadRequest("қазір комиссия мүшелері тағайындалмаған, өтініш қабылдау уақытша тоқтатылды")
 	}
 
 	if rooms, err := s.roomRepo.ListByDormitory(ctx, dormitoryID); err != nil {
@@ -265,15 +279,18 @@ func (s *ApplicationService) Resubmit(ctx context.Context, actorStudentID, appli
 // locked for the duration, so two concurrent decisions on the same
 // application serialize and the second one sees a non-pending status.
 //
-// On approve, roomID is optional: a manager may assign a room immediately
-// (reusing RoomService.AddResident's capacity + restriction validation from
-// phase 1) before the application's own status is committed — if that room
-// assignment fails, nothing about the application is changed. If the manager
+// On approve, roomID is optional: a manager may earmark a room immediately
+// (reusing RoomService.ValidateAssignable's capacity + restriction checks)
+// before the application's own status is committed — if that room fails
+// validation, nothing about the application is changed. If the manager
 // leaves roomID unset, this falls back to the student's own PreferredRoomID
 // (chosen at application time): a manager with no objection to that choice
 // can approve without picking anything themselves, rather than the student
 // silently ending up unassigned. Only a student who never expressed a room
 // preference is left unassigned for now, to be placed in a room later.
+// Approval only earmarks AssignedRoomID; the seat itself (a room_residents
+// row) is claimed later, once the student accepts the contract that gets
+// sent after the commission also approves — see ContractService.Respond.
 func (s *ApplicationService) Decide(ctx context.Context, actorID, applicationID uuid.UUID, action DecisionAction, roomID *uuid.UUID, comment *string) (*domain.Application, error) {
 	var finalStatus domain.ApplicationStatus
 	var studentID uuid.UUID
@@ -299,7 +316,10 @@ func (s *ApplicationService) Decide(ctx context.Context, actorID, applicationID 
 				roomID = app.PreferredRoomID
 			}
 			if roomID != nil {
-				if _, err := s.rooms.AddResident(ctx, *roomID, app.StudentID); err != nil {
+				// Validate only — the seat itself is claimed later, once the
+				// student actually accepts their contract (ContractService.
+				// Respond), not the moment a manager approves the application.
+				if _, err := s.rooms.ValidateAssignable(ctx, *roomID, app.StudentID); err != nil {
 					return err
 				}
 			}
@@ -340,6 +360,45 @@ func (s *ApplicationService) Decide(ctx context.Context, actorID, applicationID 
 	}
 
 	s.notifyDecision(ctx, studentID, applicationID, finalStatus, comment)
+
+	return s.GetByID(ctx, applicationID)
+}
+
+// CancelApproved is an admin/manager escape hatch for an application stuck in
+// 'approved': Decide only accepts 'pending' applications, but an approved
+// application can dead-end with no way forward if it can never be attached
+// to a protocol (e.g. no committee members are configured — see Create's
+// guard, which prevents new applications from getting into this state but
+// does nothing for ones approved before committee membership dropped to
+// zero). Since a seat is only claimed on contract acceptance (see
+// ContractService.Respond), cancelling here never needs to free a room.
+func (s *ApplicationService) CancelApproved(ctx context.Context, actorID, applicationID uuid.UUID, comment string) (*domain.Application, error) {
+	if comment == "" {
+		return nil, apperror.BadRequest("бас тарту себебін көрсету міндетті")
+	}
+
+	var studentID uuid.UUID
+	err := s.applications.WithLock(ctx, applicationID, func(ctx context.Context, app *domain.Application, tx repository.ApplicationTx) error {
+		if app.Status != domain.ApplicationApproved {
+			return apperror.Conflict("тек мақұлданған өтінішті осылай өшіруге болады")
+		}
+		studentID = app.StudentID
+		if err := tx.SetDecision(ctx, applicationID, domain.ApplicationRejected, nil, actorID); err != nil {
+			return err
+		}
+		return tx.AddHistory(ctx, &domain.ApplicationStatusHistory{
+			ApplicationID: applicationID,
+			FromStatus:    statusPtr(domain.ApplicationApproved),
+			ToStatus:      domain.ApplicationRejected,
+			Comment:       &comment,
+			ChangedBy:     actorID,
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	s.notifyDecision(ctx, studentID, applicationID, domain.ApplicationRejected, &comment)
 
 	return s.GetByID(ctx, applicationID)
 }

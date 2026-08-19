@@ -15,7 +15,7 @@ export function buildRegisterSchema(t: TFunction) {
     .object({
       aty: z.string().min(1, t('validation.nameRequired')),
       familiya: z.string().min(1, t('validation.lastNameRequired')),
-      tegi: z.string().min(1, t('validation.patronymicRequired')),
+      tegi: z.string().optional(),
       email: z.string().email(t('validation.emailInvalid')),
       phone: z.string().min(1, t('validation.phoneRequired')),
       iin: z.string().regex(/^\d{12}$/, t('validation.iinFormat')),

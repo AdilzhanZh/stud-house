@@ -453,6 +453,11 @@ export const kk = {
       approve: 'Мақұлдау',
       rejectReason: 'Қабылдамау себебі',
       correctionRequest: 'Түзету талабы',
+      cancelApproved: 'Өтінішті болдырмау',
+      cancelApprovedReason: 'Болдырмау себебі',
+      cancelApprovedHint:
+        'Бұл өтініш комиссия мүшелерінің болмауы немесе басқа себеппен алға баса алмай тұр. Болдырмасаңыз, студент қайта өтініш бере алмайды.',
+      cancelApprovedFailed: 'Өтінішті болдырмау сәтсіз аяқталды',
       aboutStudent: 'Студент туралы',
       phone: 'Телефон',
       iin: 'ИИН',
@@ -823,6 +828,8 @@ export const kk = {
       registerStudentHint:
         'Студенттің тіркелгісі бірден расталған және белсенді түрде жасалады — email растауы қажет емес.',
       registerStudentFailed: 'Студентті қосу сәтсіз аяқталды',
+      searchPlaceholder: 'Аты-жөні немесе ЖСН бойынша іздеу...',
+      noSearchResults: 'Іздеу нәтижесі табылмады',
     },
   },
 }

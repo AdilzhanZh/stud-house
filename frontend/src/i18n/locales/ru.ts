@@ -456,6 +456,11 @@ export const ru: typeof kk = {
       approve: 'Одобрить',
       rejectReason: 'Причина отказа',
       correctionRequest: 'Запрос на исправление',
+      cancelApproved: 'Отменить заявку',
+      cancelApprovedReason: 'Причина отмены',
+      cancelApprovedHint:
+        'Эта заявка не может двигаться дальше (например, из-за отсутствия членов комиссии). Отмена нужна, чтобы студент мог подать новую заявку.',
+      cancelApprovedFailed: 'Не удалось отменить заявку',
       aboutStudent: 'О студенте',
       phone: 'Телефон',
       iin: 'ИИН',
@@ -826,6 +831,8 @@ export const ru: typeof kk = {
       registerStudentHint:
         'Аккаунт студента создаётся сразу подтверждённым и активным — подтверждение email не требуется.',
       registerStudentFailed: 'Не удалось добавить студента',
+      searchPlaceholder: 'Поиск по ФИО или ИИН...',
+      noSearchResults: 'По запросу ничего не найдено',
     },
   },
 }

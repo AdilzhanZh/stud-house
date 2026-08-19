@@ -9,7 +9,7 @@ import { StatusBadge } from '../../../components/StatusBadge'
 import { ApplicationJourneyStepper } from '../../../components/ApplicationJourneyStepper'
 import { extractErrorMessage } from '../../../api/client'
 import { getApplication } from '../../../api/applicationApi'
-import { decideApplication } from '../../../api/applicationAdminApi'
+import { cancelApprovedApplication, decideApplication } from '../../../api/applicationAdminApi'
 import { getDormitory } from '../../../api/dormitoryApi'
 import { listRoomResidents, listRoomsByDormitory } from '../../../api/roomApi'
 import { listUsers } from '../../../api/adminUserApi'
@@ -27,7 +27,7 @@ interface RoomWithOccupancy extends Room {
   residentCount: number
 }
 
-type ActionPanel = 'reject' | 'correction' | null
+type ActionPanel = 'reject' | 'correction' | 'cancelApproved' | null
 
 export function ApplicationAdminDetailPage() {
   const { t, i18n } = useTranslation()
@@ -132,6 +132,24 @@ export function ApplicationAdminDetailPage() {
     }
   }
 
+  // 'approved' applications can dead-end with no way forward (e.g. no
+  // committee members are configured, so a protocol can never be formed).
+  // decideApplication() only accepts 'pending' applications, so this is a
+  // separate endpoint/action.
+  async function handleCancelApproved() {
+    if (!id || !comment.trim()) return
+    setActionError(null)
+    setIsSubmitting(true)
+    try {
+      await cancelApprovedApplication(id, comment.trim())
+      navigate('/admin/applications')
+    } catch (err) {
+      setActionError(extractErrorMessage(err, t('admin.applications.cancelApprovedFailed')))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   if (loadError) return <Alert variant="error" message={loadError} />
   if (!application) return <p className="text-sm text-sand-300">{t('admin.common.loading')}</p>
 
@@ -168,6 +186,13 @@ export function ApplicationAdminDetailPage() {
             </Button>
           </div>
         )}
+        {application.status === 'approved' && (
+          <div className="flex gap-2">
+            <Button variant="secondary" className="!text-clay-400" onClick={() => setPanel('cancelApproved')}>
+              {t('admin.applications.cancelApproved')}
+            </Button>
+          </div>
+        )}
       </div>
 
       {actionError && <Alert variant="error" message={actionError} />}
@@ -175,8 +200,13 @@ export function ApplicationAdminDetailPage() {
       {panel && (
         <Card>
           <p className="mb-3 text-sm font-semibold text-sand-100">
-            {panel === 'reject' ? t('admin.applications.rejectReason') : t('admin.applications.correctionRequest')}
+            {panel === 'reject' && t('admin.applications.rejectReason')}
+            {panel === 'correction' && t('admin.applications.correctionRequest')}
+            {panel === 'cancelApproved' && t('admin.applications.cancelApprovedReason')}
           </p>
+          {panel === 'cancelApproved' && (
+            <p className="mb-3 text-xs text-sand-300">{t('admin.applications.cancelApprovedHint')}</p>
+          )}
           <div className="flex flex-col gap-3">
             <textarea
               rows={3}
@@ -187,8 +217,14 @@ export function ApplicationAdminDetailPage() {
             />
             <div className="flex gap-3">
               <Button
-                variant={panel === 'reject' ? 'danger' : 'primary'}
-                onClick={panel === 'reject' ? handleReject : handleRequestCorrection}
+                variant={panel === 'correction' ? 'primary' : 'danger'}
+                onClick={
+                  panel === 'reject'
+                    ? handleReject
+                    : panel === 'cancelApproved'
+                      ? handleCancelApproved
+                      : handleRequestCorrection
+                }
                 isLoading={isSubmitting}
                 disabled={!comment.trim()}
               >

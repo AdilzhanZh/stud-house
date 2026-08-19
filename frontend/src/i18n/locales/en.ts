@@ -453,6 +453,11 @@ export const en: typeof kk = {
       approve: 'Approve',
       rejectReason: 'Rejection reason',
       correctionRequest: 'Correction request',
+      cancelApproved: 'Cancel application',
+      cancelApprovedReason: 'Cancellation reason',
+      cancelApprovedHint:
+        'This application cannot move forward (e.g. no committee members are configured). Cancelling it lets the student submit a new one.',
+      cancelApprovedFailed: 'Failed to cancel the application',
       aboutStudent: 'About the student',
       phone: 'Phone',
       iin: 'IIN',
@@ -822,6 +827,8 @@ export const en: typeof kk = {
       registerStudentHint:
         "The student's account is created already approved and active — no email confirmation is required.",
       registerStudentFailed: 'Failed to add student',
+      searchPlaceholder: 'Search by name or IIN...',
+      noSearchResults: 'No results found',
     },
   },
 }

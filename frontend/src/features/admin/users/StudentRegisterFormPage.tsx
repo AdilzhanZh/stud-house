@@ -79,12 +79,7 @@ export function StudentRegisterFormPage() {
             required
             {...register('familiya')}
           />
-          <Input
-            label={t('auth.patronymic')}
-            error={errors.tegi?.message}
-            required
-            {...register('tegi')}
-          />
+          <Input label={t('auth.patronymic')} {...register('tegi')} />
           <Input
             label={t('auth.email')}
             type="email"

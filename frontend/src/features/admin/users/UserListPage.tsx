@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { KeyRound, ShieldCheck } from 'lucide-react'
+import { KeyRound, Search, ShieldCheck } from 'lucide-react'
 import { Card } from '../../../components/Card'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
@@ -22,6 +22,7 @@ export function UserListPage() {
   const { user: currentUser } = useAuth()
   const [users, setUsers] = useState<User[] | null>(null)
   const [roleFilter, setRoleFilter] = useState<Role | ''>('')
+  const [search, setSearch] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null)
@@ -40,6 +41,15 @@ export function UserListPage() {
   }
 
   useEffect(load, [roleFilter])
+
+  const visibleUsers = useMemo(() => {
+    if (!users) return null
+    const q = search.trim().toLowerCase()
+    if (!q) return users
+    return users.filter(
+      (u) => u.full_name.toLowerCase().includes(q) || (u.iin ?? '').includes(q),
+    )
+  }, [users, search])
 
   async function handleDelete() {
     if (!deleteTarget) return
@@ -80,22 +90,40 @@ export function UserListPage() {
     <div className="flex flex-col gap-3.5">
       <div className="flex items-center justify-between">
         <h1 className={adminPageHeading}>{t('admin.layout.users')}</h1>
-        {currentUser?.role === 'admin' && (
-          <Button onClick={() => navigate('/admin/users/new')}>{t('admin.users.registerManager')}</Button>
-        )}
+        <div className="flex gap-3">
+          <Button onClick={() => navigate('/admin/students/new')}>{t('admin.users.registerStudent')}</Button>
+          {currentUser?.role === 'admin' && (
+            <Button variant="secondary" onClick={() => navigate('/admin/users/new')}>
+              {t('admin.users.registerManager')}
+            </Button>
+          )}
+        </div>
       </div>
 
-      <div className="max-w-xs">
-        <Select
-          label={t('admin.users.roleFilter')}
-          value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value as Role | '')}
-        >
-          <option value="">{t('admin.users.allRoles')}</option>
-          <option value="admin">{roleLabels.admin}</option>
-          <option value="manager">{roleLabels.manager}</option>
-          <option value="student">{roleLabels.student}</option>
-        </Select>
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="max-w-xs">
+          <Select
+            label={t('admin.users.roleFilter')}
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value as Role | '')}
+          >
+            <option value="">{t('admin.users.allRoles')}</option>
+            <option value="admin">{roleLabels.admin}</option>
+            <option value="manager">{roleLabels.manager}</option>
+            <option value="student">{roleLabels.student}</option>
+          </Select>
+        </div>
+        {users && users.length > 0 && (
+          <div className="flex max-w-80 items-center gap-2 rounded-full border border-navy-700 bg-navy-900 px-4 py-2.5">
+            <Search className="h-4 w-4 shrink-0 text-sand-300" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('admin.users.searchPlaceholder')}
+              className="w-full bg-transparent text-sm text-sand-100 outline-none placeholder:text-sand-400"
+            />
+          </div>
+        )}
       </div>
 
       {error && <Alert variant="error" message={error} />}
@@ -116,7 +144,7 @@ export function UserListPage() {
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => (
+              {visibleUsers?.map((u) => (
                 <tr key={u.id} className={adminRowClass}>
                   <td className={`${adminCellClass} font-semibold text-sand-100`}>{u.full_name}</td>
                   <td className={`${adminCellClass} text-sand-300`}>{u.email}</td>
@@ -164,6 +192,13 @@ export function UserListPage() {
                 <tr>
                   <td className={`${adminCellClass} text-sand-300`} colSpan={6}>
                     {t('admin.users.empty')}
+                  </td>
+                </tr>
+              )}
+              {users.length > 0 && visibleUsers?.length === 0 && (
+                <tr>
+                  <td className={`${adminCellClass} text-sand-300`} colSpan={6}>
+                    {t('admin.users.noSearchResults')}
                   </td>
                 </tr>
               )}

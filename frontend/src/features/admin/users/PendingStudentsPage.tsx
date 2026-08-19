@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
 import { Search } from 'lucide-react'
 import { Card } from '../../../components/Card'
 import { Button } from '../../../components/Button'
@@ -11,7 +10,6 @@ import type { User } from '../../../types'
 
 export function PendingStudentsPage() {
   const { t } = useTranslation()
-  const navigate = useNavigate()
   const [students, setStudents] = useState<User[] | null>(null)
   const [search, setSearch] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -50,10 +48,7 @@ export function PendingStudentsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-[23px] font-bold text-sand-100">{t('admin.layout.pendingStudents')}</h1>
-        <Button onClick={() => navigate('/admin/students/new')}>{t('admin.users.registerStudent')}</Button>
-      </div>
+      <h1 className="text-[23px] font-bold text-sand-100">{t('admin.layout.pendingStudents')}</h1>
 
       {error && <Alert variant="error" message={error} />}
       {actionError && <Alert variant="error" message={actionError} />}

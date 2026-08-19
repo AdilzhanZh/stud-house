@@ -222,3 +222,32 @@ func (h *ApplicationHandler) Decide(c *gin.Context) {
 	}
 	response.OK(c, applicationDTO(app))
 }
+
+type cancelApprovedRequest struct {
+	Comment string `json:"comment" binding:"required"`
+}
+
+// CancelApproved is admin/manager-only: cancels an application stuck in
+// 'approved' status (e.g. no committee members configured, so it can never
+// reach a protocol/contract). Decide only accepts 'pending' applications, so
+// this is a separate endpoint for the one non-pending status that can still
+// legitimately need to be undone.
+func (h *ApplicationHandler) CancelApproved(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, apperror.BadRequest("өтініш идентификаторы дұрыс емес"))
+		return
+	}
+	var req cancelApprovedRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.BadRequest(err.Error()))
+		return
+	}
+	actorID, _ := middleware.UserID(c)
+	app, err := h.applications.CancelApproved(c.Request.Context(), actorID, id, req.Comment)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, applicationDTO(app))
+}

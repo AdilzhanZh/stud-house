@@ -35,6 +35,11 @@ export async function deleteApplication(id: string): Promise<void> {
 
 export interface ResubmitApplicationPayload {
   notes: string | null
+  // Only meaningful while the application is needs_correction (its room
+  // hold was released on entering that status — see the backend's
+  // ApplicationService.Decide) — omit to leave whatever room pick already
+  // exists (usually none, right after a correction request) untouched.
+  preferred_room_id?: string | null
 }
 
 export async function resubmitApplication(

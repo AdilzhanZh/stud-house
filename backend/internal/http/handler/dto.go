@@ -243,6 +243,28 @@ func roomsDTO(list []*domain.Room) []roomResponse {
 	return out
 }
 
+type roomAvailabilityResponse struct {
+	roomResponse
+	ResidentCount int `json:"resident_count"`
+	HeldCount     int `json:"held_count"`
+}
+
+func roomAvailabilityDTO(a *domain.RoomAvailability) roomAvailabilityResponse {
+	return roomAvailabilityResponse{
+		roomResponse:  roomDTO(a.Room),
+		ResidentCount: a.ResidentCount,
+		HeldCount:     a.HeldCount,
+	}
+}
+
+func roomsAvailabilityDTO(list []*domain.RoomAvailability) []roomAvailabilityResponse {
+	out := make([]roomAvailabilityResponse, 0, len(list))
+	for _, a := range list {
+		out = append(out, roomAvailabilityDTO(a))
+	}
+	return out
+}
+
 type roomResidentResponse struct {
 	ID         uuid.UUID  `json:"id"`
 	RoomID     uuid.UUID  `json:"room_id"`

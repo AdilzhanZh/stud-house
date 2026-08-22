@@ -75,6 +75,7 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 			protected.GET("/dormitories/:id/capacity", h.Dormitory.GetCapacity)
 			protected.GET("/dormitories/:id/images", h.Dormitory.ListImages)
 			protected.GET("/dormitories/:id/rooms", h.Room.ListByDormitory)
+			protected.GET("/dormitories/:id/rooms/availability", h.Room.ListAvailability)
 			protected.GET("/rooms/:roomId", h.Room.Get)
 			protected.GET("/rooms/:roomId/residents", h.Room.ListActiveResidents)
 			protected.GET("/benefits", h.Benefit.List)

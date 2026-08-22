@@ -217,3 +217,57 @@ func (r *RoomRepo) GetActiveResidentByStudent(ctx context.Context, studentID uui
 	}
 	return rr, nil
 }
+
+// CountHeldSeats counts non-terminal, non-correction applications
+// (pending/manager_review/approved) currently claiming roomID — via
+// assigned_room_id once a manager has earmarked one, falling back to the
+// student's own preferred_room_id otherwise. excludeApplicationID, when
+// set, omits that one application from the count (used when checking
+// whether an application may keep/take a room it may itself already hold).
+func (r *RoomRepo) CountHeldSeats(ctx context.Context, roomID uuid.UUID, excludeApplicationID *uuid.UUID) (int, error) {
+	const q = `
+		SELECT count(*) FROM applications
+		WHERE COALESCE(assigned_room_id, preferred_room_id) = $1
+		  AND status IN ('pending', 'manager_review', 'approved')
+		  AND ($2::uuid IS NULL OR id <> $2)`
+	var count int
+	if err := r.db.QueryRow(ctx, q, roomID, excludeApplicationID).Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+// ListAvailabilityByDormitory returns every room of a dormitory together
+// with its current resident and hold counts, in one query — used by the
+// student-facing room picker so it doesn't have to fetch residents per room
+// (see CountHeldSeats for what counts as a hold).
+func (r *RoomRepo) ListAvailabilityByDormitory(ctx context.Context, dormitoryID uuid.UUID) ([]*domain.RoomAvailability, error) {
+	q := `
+		SELECT ` + roomColumns + `,
+			(SELECT count(*) FROM room_residents rr WHERE rr.room_id = rooms.id AND rr.moved_out_at IS NULL) AS resident_count,
+			(SELECT count(*) FROM applications a
+				WHERE COALESCE(a.assigned_room_id, a.preferred_room_id) = rooms.id
+				  AND a.status IN ('pending', 'manager_review', 'approved')) AS held_count
+		FROM rooms WHERE dormitory_id = $1 ORDER BY room_number`
+	rows, err := r.db.Query(ctx, q, dormitoryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []*domain.RoomAvailability
+	for rows.Next() {
+		room := &domain.Room{}
+		avail := &domain.RoomAvailability{Room: room}
+		err := rows.Scan(
+			&room.ID, &room.DormitoryID, &room.RoomNumber, &room.Capacity, &room.Floor,
+			&room.Category, &room.Restrictions, &room.CreatedAt, &room.UpdatedAt,
+			&avail.ResidentCount, &avail.HeldCount,
+		)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, avail)
+	}
+	return out, rows.Err()
+}

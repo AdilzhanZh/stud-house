@@ -34,22 +34,35 @@ export function UserListPage() {
   const [passwordError, setPasswordError] = useState<string | null>(null)
   const [isSavingPassword, setIsSavingPassword] = useState(false)
 
+  const [detailsTarget, setDetailsTarget] = useState<User | null>(null)
+
   function load() {
-    listUsers(roleFilter || undefined)
+    listUsers()
       .then(setUsers)
       .catch((err) => setError(extractErrorMessage(err, t('admin.users.loadError'))))
   }
 
-  useEffect(load, [roleFilter])
+  useEffect(load, [])
+
+  const stats = useMemo(() => {
+    if (!users) return null
+    return {
+      total: users.length,
+      admins: users.filter((u) => u.role === 'admin').length,
+      managers: users.filter((u) => u.role === 'manager').length,
+      students: users.filter((u) => u.role === 'student').length,
+    }
+  }, [users])
 
   const visibleUsers = useMemo(() => {
     if (!users) return null
+    const byRole = roleFilter ? users.filter((u) => u.role === roleFilter) : users
     const q = search.trim().toLowerCase()
-    if (!q) return users
-    return users.filter(
+    if (!q) return byRole
+    return byRole.filter(
       (u) => u.full_name.toLowerCase().includes(q) || (u.iin ?? '').includes(q),
     )
-  }, [users, search])
+  }, [users, roleFilter, search])
 
   async function handleDelete() {
     if (!deleteTarget) return
@@ -100,6 +113,25 @@ export function UserListPage() {
         </div>
       </div>
 
+      <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
+        <Card className="!p-4">
+          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('admin.users.statsTotal')}</p>
+          <p className="mt-1.5 text-2xl font-bold text-sand-100">{stats?.total ?? '—'}</p>
+        </Card>
+        <Card className="!p-4">
+          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('admin.users.statsAdmins')}</p>
+          <p className="mt-1.5 text-2xl font-bold text-turquoise-400">{stats?.admins ?? '—'}</p>
+        </Card>
+        <Card className="!p-4">
+          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('admin.users.statsManagers')}</p>
+          <p className="mt-1.5 text-2xl font-bold text-amber-400">{stats?.managers ?? '—'}</p>
+        </Card>
+        <Card className="!p-4">
+          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('admin.users.statsStudents')}</p>
+          <p className="mt-1.5 text-2xl font-bold text-mint-400">{stats?.students ?? '—'}</p>
+        </Card>
+      </div>
+
       <div className="flex flex-wrap items-end gap-3">
         <div className="max-w-xs">
           <Select
@@ -145,14 +177,14 @@ export function UserListPage() {
             </thead>
             <tbody>
               {visibleUsers?.map((u) => (
-                <tr key={u.id} className={adminRowClass}>
+                <tr key={u.id} className={`${adminRowClass} cursor-pointer`} onClick={() => setDetailsTarget(u)}>
                   <td className={`${adminCellClass} font-semibold text-sand-100`}>{u.full_name}</td>
                   <td className={`${adminCellClass} text-sand-300`}>{u.email}</td>
                   <td className={`${adminCellClass} text-sand-300`}>{roleLabels[u.role]}</td>
                   <td className={`${adminCellClass} text-sand-300`}>{u.is_committee_member ? t('admin.users.yes') : '—'}</td>
                   <td className={`${adminCellClass} text-sand-300`}>{u.is_chairperson ? t('admin.users.yes') : '—'}</td>
                   {currentUser?.role === 'admin' && (
-                    <td className={adminCellClass}>
+                    <td className={adminCellClass} onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
                         <div className="flex h-8 w-8 shrink-0 items-center justify-center">
                           {u.role === 'manager' && (
@@ -235,6 +267,63 @@ export function UserListPage() {
         />
         {passwordError && <p className="mt-2 text-xs text-clay-400">{passwordError}</p>}
       </ConfirmDialog>
+
+      {detailsTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-navy-950/70 px-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setDetailsTarget(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-[20px] bg-navy-900 p-6 shadow-[var(--shadow-card)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="font-heading text-lg text-sand-100">{detailsTarget.full_name}</h2>
+            <dl className="mt-4 flex flex-col gap-2.5 text-sm">
+              <div className="flex justify-between gap-4">
+                <dt className="text-sand-300">Email</dt>
+                <dd className="text-right text-sand-100">{detailsTarget.email}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-sand-300">{t('admin.users.phone')}</dt>
+                <dd className="text-right text-sand-100">{detailsTarget.phone || '—'}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-sand-300">{t('admin.users.iin')}</dt>
+                <dd className="text-right text-sand-100">{detailsTarget.iin || '—'}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-sand-300">{t('admin.users.role')}</dt>
+                <dd className="text-right text-sand-100">{roleLabels[detailsTarget.role]}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-sand-300">{t('admin.users.committeeMember')}</dt>
+                <dd className="text-right text-sand-100">
+                  {detailsTarget.is_committee_member ? t('admin.users.yes') : '—'}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-sand-300">{t('admin.users.chairperson')}</dt>
+                <dd className="text-right text-sand-100">
+                  {detailsTarget.is_chairperson ? t('admin.users.yes') : '—'}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-sand-300">{t('admin.users.createdAt')}</dt>
+                <dd className="text-right text-sand-100">
+                  {new Date(detailsTarget.created_at).toLocaleDateString()}
+                </dd>
+              </div>
+            </dl>
+            <div className="mt-6 flex justify-end">
+              <Button variant="secondary" onClick={() => setDetailsTarget(null)}>
+                {t('admin.common.close')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

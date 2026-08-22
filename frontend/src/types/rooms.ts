@@ -25,6 +25,16 @@ export interface Room {
   updated_at: string
 }
 
+// Room plus how many seats are already spoken for — by actual residents
+// (resident_count) and by other pending applicants who currently have this
+// room as their pick (held_count, a "hold" — see the backend's
+// RoomService.CheckHoldable). capacity - resident_count - held_count is how
+// many more applicants may still pick this room.
+export interface RoomAvailability extends Room {
+  resident_count: number
+  held_count: number
+}
+
 // moved_in_at is always set — RoomRepository.AddResident inserts room_id +
 // student_id + moved_in_at (DB default now()) together in one statement,
 // so there is no "reserved but not yet moved in" (moved_in_at IS NULL)

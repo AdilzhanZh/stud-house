@@ -16,13 +16,13 @@ import {
   listMyApplications,
 } from '../../api/applicationApi'
 import { assignOwnBenefit, listBenefitRequiredDocuments, listBenefits } from '../../api/benefitApi'
-import { listRoomResidents, listRoomsByDormitory } from '../../api/roomApi'
+import { listRoomsByDormitory } from '../../api/roomApi'
 import { getStudentProfile } from '../../api/profileApi'
 import { uploadFile } from '../../api/uploadApi'
 import { generatePetitionPdfBlob } from '../../utils/petitionPdf'
 import { formatTenge } from '../../utils/dormitoryLabels'
 import { bilingualField } from '../../utils/bilingualField'
-import { FloorCorridorMap } from '../../components/FloorCorridorMap'
+import { RoomPicker } from './RoomPicker'
 import { useDormitoriesWithMeta } from '../dormitories/useDormitoriesWithMeta'
 import { useAuth } from '../auth/useAuth'
 import { useIsSettled } from '../residence/useIsSettled'
@@ -31,12 +31,7 @@ import { isActiveApplicationStatus } from './statusHelpers'
 import type { TFunction } from 'i18next'
 import type { DormitoryRequiredDocument } from '../../types/dormitories'
 import type { Benefit, BenefitRequiredDocument } from '../../types/benefits'
-import type { Room } from '../../types/rooms'
 import type { Gender } from '../../types'
-
-interface RoomWithOccupancy extends Room {
-  residentCount: number
-}
 
 function DocumentCard({
   name,
@@ -114,9 +109,7 @@ export function NewApplicationPage() {
   const [dormitoryId, setDormitoryId] = useState(searchParams.get('dormitory_id') ?? '')
   const [dormitoryRequiredDocs, setDormitoryRequiredDocs] = useState<DormitoryRequiredDocument[]>([])
   const [studentGender, setStudentGender] = useState<Gender | null>(null)
-  const [rooms, setRooms] = useState<RoomWithOccupancy[]>([])
   const [roomId, setRoomId] = useState('')
-  const [selectedFloor, setSelectedFloor] = useState<string | null>(null)
   const [hasActiveApplication, setHasActiveApplication] = useState(false)
   const [benefits, setBenefits] = useState<Benefit[]>([])
   const [hasBenefit, setHasBenefit] = useState(false)
@@ -176,39 +169,8 @@ export function NewApplicationPage() {
     listDormitoryRequiredDocuments(dormitoryId)
       .then(setDormitoryRequiredDocs)
       .catch(() => setDormitoryRequiredDocs([]))
-    setRoomId('')
-    listRoomsByDormitory(dormitoryId)
-      .then(async (list) => {
-        const withOccupancy = await Promise.all(
-          list.map(async (r) => {
-            const residents = await listRoomResidents(r.id).catch(() => [])
-            return { ...r, residentCount: residents.length }
-          }),
-        )
-        setRooms(withOccupancy)
-      })
-      .catch(() => setRooms([]))
   }, [dormitoryId])
 
-  // A student may only pick a room whose gender restriction is either unset
-  // (a shared/mixed room) or matches their own gender — a manager can still
-  // assign a different room later regardless of this preference.
-  const eligibleRooms = rooms.filter(
-    (r) => r.restrictions.gender === null || r.restrictions.gender === studentGender,
-  )
-  const eligibleFloorGroups = Object.entries(
-    eligibleRooms.reduce<Record<number, RoomWithOccupancy[]>>((byFloor, room) => {
-      const floor = room.floor ?? 0
-      byFloor[floor] = [...(byFloor[floor] ?? []), room]
-      return byFloor
-    }, {}),
-  ).sort(([a], [b]) => Number(a) - Number(b))
-  const activeFloor =
-    selectedFloor && eligibleFloorGroups.some(([floor]) => floor === selectedFloor)
-      ? selectedFloor
-      : eligibleFloorGroups[0]?.[0]
-  const activeFloorRooms = eligibleFloorGroups.find(([floor]) => floor === activeFloor)?.[1] ?? []
-  const selectedRoom = eligibleRooms.find((r) => r.id === roomId) ?? null
   const chosenDormitory = dormitories?.find((d) => d.id === dormitoryId) ?? null
 
   function toggleBenefit(benefitId: string) {
@@ -410,9 +372,11 @@ export function NewApplicationPage() {
       {step === 1 && (
         <>
           <p className="text-sm text-sand-200">{t('wizard.chooseDormPrompt')}</p>
-          <div className="flex max-w-[560px] flex-col gap-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {dormitories.length === 0 && (
-              <Alert variant="error" message={t('wizard.noDormsAvailable')} />
+              <div className="md:col-span-2 xl:col-span-3">
+                <Alert variant="error" message={t('wizard.noDormsAvailable')} />
+              </div>
             )}
             {dormitories.map((d) => {
               const hasRooms = dormitoriesWithRooms.has(d.id)
@@ -469,43 +433,12 @@ export function NewApplicationPage() {
             })}
           </div>
 
-          {dormitoryId && eligibleFloorGroups.length > 0 && (
-            <div className="flex flex-col gap-3">
-              <label className="text-sm font-medium text-sand-200">{t('wizard.roomLabel')}</label>
-              {eligibleFloorGroups.length > 1 && (
-                <div className="flex flex-wrap gap-2">
-                  {eligibleFloorGroups.map(([floor]) => (
-                    <button
-                      key={floor}
-                      type="button"
-                      onClick={() => setSelectedFloor(floor)}
-                      className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                        floor === activeFloor
-                          ? 'bg-turquoise-500 text-white'
-                          : 'bg-navy-800 text-sand-300 hover:bg-navy-700'
-                      }`}
-                    >
-                      {floor === '0' ? t('wizard.floorNotSpecified') : t('wizard.floorLabel', { floor })}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <FloorCorridorMap
-                rooms={activeFloorRooms}
-                selectedRoomId={roomId}
-                onSelectRoom={(id) => setRoomId((prev) => (prev === id ? '' : id))}
-              />
-              <p className="text-xs text-sand-300">
-                {selectedRoom
-                  ? t('wizard.roomSelected', {
-                      room: selectedRoom.room_number,
-                      occupied: selectedRoom.residentCount,
-                      capacity: selectedRoom.capacity,
-                    })
-                  : t('wizard.roomNotSelected')}
-              </p>
-            </div>
-          )}
+          <RoomPicker
+            dormitoryId={dormitoryId}
+            studentGender={studentGender}
+            roomId={roomId}
+            onSelectRoom={setRoomId}
+          />
 
           <div className="mt-1">
             <Button className="w-full" onClick={goNext}>

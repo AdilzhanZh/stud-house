@@ -11,6 +11,12 @@ interface FloorCorridorMapProps {
   rooms: CorridorRoom[]
   onSelectRoom?: (roomId: string) => void
   selectedRoomId?: string
+  // When set, a room at/over capacity stays visible (still shows its
+  // occupancy) but can't be clicked — used by the student-facing room
+  // picker so a full room can't be picked, while the admin's manage-room
+  // map (which navigates to a room's resident list regardless of how full
+  // it is) leaves this off.
+  disableFull?: boolean
 }
 
 function occupancyClasses(residentCount: number, capacity: number): string {
@@ -23,23 +29,30 @@ function RoomTile({
   room,
   onSelectRoom,
   selected,
+  disableFull,
 }: {
   room?: CorridorRoom
   onSelectRoom?: (roomId: string) => void
   selected?: boolean
+  disableFull?: boolean
 }) {
   const { t } = useTranslation()
   if (!room) return <div className="h-11 w-11 shrink-0" />
+  const isFull = room.residentCount >= room.capacity
+  const disabled = disableFull && isFull
   return (
     <button
       type="button"
+      disabled={disabled}
       onClick={() => onSelectRoom?.(room.id)}
       title={t('admin.dormitories.roomTileTitle', {
         room: room.room_number,
         occupied: room.residentCount,
         capacity: room.capacity,
       })}
-      className={`relative flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-lg ring-1 ring-inset transition-colors hover:brightness-110 ${occupancyClasses(room.residentCount, room.capacity)} ${
+      className={`relative flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-lg ring-1 ring-inset transition-colors ${
+        disabled ? 'cursor-not-allowed opacity-60' : 'hover:brightness-110'
+      } ${occupancyClasses(room.residentCount, room.capacity)} ${
         selected ? 'ring-2 ring-turquoise-400' : ''
       }`}
     >
@@ -53,7 +66,7 @@ function RoomTile({
 
 // Mirrors a real dormitory corridor: even-numbered rooms line one side of the
 // hallway, odd-numbered rooms the other, laid out as paired columns.
-export function FloorCorridorMap({ rooms, onSelectRoom, selectedRoomId }: FloorCorridorMapProps) {
+export function FloorCorridorMap({ rooms, onSelectRoom, selectedRoomId, disableFull }: FloorCorridorMapProps) {
   const numbered = rooms
     .map((room) => ({ room, num: parseInt(room.room_number, 10) }))
     .filter((x) => !Number.isNaN(x.num))
@@ -78,11 +91,13 @@ export function FloorCorridorMap({ rooms, onSelectRoom, selectedRoomId }: FloorC
             room={evens[i]}
             onSelectRoom={onSelectRoom}
             selected={evens[i]?.id === selectedRoomId}
+            disableFull={disableFull}
           />
           <RoomTile
             room={odds[i]}
             onSelectRoom={onSelectRoom}
             selected={odds[i]?.id === selectedRoomId}
+            disableFull={disableFull}
           />
         </div>
       ))}

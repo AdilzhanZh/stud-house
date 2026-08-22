@@ -71,6 +71,24 @@ func (h *RoomHandler) ListByDormitory(c *gin.Context) {
 	response.OK(c, roomsDTO(rooms))
 }
 
+// ListAvailability is like ListByDormitory but includes each room's current
+// resident and hold counts in one response, so the student-facing room
+// picker doesn't need to fetch residents per room to know which rooms are
+// still pickable.
+func (h *RoomHandler) ListAvailability(c *gin.Context) {
+	dormitoryID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, apperror.BadRequest("жатақхана идентификаторы дұрыс емес"))
+		return
+	}
+	rooms, err := h.rooms.ListAvailabilityByDormitory(c.Request.Context(), dormitoryID)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, roomsAvailabilityDTO(rooms))
+}
+
 func (h *RoomHandler) Get(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("roomId"))
 	if err != nil {

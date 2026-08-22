@@ -15,9 +15,14 @@ type ApplicationTx interface {
 	// SetDecision finalizes a manager decision: sets status, optionally
 	// assigned_room_id (approve only), and handled_by.
 	SetDecision(ctx context.Context, id uuid.UUID, status domain.ApplicationStatus, assignedRoomID *uuid.UUID, handledBy uuid.UUID) error
-	// UpdateEditableFieldsAndResubmit updates preferred_room_type/notes and
-	// moves the status back to pending in one statement.
-	UpdateEditableFieldsAndResubmit(ctx context.Context, id uuid.UUID, preferredRoomType, notes *string) error
+	// UpdateEditableFieldsAndResubmit updates preferred_room_type/notes/
+	// preferred_room_id and moves the status back to pending in one
+	// statement. preferredRoomID is nil when the student didn't (re-)pick a
+	// room this time — it leaves the column untouched, it does not clear it.
+	UpdateEditableFieldsAndResubmit(ctx context.Context, id uuid.UUID, preferredRoomType, notes *string, preferredRoomID *uuid.UUID) error
+	// ClearPreferredRoom nulls preferred_room_id — used when an application
+	// enters needs_correction, releasing any room hold it held.
+	ClearPreferredRoom(ctx context.Context, id uuid.UUID) error
 	AddHistory(ctx context.Context, h *domain.ApplicationStatusHistory) error
 }
 

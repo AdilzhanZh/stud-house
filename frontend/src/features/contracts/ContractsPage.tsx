@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { AlertCircle, Check } from 'lucide-react'
+import { AlertCircle, Check, ChevronDown, ChevronUp } from 'lucide-react'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
@@ -48,6 +48,19 @@ export function ContractsPage() {
   const [pendingAction, setPendingAction] = useState<PendingAction>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [acknowledged, setAcknowledged] = useState<Set<string>>(new Set())
+  // Contracts render as a collapsed summary row by default — otherwise every
+  // multi-page contract's full text sits open, one after another, and the
+  // list becomes unusably long. Expanding is per-contract and opt-in.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+
+  function toggleExpanded(contractId: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(contractId)) next.delete(contractId)
+      else next.add(contractId)
+      return next
+    })
+  }
 
   // Default to the Russian template only when the site itself is in Russian
   // — every other UI language (including English) falls back to Kazakh.
@@ -168,12 +181,20 @@ export function ContractsPage() {
           const dormitory = dormitoryByContract[contract.id]
           const pagesByLang = documentByContract[contract.id]
           const language = languageByContract[contract.id] ?? defaultLanguage
+          const isExpanded = expanded.has(contract.id)
           return (
             <Card key={contract.id}>
-              <div className="flex items-start justify-between gap-3">
+              <button
+                type="button"
+                className="flex w-full items-start justify-between gap-3 text-left"
+                onClick={() => pagesByLang && toggleExpanded(contract.id)}
+              >
                 <div>
                   <p className="text-base font-semibold text-sand-100">
                     {dormitory?.name ?? t('contracts.contractFallback')}
+                  </p>
+                  <p className="mt-0.5 text-xs text-sand-300">
+                    {t('contracts.createdAt', { date: formatDate(contract.created_at) })}
                   </p>
                   {contract.status === 'sent' && (
                     <p className="mt-0.5 text-sm font-semibold text-clay-400">
@@ -181,36 +202,46 @@ export function ContractsPage() {
                     </p>
                   )}
                 </div>
-                <ContractStatusBadge status={contract.status} />
-              </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <ContractStatusBadge status={contract.status} />
+                  {pagesByLang &&
+                    (isExpanded ? (
+                      <ChevronUp className="h-4.5 w-4.5 text-sand-300" />
+                    ) : (
+                      <ChevronDown className="h-4.5 w-4.5 text-sand-300" />
+                    ))}
+                </div>
+              </button>
 
               {pagesByLang ? (
-                <div className="mt-3.5 flex flex-col gap-2.5">
-                  <div className="flex gap-2">
-                    {LANGUAGES.map((lang) => (
-                      <button
-                        key={lang}
-                        onClick={() => setLanguageByContract((prev) => ({ ...prev, [contract.id]: lang }))}
-                        className={`rounded-full border px-3.5 py-1.5 text-xs font-semibold ${
-                          language === lang
-                            ? 'border-turquoise-500 bg-turquoise-500/10 text-turquoise-400'
-                            : 'border-navy-700 bg-navy-900 text-sand-300 hover:text-sand-100'
-                        }`}
-                      >
-                        {t(`contracts.language.${lang}`)}
-                      </button>
-                    ))}
+                isExpanded && (
+                  <div className="mt-3.5 flex flex-col gap-2.5">
+                    <div className="flex gap-2">
+                      {LANGUAGES.map((lang) => (
+                        <button
+                          key={lang}
+                          onClick={() => setLanguageByContract((prev) => ({ ...prev, [contract.id]: lang }))}
+                          className={`rounded-full border px-3.5 py-1.5 text-xs font-semibold ${
+                            language === lang
+                              ? 'border-turquoise-500 bg-turquoise-500/10 text-turquoise-400'
+                              : 'border-navy-700 bg-navy-900 text-sand-300 hover:text-sand-100'
+                          }`}
+                        >
+                          {t(`contracts.language.${lang}`)}
+                        </button>
+                      ))}
+                    </div>
+                    <TemplatePages pages={pagesByLang[language]} />
+                    <Button
+                      variant="secondary"
+                      className="self-start"
+                      isLoading={downloadingId === contract.id}
+                      onClick={() => handleDownload(contract, dormitory)}
+                    >
+                      {t('contracts.download')}
+                    </Button>
                   </div>
-                  <TemplatePages pages={pagesByLang[language]} />
-                  <Button
-                    variant="secondary"
-                    className="self-start"
-                    isLoading={downloadingId === contract.id}
-                    onClick={() => handleDownload(contract, dormitory)}
-                  >
-                    {t('contracts.download')}
-                  </Button>
-                </div>
+                )
               ) : (
                 dormitory &&
                 (dormitory.monthly_payment_bachelor != null || dormitory.yearly_payment_bachelor != null) && (

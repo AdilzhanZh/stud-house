@@ -422,3 +422,43 @@ func (s *RoomService) TransferResident(ctx context.Context, residentRowID, newRo
 func (s *RoomService) ListActiveResidents(ctx context.Context, roomID uuid.UUID) ([]*domain.RoomResident, error) {
 	return s.rooms.ListActiveResidents(ctx, roomID)
 }
+
+// CheckHoldable reports whether roomID still has a free seat once both
+// actual residents and other pending applicants' holds are counted — a
+// hold being any non-terminal, non-correction application (pending/
+// manager_review/approved) currently claiming that room (see
+// RoomRepository.CountHeldSeats). excludeApplicationID lets a caller check
+// whether an application may keep/take this room without counting its own
+// existing hold on it against itself.
+//
+// This is deliberately separate from ValidateAssignable, which continues to
+// check only actual residents: that method gates the final, authoritative
+// seat claim at contract-acceptance time (RoomService.AddResident), by
+// which point this application's own hold is meant to convert into that
+// exact seat, not be double-counted against it. CheckHoldable instead runs
+// at the two points a hold is created or kept — ApplicationService.Create
+// and the approve branch of ApplicationService.Decide.
+func (s *RoomService) CheckHoldable(ctx context.Context, roomID uuid.UUID, excludeApplicationID *uuid.UUID) error {
+	room, err := s.GetByID(ctx, roomID)
+	if err != nil {
+		return err
+	}
+	residents, err := s.rooms.ListActiveResidents(ctx, roomID)
+	if err != nil {
+		return err
+	}
+	held, err := s.rooms.CountHeldSeats(ctx, roomID, excludeApplicationID)
+	if err != nil {
+		return err
+	}
+	if len(residents)+held >= room.Capacity {
+		return apperror.Conflict("бөлме толығымен толған")
+	}
+	return nil
+}
+
+// ListAvailabilityByDormitory returns every room of a dormitory with its
+// current resident and hold counts, for the student-facing room picker.
+func (s *RoomService) ListAvailabilityByDormitory(ctx context.Context, dormitoryID uuid.UUID) ([]*domain.RoomAvailability, error) {
+	return s.rooms.ListAvailabilityByDormitory(ctx, dormitoryID)
+}

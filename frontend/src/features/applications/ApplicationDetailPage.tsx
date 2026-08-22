@@ -13,19 +13,25 @@ import { extractErrorMessage } from '../../api/client'
 import { addApplicationDocument, deleteApplication, getApplication, resubmitApplication } from '../../api/applicationApi'
 import { getDormitory } from '../../api/dormitoryApi'
 import { getRoom } from '../../api/roomApi'
+import { getStudentProfile } from '../../api/profileApi'
 import { formatDateTime } from '../../utils/dateFormat'
 import { bilingualField } from '../../utils/bilingualField'
 import { useApplicationJourneys } from './useApplicationJourneys'
+import { RoomPicker } from './RoomPicker'
+import { useAuth } from '../auth/useAuth'
 import type { ApplicationDetail } from '../../types/applications'
 import type { Room } from '../../types/rooms'
+import type { Gender } from '../../types'
 
 export function ApplicationDetailPage() {
   const { t, i18n } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [application, setApplication] = useState<ApplicationDetail | null>(null)
   const [dormitoryName, setDormitoryName] = useState<string | null>(null)
   const [preferredRoom, setPreferredRoom] = useState<Room | null>(null)
+  const [studentGender, setStudentGender] = useState<Gender | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const journeys = useApplicationJourneys(application ? [application] : null)
   const step = application ? journeys[application.id]?.step : undefined
@@ -39,6 +45,10 @@ export function ApplicationDetailPage() {
   const [editingNotes, setEditingNotes] = useState(false)
   const [notesError, setNotesError] = useState<string | null>(null)
   const [notesSubmitting, setNotesSubmitting] = useState(false)
+
+  const [pickedRoomId, setPickedRoomId] = useState('')
+  const [roomError, setRoomError] = useState<string | null>(null)
+  const [roomSubmitting, setRoomSubmitting] = useState(false)
 
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -65,6 +75,13 @@ export function ApplicationDetailPage() {
   }
 
   useEffect(load, [id, t])
+
+  useEffect(() => {
+    if (!user) return
+    getStudentProfile(user.id)
+      .then((profile) => setStudentGender(profile.gender))
+      .catch(() => {})
+  }, [user])
 
   async function handleAddDocument(e: React.FormEvent) {
     e.preventDefault()
@@ -96,6 +113,21 @@ export function ApplicationDetailPage() {
       setNotesError(extractErrorMessage(err, t('appDetail.saveFailed')))
     } finally {
       setNotesSubmitting(false)
+    }
+  }
+
+  async function handleConfirmRoom() {
+    if (!id || !pickedRoomId) return
+    setRoomError(null)
+    setRoomSubmitting(true)
+    try {
+      await resubmitApplication(id, { notes, preferred_room_id: pickedRoomId })
+      setPickedRoomId('')
+      load()
+    } catch (err) {
+      setRoomError(extractErrorMessage(err, t('appDetail.saveFailed')))
+    } finally {
+      setRoomSubmitting(false)
     }
   }
 
@@ -249,6 +281,30 @@ export function ApplicationDetailPage() {
               <AlertCircle className="h-5 w-5 shrink-0 text-amber-400" />
               <p className="text-sm font-semibold text-amber-400">{t('appDetail.needsCorrectionHint')}</p>
             </div>
+          )}
+
+          {canEdit && (
+            <Card>
+              <p className="text-[15px] font-bold text-sand-100">{t('appDetail.reselectRoomTitle')}</p>
+              <p className="mt-1 text-sm text-sand-300">{t('appDetail.reselectRoomHint')}</p>
+              {roomError && <Alert variant="error" message={roomError} />}
+              <div className="mt-3">
+                <RoomPicker
+                  dormitoryId={application.dormitory_id}
+                  studentGender={studentGender}
+                  roomId={pickedRoomId}
+                  onSelectRoom={setPickedRoomId}
+                />
+              </div>
+              <Button
+                className="mt-3.5"
+                isLoading={roomSubmitting}
+                disabled={!pickedRoomId}
+                onClick={handleConfirmRoom}
+              >
+                {t('appDetail.reselectRoomConfirm')}
+              </Button>
+            </Card>
           )}
 
           <Card>

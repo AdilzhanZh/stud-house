@@ -90,6 +90,14 @@ type RoomRepository interface {
 	// audience — every student currently resident (moved_out_at IS NULL) in
 	// any room of the given dormitory.
 	ListResidentStudentIDsByDormitory(ctx context.Context, dormitoryID uuid.UUID) ([]uuid.UUID, error)
+	// CountHeldSeats counts non-terminal applications currently claiming
+	// roomID (see RoomService.CheckHoldable) — used to keep a pending
+	// applicant's room pick from exceeding capacity before any
+	// room_residents row exists.
+	CountHeldSeats(ctx context.Context, roomID uuid.UUID, excludeApplicationID *uuid.UUID) (int, error)
+	// ListAvailabilityByDormitory returns every room of a dormitory with its
+	// resident and hold counts, for the room-picker UI.
+	ListAvailabilityByDormitory(ctx context.Context, dormitoryID uuid.UUID) ([]*domain.RoomAvailability, error)
 }
 
 type RequiredDocumentRepository interface {

@@ -116,6 +116,12 @@ func (s *ApplicationService) Create(ctx context.Context, studentID, dormitoryID 
 		if err := s.rooms.CheckAssignable(ctx, *preferredRoomID, studentID); err != nil {
 			return nil, err
 		}
+		// Reject the pick outright if it would exceed capacity once other
+		// pending applicants' holds on this room are counted, not just its
+		// actual residents — see RoomService.CheckHoldable.
+		if err := s.rooms.CheckHoldable(ctx, *preferredRoomID, nil); err != nil {
+			return nil, err
+		}
 	}
 
 	app := &domain.Application{
@@ -248,8 +254,11 @@ func (s *ApplicationService) ListDocuments(ctx context.Context, applicationID uu
 }
 
 // Resubmit lets the owning student edit their application while it is in
-// needs_correction, moving it back to pending in the same operation.
-func (s *ApplicationService) Resubmit(ctx context.Context, actorStudentID, applicationID uuid.UUID, preferredRoomType, notes *string) (*domain.Application, error) {
+// needs_correction, moving it back to pending in the same operation. A room
+// hold is released the moment an application enters needs_correction (see
+// Decide's request_correction branch), so if the student wants to keep a
+// room reservation they must pick one again here via preferredRoomID.
+func (s *ApplicationService) Resubmit(ctx context.Context, actorStudentID, applicationID uuid.UUID, preferredRoomType, notes *string, preferredRoomID *uuid.UUID) (*domain.Application, error) {
 	err := s.applications.WithLock(ctx, applicationID, func(ctx context.Context, app *domain.Application, tx repository.ApplicationTx) error {
 		if app.StudentID != actorStudentID {
 			return apperror.Forbidden("тек өз өтінішіңізді өзгерте аласыз")
@@ -257,7 +266,25 @@ func (s *ApplicationService) Resubmit(ctx context.Context, actorStudentID, appli
 		if app.Status != domain.ApplicationNeedsCorrection {
 			return apperror.BadRequest("өтінішті тек түзету қажет болған кезде ғана өзгертуге болады")
 		}
-		if err := tx.UpdateEditableFieldsAndResubmit(ctx, applicationID, preferredRoomType, notes); err != nil {
+		if preferredRoomID != nil {
+			room, err := s.roomRepo.GetByID(ctx, *preferredRoomID)
+			if err != nil {
+				if errors.Is(err, repository.ErrNotFound) {
+					return apperror.NotFound("бөлме табылмады")
+				}
+				return err
+			}
+			if room.DormitoryID != app.DormitoryID {
+				return apperror.BadRequest("таңдалған бөлме көрсетілген жатақханаға жатпайды")
+			}
+			if err := s.rooms.CheckAssignable(ctx, *preferredRoomID, actorStudentID); err != nil {
+				return err
+			}
+			if err := s.rooms.CheckHoldable(ctx, *preferredRoomID, &applicationID); err != nil {
+				return err
+			}
+		}
+		if err := tx.UpdateEditableFieldsAndResubmit(ctx, applicationID, preferredRoomType, notes, preferredRoomID); err != nil {
 			return err
 		}
 		return tx.AddHistory(ctx, &domain.ApplicationStatusHistory{
@@ -322,6 +349,12 @@ func (s *ApplicationService) Decide(ctx context.Context, actorID, applicationID 
 				if _, err := s.rooms.ValidateAssignable(ctx, *roomID, app.StudentID); err != nil {
 					return err
 				}
+				// Also check the room isn't already held to capacity by other
+				// pending applicants — excluding this application itself,
+				// since it may already hold *roomID via its own preference.
+				if err := s.rooms.CheckHoldable(ctx, *roomID, &applicationID); err != nil {
+					return err
+				}
 			}
 			finalStatus = domain.ApplicationApproved
 			if err := tx.SetDecision(ctx, applicationID, finalStatus, roomID, actorID); err != nil {
@@ -341,6 +374,13 @@ func (s *ApplicationService) Decide(ctx context.Context, actorID, applicationID 
 			}
 			finalStatus = domain.ApplicationNeedsCorrection
 			if err := tx.SetDecision(ctx, applicationID, finalStatus, nil, actorID); err != nil {
+				return err
+			}
+			// SetDecision above already nulls assigned_room_id (roomID is
+			// nil for this action). Also null preferred_room_id so the room
+			// is fully released for other applicants to pick — the student
+			// must explicitly re-select a room when they resubmit.
+			if err := tx.ClearPreferredRoom(ctx, applicationID); err != nil {
 				return err
 			}
 		default:

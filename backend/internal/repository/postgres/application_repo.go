@@ -172,9 +172,19 @@ func (t *applicationTx) SetDecision(ctx context.Context, id uuid.UUID, status do
 	return err
 }
 
-func (t *applicationTx) UpdateEditableFieldsAndResubmit(ctx context.Context, id uuid.UUID, preferredRoomType, notes *string) error {
-	const q = `UPDATE applications SET preferred_room_type = $2, notes = $3, status = 'pending', updated_at = now() WHERE id = $1`
-	_, err := t.tx.Exec(ctx, q, id, preferredRoomType, notes)
+func (t *applicationTx) UpdateEditableFieldsAndResubmit(ctx context.Context, id uuid.UUID, preferredRoomType, notes *string, preferredRoomID *uuid.UUID) error {
+	const q = `
+		UPDATE applications
+		SET preferred_room_type = $2, notes = $3, preferred_room_id = COALESCE($4, preferred_room_id),
+			status = 'pending', updated_at = now()
+		WHERE id = $1`
+	_, err := t.tx.Exec(ctx, q, id, preferredRoomType, notes, preferredRoomID)
+	return err
+}
+
+func (t *applicationTx) ClearPreferredRoom(ctx context.Context, id uuid.UUID) error {
+	const q = `UPDATE applications SET preferred_room_id = NULL WHERE id = $1`
+	_, err := t.tx.Exec(ctx, q, id)
 	return err
 }
 

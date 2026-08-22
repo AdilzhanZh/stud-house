@@ -1,8 +1,18 @@
 import { apiClient } from './client'
-import type { Room, RoomResident, RoomRestrictions } from '../types/rooms'
+import type { Room, RoomAvailability, RoomResident, RoomRestrictions } from '../types/rooms'
 
 export async function listRoomsByDormitory(dormitoryId: string): Promise<Room[]> {
   const { data } = await apiClient.get<{ data: Room[] }>(`/dormitories/${dormitoryId}/rooms`)
+  return data.data
+}
+
+// Same rooms as listRoomsByDormitory, but with each room's resident/hold
+// counts included in one request — used by the room picker so it doesn't
+// have to fetch residents per room.
+export async function listRoomAvailability(dormitoryId: string): Promise<RoomAvailability[]> {
+  const { data } = await apiClient.get<{ data: RoomAvailability[] }>(
+    `/dormitories/${dormitoryId}/rooms/availability`,
+  )
   return data.data
 }
 

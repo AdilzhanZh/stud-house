@@ -74,8 +74,9 @@ func (h *ApplicationHandler) ListMine(c *gin.Context) {
 }
 
 type resubmitApplicationRequest struct {
-	PreferredRoomType *string `json:"preferred_room_type"`
-	Notes             *string `json:"notes"`
+	PreferredRoomType *string    `json:"preferred_room_type"`
+	Notes             *string    `json:"notes"`
+	PreferredRoomID   *uuid.UUID `json:"preferred_room_id"`
 }
 
 // Resubmit is student-only: editing is only allowed on the caller's own
@@ -92,7 +93,7 @@ func (h *ApplicationHandler) Resubmit(c *gin.Context) {
 		return
 	}
 	studentID, _ := middleware.UserID(c)
-	app, err := h.applications.Resubmit(c.Request.Context(), studentID, id, req.PreferredRoomType, req.Notes)
+	app, err := h.applications.Resubmit(c.Request.Context(), studentID, id, req.PreferredRoomType, req.Notes, req.PreferredRoomID)
 	if err != nil {
 		response.Error(c, err)
 		return

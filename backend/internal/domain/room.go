@@ -78,3 +78,14 @@ type RoomResident struct {
 	MovedInAt  time.Time
 	MovedOutAt *time.Time
 }
+
+// RoomAvailability is a Room plus how many seats are already spoken for —
+// by actual residents (ResidentCount) and by pending applicants who have
+// this room as their current pick, i.e. a "hold" (HeldCount; see
+// RoomService.CheckHoldable). Capacity - ResidentCount - HeldCount is how
+// many more applicants may still pick this room.
+type RoomAvailability struct {
+	*Room
+	ResidentCount int
+	HeldCount     int
+}

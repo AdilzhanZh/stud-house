@@ -472,8 +472,11 @@ export const en: typeof kk = {
       assignRoom: 'Assign room',
       noRooms: 'This dormitory has no rooms',
       studentPreferred: "(student's choice)",
+      roomSelected: 'Selected: room {{room}}',
       roomAssignHint:
         "The assigned room is saved on approval. If you skip it, the student's own room choice from their application is used instead; if they didn't pick one, it can be assigned later.",
+      genderMismatchLegend:
+        "A dot on a room means its gender restriction doesn't match the applicant — click it to relax the restriction instead of picking it directly.",
       journey: 'Application journey',
       noDocuments: 'No documents uploaded',
       history: 'History',
@@ -609,6 +612,9 @@ export const en: typeof kk = {
       floorLabel: 'Floor',
       genderRestriction: 'Gender restriction',
       anyGender: 'Any',
+      editRestrictionsTitle: 'Edit room {{room}} restriction',
+      genderMismatchDialogHint:
+        "This room's gender restriction doesn't match the applicant. Relax it here, or cancel and pick a different room. A change is rejected if it would no longer fit a current resident.",
       courseRestriction: 'Year restriction',
       noCourseSelectedHint: 'If none are selected, students of any year can be placed here',
       degreeRestriction: 'Degree level restriction',

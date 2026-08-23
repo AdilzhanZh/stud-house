@@ -205,6 +205,10 @@ export function NewApplicationPage() {
         setServerError(t('wizard.dormNoRooms'))
         return
       }
+      if (!roomId) {
+        setServerError(t('wizard.roomNotSelectedError'))
+        return
+      }
     }
     setStep((s) => (s < 3 ? ((s + 1) as 1 | 2 | 3) : s))
   }
@@ -441,7 +445,7 @@ export function NewApplicationPage() {
           />
 
           <div className="mt-1">
-            <Button className="w-full" onClick={goNext}>
+            <Button className="w-full" onClick={goNext} disabled={!roomId}>
               {t('wizard.continueButton')}
             </Button>
             <p className="mt-2.5 text-center text-xs text-sand-300">{t('wizard.nextDocsHint')}</p>

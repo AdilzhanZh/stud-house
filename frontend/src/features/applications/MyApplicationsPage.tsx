@@ -100,7 +100,7 @@ export function MyApplicationsPage() {
               </div>
               {step && !rejected && (
                 <>
-                  <SegmentedProgress total={5} filled={journeyStepIndex(step) + 1} className="mt-3" />
+                  <SegmentedProgress total={7} filled={journeyStepIndex(step) + 1} className="mt-3" />
                   <p className="mt-2 text-sm text-sand-200">{journeyStepCaption(step, t)}</p>
                 </>
               )}

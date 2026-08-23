@@ -63,6 +63,21 @@ func (s *ProtocolService) GetByID(ctx context.Context, id uuid.UUID) (*domain.Pr
 	return protocol, nil
 }
 
+// GetByApplicationID is used by the application journey stepper (both the
+// student's own view and the admin/manager view) to tell "approved, not
+// yet sent to committee" apart from "in committee review" and "committee
+// approved" — three stages that Application.status alone can't distinguish.
+func (s *ProtocolService) GetByApplicationID(ctx context.Context, applicationID uuid.UUID) (*domain.Protocol, error) {
+	protocol, err := s.protocols.GetByApplicationID(ctx, applicationID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, apperror.NotFound("хаттама табылмады")
+		}
+		return nil, err
+	}
+	return protocol, nil
+}
+
 func (s *ProtocolService) List(ctx context.Context, status *domain.ProtocolStatus) ([]*domain.Protocol, error) {
 	return s.protocols.List(ctx, status)
 }

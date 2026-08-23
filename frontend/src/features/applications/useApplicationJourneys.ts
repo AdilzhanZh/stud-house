@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { listMyContracts } from '../../api/contractApi'
 import { getMyResidence } from '../../api/residenceApi'
+import { getApplicationProtocol } from '../../api/protocolApi'
 import { useAuth } from '../auth/useAuth'
 import { computeJourneyStep } from './statusHelpers'
 import type { JourneyStep } from '../../components/ApplicationJourneyStepper'
 import type { Application } from '../../types/applications'
 import type { Contract } from '../../types/contracts'
+import type { Protocol } from '../../types/protocols'
 
 export interface ApplicationJourneyState {
   contract: Contract | null
@@ -30,18 +32,24 @@ export function useApplicationJourneys(
     const userId = user.id
 
     async function load() {
-      const [contracts, hasActiveResidence] = await Promise.all([
+      const [contracts, hasActiveResidence, protocolsByAppId] = await Promise.all([
         listMyContracts().catch(() => []),
         getMyResidence(userId)
           .then(() => true)
           .catch(() => false),
+        Promise.all(
+          (applications ?? []).map(
+            async (app) => [app.id, await getApplicationProtocol(app.id).catch(() => null)] as const,
+          ),
+        ).then((entries) => new Map<string, Protocol | null>(entries)),
       ])
       if (cancelled) return
 
       const next: Record<string, ApplicationJourneyState> = {}
       for (const app of applications ?? []) {
         const contract = contracts.find((c) => c.application_id === app.id) ?? null
-        next[app.id] = { contract, step: computeJourneyStep(app.status, contract, hasActiveResidence) }
+        const protocol = protocolsByAppId.get(app.id) ?? null
+        next[app.id] = { contract, step: computeJourneyStep(app.status, protocol, contract, hasActiveResidence) }
       }
       setById(next)
     }

@@ -14,11 +14,50 @@ import (
 )
 
 type ProtocolHandler struct {
-	protocols *service.ProtocolService
+	protocols    *service.ProtocolService
+	applications *service.ApplicationService
 }
 
-func NewProtocolHandler(protocols *service.ProtocolService) *ProtocolHandler {
-	return &ProtocolHandler{protocols: protocols}
+func NewProtocolHandler(protocols *service.ProtocolService, applications *service.ApplicationService) *ProtocolHandler {
+	return &ProtocolHandler{protocols: protocols, applications: applications}
+}
+
+// canAccessApplication allows admin/manager unconditionally, and a student
+// only for their own application — mirrors ContractHandler's method of the
+// same name exactly.
+func (h *ProtocolHandler) canAccessApplication(c *gin.Context, applicationID uuid.UUID) bool {
+	role, _ := middleware.Role(c)
+	if role == domain.RoleAdmin || role == domain.RoleManager {
+		return true
+	}
+	app, err := h.applications.GetByID(c.Request.Context(), applicationID)
+	if err != nil {
+		return false
+	}
+	userID, ok := middleware.UserID(c)
+	return ok && app.StudentID == userID
+}
+
+// GetByApplication is available to the owning student or admin/manager —
+// used by the application journey stepper to tell whether an approved
+// application is still waiting to be sent to committee, is under
+// committee review, or has been unanimously approved.
+func (h *ProtocolHandler) GetByApplication(c *gin.Context) {
+	appID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, apperror.BadRequest("өтініш идентификаторы дұрыс емес"))
+		return
+	}
+	if !h.canAccessApplication(c, appID) {
+		response.Error(c, apperror.Forbidden("бұл өтініштің хаттамасын көруге құқығыңыз жоқ"))
+		return
+	}
+	protocol, err := h.protocols.GetByApplicationID(c.Request.Context(), appID)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, protocolDTO(protocol))
 }
 
 type createProtocolRequest struct {

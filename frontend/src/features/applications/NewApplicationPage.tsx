@@ -325,7 +325,7 @@ export function NewApplicationPage() {
         </span>
         <p className="text-[22px] font-bold text-sand-100">{t('wizard.sentTitle')}</p>
         <p className="max-w-[300px] text-sm text-sand-300">{t('wizard.sentBody')}</p>
-        <SegmentedProgress total={5} filled={2} className="mt-1.5 w-full max-w-[300px]" />
+        <SegmentedProgress total={7} filled={2} className="mt-1.5 w-full max-w-[300px]" />
         <p className="text-xs text-sand-300">{t('wizard.sentStepCaption')}</p>
         <Button className="mt-2" onClick={() => navigate('/dashboard/home')}>
           {t('wizard.backToHome')}

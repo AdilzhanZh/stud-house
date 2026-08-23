@@ -32,6 +32,10 @@ type ProtocolRepository interface {
 	CreateWithApplications(ctx context.Context, protocol *domain.Protocol, applicationIDs []uuid.UUID, committeeMemberIDs []uuid.UUID) error
 
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Protocol, error)
+	// GetByApplicationID returns the protocol containing applicationID, if
+	// any — an approved application isn't necessarily attached to one yet.
+	// Returns ErrNotFound if none.
+	GetByApplicationID(ctx context.Context, applicationID uuid.UUID) (*domain.Protocol, error)
 	List(ctx context.Context, status *domain.ProtocolStatus) ([]*domain.Protocol, error)
 	ListApplicationIDs(ctx context.Context, protocolID uuid.UUID) ([]uuid.UUID, error)
 	ListVotes(ctx context.Context, protocolID uuid.UUID) ([]*domain.CommitteeVote, error)

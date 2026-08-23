@@ -94,7 +94,7 @@ func main() {
 		Document:         handler.NewDocumentHandler(documentService),
 		Application:      handler.NewApplicationHandler(applicationService),
 		Notification:     handler.NewNotificationHandler(notificationService),
-		Protocol:         handler.NewProtocolHandler(protocolService),
+		Protocol:         handler.NewProtocolHandler(protocolService, applicationService),
 		ProtocolTemplate: handler.NewProtocolTemplateHandler(protocolTemplateService),
 		Contract:         handler.NewContractHandler(contractService, applicationService),
 		Feedback:         handler.NewFeedbackHandler(feedbackService),

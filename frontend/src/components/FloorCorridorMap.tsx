@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { Star } from 'lucide-react'
 
 interface CorridorRoom {
   id: string
@@ -11,6 +12,15 @@ interface CorridorRoom {
   // inspected/fixed), just flagged as needing attention before it can be
   // picked.
   warning?: boolean
+  // Marks the applicant's own pick from their application (preferred_room_id)
+  // directly on the tile, so it's visible while browsing the map — not only
+  // once a manager has actually selected/confirmed a room.
+  preferred?: boolean
+  // The room stays visible (so the applicant can see it exists) but can't be
+  // picked because it fails a hard restriction, e.g. a gender-restricted
+  // room that doesn't match the applicant. Clicking it doesn't select it —
+  // it reports back via onBlockedRoom instead, so the caller can explain why.
+  blocked?: boolean
 }
 
 interface FloorCorridorMapProps {
@@ -23,6 +33,8 @@ interface FloorCorridorMapProps {
   // map (which navigates to a room's resident list regardless of how full
   // it is) leaves this off.
   disableFull?: boolean
+  // Called instead of onSelectRoom when a `blocked` tile is clicked.
+  onBlockedRoom?: (room: CorridorRoom) => void
 }
 
 function occupancyClasses(residentCount: number, capacity: number): string {
@@ -34,36 +46,45 @@ function occupancyClasses(residentCount: number, capacity: number): string {
 function RoomTile({
   room,
   onSelectRoom,
+  onBlockedRoom,
   selected,
   disableFull,
 }: {
   room?: CorridorRoom
   onSelectRoom?: (roomId: string) => void
+  onBlockedRoom?: (room: CorridorRoom) => void
   selected?: boolean
   disableFull?: boolean
 }) {
   const { t } = useTranslation()
   if (!room) return <div className="h-11 w-11 shrink-0" />
   const isFull = room.residentCount >= room.capacity
-  const disabled = disableFull && isFull
+  const disabled = disableFull && isFull && !room.blocked
   return (
     <button
       type="button"
       disabled={disabled}
-      onClick={() => onSelectRoom?.(room.id)}
+      onClick={() => (room.blocked ? onBlockedRoom?.(room) : onSelectRoom?.(room.id))}
       title={t('admin.dormitories.roomTileTitle', {
         room: room.room_number,
         occupied: room.residentCount,
         capacity: room.capacity,
       })}
       className={`relative flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-lg ring-1 ring-inset transition-colors ${
-        disabled ? 'cursor-not-allowed opacity-60' : 'hover:brightness-110'
+        room.blocked
+          ? 'cursor-not-allowed opacity-40 grayscale hover:brightness-100'
+          : disabled
+            ? 'cursor-not-allowed opacity-60'
+            : 'hover:brightness-110'
       } ${occupancyClasses(room.residentCount, room.capacity)} ${
         selected ? 'ring-2 ring-turquoise-400' : ''
       }`}
     >
       {room.warning && (
         <span className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-amber-400" />
+      )}
+      {room.preferred && (
+        <Star className="absolute top-0.5 left-0.5 h-3 w-3 fill-turquoise-400 text-turquoise-400" />
       )}
       <span className="text-xs font-semibold leading-none">{room.room_number}</span>
       <span className="mt-1 text-[10px] leading-none opacity-80">
@@ -75,7 +96,13 @@ function RoomTile({
 
 // Mirrors a real dormitory corridor: even-numbered rooms line one side of the
 // hallway, odd-numbered rooms the other, laid out as paired columns.
-export function FloorCorridorMap({ rooms, onSelectRoom, selectedRoomId, disableFull }: FloorCorridorMapProps) {
+export function FloorCorridorMap({
+  rooms,
+  onSelectRoom,
+  selectedRoomId,
+  disableFull,
+  onBlockedRoom,
+}: FloorCorridorMapProps) {
   const numbered = rooms
     .map((room) => ({ room, num: parseInt(room.room_number, 10) }))
     .filter((x) => !Number.isNaN(x.num))
@@ -99,12 +126,14 @@ export function FloorCorridorMap({ rooms, onSelectRoom, selectedRoomId, disableF
           <RoomTile
             room={evens[i]}
             onSelectRoom={onSelectRoom}
+            onBlockedRoom={onBlockedRoom}
             selected={evens[i]?.id === selectedRoomId}
             disableFull={disableFull}
           />
           <RoomTile
             room={odds[i]}
             onSelectRoom={onSelectRoom}
+            onBlockedRoom={onBlockedRoom}
             selected={odds[i]?.id === selectedRoomId}
             disableFull={disableFull}
           />

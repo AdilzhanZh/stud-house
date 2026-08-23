@@ -18,7 +18,14 @@ import { useAuth } from '../auth/useAuth'
 import type { Application } from '../../types/applications'
 import type { JourneyStep } from '../../components/ApplicationJourneyStepper'
 
-const NEXT_STEP_HINT_STEPS: JourneyStep[] = ['submitted', 'under_review', 'approved', 'contract']
+const NEXT_STEP_HINT_STEPS: JourneyStep[] = [
+  'submitted',
+  'under_review',
+  'accepted',
+  'committee_review',
+  'fully_approved',
+  'contract',
+]
 
 // The application card's action link should always take the student straight
 // to whatever they still need to do — sign the contract, or (once settled)
@@ -97,7 +104,7 @@ export function HomePage() {
                 <StatusBadge status={latestApplication.status} />
               </div>
               <p className="mt-2 text-lg font-semibold text-sand-100">{dormitoryName ?? '...'}</p>
-              <SegmentedProgress total={5} filled={journeyStepIndex(journey.step) + 1} className="mt-3" />
+              <SegmentedProgress total={7} filled={journeyStepIndex(journey.step) + 1} className="mt-3" />
               <p className="mt-2 text-sm text-sand-200">{journeyStepCaption(journey.step, t)}</p>
               <p className="mt-3 text-sm font-semibold text-turquoise-400">{nextAction.label}</p>
             </Card>

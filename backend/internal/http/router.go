@@ -112,6 +112,7 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 			// checked inside the handler.
 			protected.GET("/applications/:id", h.Application.GetDetail)
 			protected.GET("/applications/:id/contract", h.Contract.GetByApplication)
+			protected.GET("/applications/:id/protocol", h.Protocol.GetByApplication)
 			protected.GET("/exit-requests/:id", h.ExitRequest.Get)
 			protected.GET("/transfer-requests/:id", h.TransferRequest.Get)
 

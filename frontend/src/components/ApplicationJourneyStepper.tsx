@@ -1,9 +1,24 @@
 import { Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-export type JourneyStep = 'submitted' | 'under_review' | 'approved' | 'contract' | 'settled'
+export type JourneyStep =
+  | 'submitted'
+  | 'under_review'
+  | 'accepted'
+  | 'committee_review'
+  | 'fully_approved'
+  | 'contract'
+  | 'settled'
 
-const STEP_KEYS: JourneyStep[] = ['submitted', 'under_review', 'approved', 'contract', 'settled']
+const STEP_KEYS: JourneyStep[] = [
+  'submitted',
+  'under_review',
+  'accepted',
+  'committee_review',
+  'fully_approved',
+  'contract',
+  'settled',
+]
 
 interface ApplicationJourneyStepperProps {
   currentStep: JourneyStep

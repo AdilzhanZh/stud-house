@@ -16,7 +16,10 @@ import { listRoomResidents, listRoomsByDormitory } from '../../../api/roomApi'
 import { listUsers } from '../../../api/adminUserApi'
 import { listBenefits, listStudentBenefits } from '../../../api/benefitApi'
 import { getStudentProfile } from '../../../api/profileApi'
-import { applicationStatusToJourneyStep } from '../../applications/statusHelpers'
+import { getContractByApplication } from '../../../api/contractApi'
+import { getApplicationProtocol } from '../../../api/protocolApi'
+import { getMyResidence } from '../../../api/residenceApi'
+import { computeJourneyStep } from '../../applications/statusHelpers'
 import { formatDateTime } from '../../../utils/dateFormat'
 import { bilingualField } from '../../../utils/bilingualField'
 import { RoomRestrictionsDialog } from '../rooms/RoomRestrictionsDialog'
@@ -25,6 +28,7 @@ import type { Dormitory } from '../../../types/dormitories'
 import type { Benefit } from '../../../types/benefits'
 import type { Gender, Room } from '../../../types/rooms'
 import type { User } from '../../../types'
+import type { JourneyStep } from '../../../components/ApplicationJourneyStepper'
 
 interface RoomWithOccupancy extends Room {
   residentCount: number
@@ -46,6 +50,7 @@ export function ApplicationAdminDetailPage() {
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
   const [selectedFloor, setSelectedFloor] = useState<string | null>(null)
   const [restrictionsRoom, setRestrictionsRoom] = useState<RoomWithOccupancy | null>(null)
+  const [journeyStep, setJourneyStep] = useState<JourneyStep | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
   const [panel, setPanel] = useState<ActionPanel>(null)
@@ -81,6 +86,15 @@ export function ApplicationAdminDetailPage() {
         )
         setRooms(withOccupancy)
         setSelectedRoomId(app.assigned_room_id ?? app.preferred_room_id)
+
+        const [contract, protocol, hasActiveResidence] = await Promise.all([
+          getContractByApplication(app.id).catch(() => null),
+          getApplicationProtocol(app.id).catch(() => null),
+          getMyResidence(app.student_id)
+            .then(() => true)
+            .catch(() => false),
+        ])
+        setJourneyStep(computeJourneyStep(app.status, protocol, contract, hasActiveResidence))
       })
       .catch((err) => setLoadError(extractErrorMessage(err, t('admin.common.loadError'))))
   }
@@ -352,6 +366,7 @@ export function ApplicationAdminDetailPage() {
                       capacity: r.capacity,
                       residentCount: r.residentCount,
                       warning: isGenderMismatch(r),
+                      preferred: application.preferred_room_id === r.id,
                     }))}
                     selectedRoomId={selectedRoomId ?? undefined}
                     onSelectRoom={handleSelectRoom}
@@ -365,20 +380,21 @@ export function ApplicationAdminDetailPage() {
                       {application.preferred_room_id === selectedRoomId && ` ★ ${t('admin.applications.studentPreferred')}`}
                     </p>
                   )}
+                  {!application.preferred_room_id && (
+                    <p className="text-xs text-sand-300">{t('admin.applications.noPreferredRoom')}</p>
+                  )}
                 </div>
               )}
               <p className="mt-2.5 text-xs text-sand-300">{t('admin.applications.roomAssignHint')}</p>
               <p className="mt-1 text-xs text-sand-300">{t('admin.applications.genderMismatchLegend')}</p>
+              <p className="mt-1 text-xs text-sand-300">{t('admin.applications.preferredRoomLegend')}</p>
             </Card>
           )}
 
-          {applicationStatusToJourneyStep(application.status) && (
+          {journeyStep && (
             <Card>
               <p className="mb-3 text-[15px] font-bold text-sand-100">{t('admin.applications.journey')}</p>
-              <ApplicationJourneyStepper
-                currentStep={applicationStatusToJourneyStep(application.status)!}
-                className="overflow-x-auto py-2"
-              />
+              <ApplicationJourneyStepper currentStep={journeyStep} className="overflow-x-auto py-2" />
             </Card>
           )}
         </div>

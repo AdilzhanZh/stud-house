@@ -128,6 +128,19 @@ func (r *ProtocolRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Proto
 	return scanProtocolRow(row)
 }
 
+// GetByApplicationID returns the protocol containing applicationID, if any
+// — an approved application isn't necessarily attached to one yet, see
+// EligibleApplicationIDs. Returns ErrNotFound if none.
+func (r *ProtocolRepo) GetByApplicationID(ctx context.Context, applicationID uuid.UUID) (*domain.Protocol, error) {
+	const q = `
+		SELECT ` + protocolColumns + `
+		FROM protocols
+		JOIN protocol_applications ON protocol_applications.protocol_id = protocols.id
+		WHERE protocol_applications.application_id = $1`
+	row := r.db.QueryRow(ctx, q, applicationID)
+	return scanProtocolRow(row)
+}
+
 func (r *ProtocolRepo) List(ctx context.Context, status *domain.ProtocolStatus) ([]*domain.Protocol, error) {
 	var rows pgx.Rows
 	var err error

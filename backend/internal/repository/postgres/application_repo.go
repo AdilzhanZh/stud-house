@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -103,6 +104,19 @@ func (r *ApplicationRepo) Delete(ctx context.Context, id uuid.UUID) error {
 		return repository.ErrNotFound
 	}
 	return nil
+}
+
+func (r *ApplicationRepo) DeleteOlderThan(ctx context.Context, cutoff time.Time) (int64, error) {
+	const q = `
+		DELETE FROM applications a
+		WHERE a.created_at < $1
+			AND NOT EXISTS (SELECT 1 FROM contracts c WHERE c.application_id = a.id)
+			AND NOT EXISTS (SELECT 1 FROM protocol_applications pa WHERE pa.application_id = a.id)`
+	tag, err := r.db.Exec(ctx, q, cutoff)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
 }
 
 func (r *ApplicationRepo) AddHistory(ctx context.Context, h *domain.ApplicationStatusHistory) error {

@@ -49,6 +49,11 @@ type ContractRepository interface {
 	// ListByStudent joins through applications.student_id, since contracts
 	// carry no student_id of their own (kezeng 3 frontend: GET /contracts/my).
 	ListByStudent(ctx context.Context, studentID uuid.UUID) ([]*domain.Contract, error)
+	// DeleteOlderThan removes contracts created before cutoff. Used by
+	// RetentionService, and run before ApplicationRepository.DeleteOlderThan
+	// since contracts.application_id has no ON DELETE CASCADE. Returns the
+	// number of rows deleted.
+	DeleteOlderThan(ctx context.Context, cutoff time.Time) (int64, error)
 
 	WithLock(ctx context.Context, id uuid.UUID, fn func(ctx context.Context, contract *domain.Contract, tx ContractTx) error) error
 }

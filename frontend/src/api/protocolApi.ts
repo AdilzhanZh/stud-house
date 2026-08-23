@@ -14,6 +14,15 @@ export async function getProtocolDetail(id: string): Promise<ProtocolDetail> {
   return data.data
 }
 
+// Available to the owning student or admin/manager — used by the
+// application journey stepper to tell "approved, not yet sent to
+// committee" apart from "in committee review" and "committee approved".
+// Rejects with 404 if the application isn't attached to any protocol yet.
+export async function getApplicationProtocol(applicationId: string): Promise<Protocol> {
+  const { data } = await apiClient.get<{ data: Protocol }>(`/applications/${applicationId}/protocol`)
+  return data.data
+}
+
 // "Хаттама дайындау" (prepare protocol) — bundles the selected applications
 // (must all be approved and not already in another protocol) and sends the
 // protocol to every current committee member for review.

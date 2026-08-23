@@ -43,6 +43,26 @@ type Config struct {
 	// ContractReminderWindow: managers get reminded about a 'sent' contract
 	// once its deadline is within this window (phase 5).
 	ContractReminderWindow time.Duration
+
+	// DataRetentionPeriod is how long applications, contracts, and
+	// protocols are kept after creation before RetentionService purges
+	// them. Applications are only purged once nothing (contract, protocol)
+	// still references them, so a contract/protocol created shortly after
+	// an old application keeps it alive a little longer.
+	DataRetentionPeriod time.Duration
+	// DataRetentionCheckInterval is how often the background job sweeps
+	// for expired records; the same work is also exposed as
+	// POST /api/v1/admin/retention/purge for cron-less environments/manual
+	// testing.
+	DataRetentionCheckInterval time.Duration
+
+	// AcademicYearCheckInterval is how often the background job checks
+	// whether the July 30 course-rollover is due (see
+	// AcademicYearService.Run) — deliberately checked repeatedly rather
+	// than fired once at a precise instant, so a server outage on the
+	// cutoff day just delays it to the next check instead of skipping it.
+	// Also exposed as POST /api/v1/admin/academic-year/rollover.
+	AcademicYearCheckInterval time.Duration
 }
 
 func Load() (*Config, error) {
@@ -91,6 +111,24 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	cfg.ContractReminderWindow = time.Duration(reminderHours) * time.Hour
+
+	retentionDays, err := strconv.Atoi(getEnv("DATA_RETENTION_DAYS", "365"))
+	if err != nil {
+		return nil, err
+	}
+	cfg.DataRetentionPeriod = time.Duration(retentionDays) * 24 * time.Hour
+
+	retentionCheckHours, err := strconv.Atoi(getEnv("DATA_RETENTION_CHECK_INTERVAL_HOURS", "24"))
+	if err != nil {
+		return nil, err
+	}
+	cfg.DataRetentionCheckInterval = time.Duration(retentionCheckHours) * time.Hour
+
+	academicYearCheckHours, err := strconv.Atoi(getEnv("ACADEMIC_YEAR_CHECK_INTERVAL_HOURS", "12"))
+	if err != nil {
+		return nil, err
+	}
+	cfg.AcademicYearCheckInterval = time.Duration(academicYearCheckHours) * time.Hour
 
 	return cfg, nil
 }

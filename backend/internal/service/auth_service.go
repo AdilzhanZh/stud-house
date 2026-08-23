@@ -265,6 +265,8 @@ func (s *AuthService) Login(ctx context.Context, login, password string) (*Token
 			return nil, nil, apperror.Forbidden("тіркелуіңіз әлі менеджердің растауын күтуде")
 		case domain.ApprovalRejected:
 			return nil, nil, apperror.Forbidden("тіркелу өтініші қабылданбады, менеджерге хабарласыңыз")
+		case domain.ApprovalGraduated:
+			return nil, nil, apperror.Forbidden("сіз оқуды бітірдіңіз, аккаунт енді белсенді емес")
 		}
 	}
 

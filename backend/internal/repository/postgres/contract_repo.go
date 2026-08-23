@@ -143,6 +143,14 @@ func (r *ContractRepo) ListByStudent(ctx context.Context, studentID uuid.UUID) (
 	return out, rows.Err()
 }
 
+func (r *ContractRepo) DeleteOlderThan(ctx context.Context, cutoff time.Time) (int64, error) {
+	tag, err := r.db.Exec(ctx, `DELETE FROM contracts WHERE created_at < $1`, cutoff)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
 func (r *ContractRepo) WithLock(ctx context.Context, id uuid.UUID, fn func(ctx context.Context, contract *domain.Contract, tx repository.ContractTx) error) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {

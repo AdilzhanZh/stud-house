@@ -51,6 +51,7 @@ func main() {
 	transferRequestRepo := postgres.NewTransferRequestRepo(pool)
 	petitionTemplateRepo := postgres.NewPetitionTemplateRepo(pool)
 	contractTemplateRepo := postgres.NewContractTemplateRepo(pool)
+	academicYearRepo := postgres.NewAcademicYearRepo(pool)
 
 	mailerService := mailer.New(mailer.Config{
 		Host:     cfg.SMTPHost,
@@ -80,6 +81,8 @@ func main() {
 	petitionTemplateService := service.NewPetitionTemplateService(petitionTemplateRepo)
 	protocolTemplateService := service.NewProtocolTemplateService(protocolTemplateRepo)
 	contractTemplateService := service.NewContractTemplateService(contractTemplateRepo)
+	retentionService := service.NewRetentionService(protocolRepo, contractRepo, applicationRepo, cfg.DataRetentionPeriod)
+	academicYearService := service.NewAcademicYearService(academicYearRepo)
 
 	// Once a protocol's vote tally resolves to approved, auto-generate
 	// contracts for its applications.
@@ -94,7 +97,7 @@ func main() {
 		Document:         handler.NewDocumentHandler(documentService),
 		Application:      handler.NewApplicationHandler(applicationService),
 		Notification:     handler.NewNotificationHandler(notificationService),
-		Protocol:         handler.NewProtocolHandler(protocolService),
+		Protocol:         handler.NewProtocolHandler(protocolService, applicationService),
 		ProtocolTemplate: handler.NewProtocolTemplateHandler(protocolTemplateService),
 		Contract:         handler.NewContractHandler(contractService, applicationService),
 		Feedback:         handler.NewFeedbackHandler(feedbackService),
@@ -103,12 +106,20 @@ func main() {
 		Upload:           handler.NewUploadHandler(cfg.UploadDir),
 		PetitionTemplate: handler.NewPetitionTemplateHandler(petitionTemplateService),
 		ContractTemplate: handler.NewContractTemplateHandler(contractTemplateService),
+		Retention:        handler.NewRetentionHandler(retentionService),
+		AcademicYear:     handler.NewAcademicYearHandler(academicYearService),
 	}
 
 	router := apihttp.NewRouter(cfg.JWTSecret, cfg.UploadDir, handlers)
 
 	stopExpiryChecker := startContractExpiryChecker(contractService, cfg.ContractExpiryCheckInterval)
 	defer stopExpiryChecker()
+
+	stopRetentionCleaner := startRetentionCleaner(retentionService, cfg.DataRetentionCheckInterval)
+	defer stopRetentionCleaner()
+
+	stopAcademicYearChecker := startAcademicYearChecker(academicYearService, cfg.AcademicYearCheckInterval)
+	defer stopAcademicYearChecker()
 
 	log.Printf("listening on :%s", cfg.ServerPort)
 	if err := router.Run(":" + cfg.ServerPort); err != nil {
@@ -138,6 +149,74 @@ func startContractExpiryChecker(contracts *service.ContractService, interval tim
 					log.Printf("contract deadline reminder failed: %v", err)
 				} else if n > 0 {
 					log.Printf("sent %d contract deadline reminder(s)", n)
+				}
+			case <-done:
+				return
+			}
+		}
+	}()
+	return func() {
+		ticker.Stop()
+		close(done)
+	}
+}
+
+// startAcademicYearChecker runs AcademicYearService.Run on a ticker, so the
+// July 30 course rollover happens without needing an external cron (also
+// exposed as POST /api/v1/admin/academic-year/rollover). Unlike the other
+// background jobs here, it also runs once immediately at startup: a missed
+// July 30 (e.g. the server was down that day) should be caught up on the
+// very next boot, not left waiting up to a full interval. Returns a stop func.
+func startAcademicYearChecker(academicYear *service.AcademicYearService, interval time.Duration) func() {
+	runCheck := func() {
+		results, err := academicYear.Run(context.Background())
+		if err != nil {
+			log.Printf("academic year rollover check failed: %v", err)
+			return
+		}
+		for _, r := range results {
+			log.Printf("academic year rollover %d applied: %d graduated, %d advanced", r.Year, r.Graduated, r.Advanced)
+		}
+	}
+
+	runCheck()
+
+	ticker := time.NewTicker(interval)
+	done := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				runCheck()
+			case <-done:
+				return
+			}
+		}
+	}()
+	return func() {
+		ticker.Stop()
+		close(done)
+	}
+}
+
+// startRetentionCleaner runs RetentionService.PurgeExpired on a ticker, so
+// year-old applications/contracts/protocols get deleted without needing an
+// external cron (the same sweep is also exposed as
+// POST /api/v1/admin/retention/purge). Returns a stop func.
+func startRetentionCleaner(retention *service.RetentionService, interval time.Duration) func() {
+	ticker := time.NewTicker(interval)
+	done := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				ctx := context.Background()
+				result, err := retention.PurgeExpired(ctx)
+				if err != nil {
+					log.Printf("data retention purge failed: %v", err)
+				} else if result.ProtocolsDeleted > 0 || result.ContractsDeleted > 0 || result.ApplicationsDeleted > 0 {
+					log.Printf("data retention purge: %d protocol(s), %d contract(s), %d application(s) deleted",
+						result.ProtocolsDeleted, result.ContractsDeleted, result.ApplicationsDeleted)
 				}
 			case <-done:
 				return

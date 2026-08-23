@@ -52,7 +52,7 @@ export function RoleAssignPage() {
       if (isCommitteeMember) {
         await setChairperson(id, isChairperson)
       }
-      navigate('/admin/users')
+      navigate(-1)
     } catch (err) {
       setError(extractErrorMessage(err, t('admin.common.saveFailed')))
     } finally {
@@ -65,7 +65,7 @@ export function RoleAssignPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Button variant="secondary" className="self-start" onClick={() => navigate('/admin/users')}>
+      <Button variant="secondary" className="self-start" onClick={() => navigate(-1)}>
         ← {t('admin.common.back')}
       </Button>
 

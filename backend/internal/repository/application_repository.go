@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -45,6 +46,12 @@ type ApplicationRepository interface {
 	// dormitory is being deleted. Returns ErrConflict if some other row
 	// (contract, protocol) still references it.
 	Delete(ctx context.Context, id uuid.UUID) error
+	// DeleteOlderThan removes applications created before cutoff, skipping
+	// any still referenced by a contract or protocol_applications row (no
+	// FK cascade from those) so it never errors — those are simply left for
+	// a later sweep once their contract/protocol is purged too. Used by
+	// RetentionService. Returns the number of rows deleted.
+	DeleteOlderThan(ctx context.Context, cutoff time.Time) (int64, error)
 
 	// WithLock locks the application row (SELECT ... FOR UPDATE) inside a DB
 	// transaction and invokes fn with the locked snapshot and a transactional

@@ -51,7 +51,7 @@ export function ProtocolDetailPage() {
     if (!protocol) return null
     return {
       protocolNumber: protocol.number,
-      studentNames: protocol.students.map((s) => s.student_full_name),
+      students: protocol.students.map((s) => ({ name: s.student_full_name, dormitoryName: s.dormitory_name })),
       protocolDate: formatDate(protocol.created_at),
     }
   }

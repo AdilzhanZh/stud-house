@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -53,4 +54,10 @@ type ProtocolRepository interface {
 	// Delete removes the protocol row (protocol_applications/committee_votes
 	// cascade). Returns ErrNotFound if it doesn't exist.
 	Delete(ctx context.Context, id uuid.UUID) error
+	// DeleteOlderThan removes protocols created before cutoff
+	// (protocol_applications/committee_votes cascade). Used by
+	// RetentionService, and run before ContractRepository.DeleteOlderThan /
+	// ApplicationRepository.DeleteOlderThan so their FK references clear
+	// first. Returns the number of rows deleted.
+	DeleteOlderThan(ctx context.Context, cutoff time.Time) (int64, error)
 }

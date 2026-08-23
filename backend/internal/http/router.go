@@ -26,6 +26,7 @@ type Handlers struct {
 	ExitRequest      *handler.ExitRequestHandler
 	TransferRequest  *handler.TransferRequestHandler
 	Upload           *handler.UploadHandler
+	Retention        *handler.RetentionHandler
 }
 
 func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
@@ -65,6 +66,8 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 				adminGroup.PATCH("/committee-members/:id/chairperson", h.User.SetChairperson)
 				adminGroup.DELETE("/users/:id", h.User.DeleteUser)
 				adminGroup.PATCH("/users/:id/password", h.User.SetPassword)
+
+				adminGroup.POST("/retention/purge", h.Retention.Purge)
 			}
 
 			// Read-only for any authenticated role.

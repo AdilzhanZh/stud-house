@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { KeyRound, Search, ShieldCheck } from 'lucide-react'
 import { Card } from '../../../components/Card'
@@ -8,7 +8,6 @@ import { Alert } from '../../../components/Alert'
 import { ConfirmDialog } from '../../../components/ConfirmDialog'
 import { DeleteIconButton } from '../../../components/DeleteIconButton'
 import { Input } from '../../../components/Input'
-import { Select } from '../../../components/Select'
 import { extractErrorMessage } from '../../../api/client'
 import { deleteUser, listUsers, setUserPassword } from '../../../api/adminUserApi'
 import { useAuth } from '../../auth/useAuth'
@@ -21,7 +20,15 @@ export function UserListPage() {
   const navigate = useNavigate()
   const { user: currentUser } = useAuth()
   const [users, setUsers] = useState<User[] | null>(null)
-  const [roleFilter, setRoleFilter] = useState<Role | ''>('')
+  // Kept in the URL (not local state) so it survives a round trip through
+  // RoleAssignPage — navigating there and back with browser history must
+  // land on the same filtered view, not reset to "all users".
+  const [searchParams, setSearchParams] = useSearchParams()
+  const roleFilterParam = searchParams.get('role')
+  const roleFilter: Role | '' =
+    roleFilterParam === 'admin' || roleFilterParam === 'manager' || roleFilterParam === 'student'
+      ? roleFilterParam
+      : ''
   const [search, setSearch] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -64,6 +71,18 @@ export function UserListPage() {
     )
   }, [users, roleFilter, search])
 
+  function toggleRoleFilter(role: Role | '') {
+    const next = new URLSearchParams(searchParams)
+    if (role === '' || roleFilter === role) {
+      next.delete('role')
+    } else {
+      next.set('role', role)
+    }
+    // replace: true so clicking filters doesn't pile up history entries —
+    // the "back" button from RoleAssignPage should land here in one step.
+    setSearchParams(next, { replace: true })
+  }
+
   async function handleDelete() {
     if (!deleteTarget) return
     setDeleteError(null)
@@ -85,13 +104,19 @@ export function UserListPage() {
     setPasswordError(null)
   }
 
+  function closePasswordDialog() {
+    setPasswordTarget(null)
+    setNewPassword('')
+    setPasswordError(null)
+  }
+
   async function handleSetPassword() {
     if (!passwordTarget) return
     setPasswordError(null)
     setIsSavingPassword(true)
     try {
       await setUserPassword(passwordTarget.id, newPassword)
-      setPasswordTarget(null)
+      closePasswordDialog()
     } catch (err) {
       setPasswordError(extractErrorMessage(err, t('admin.users.changePasswordFailed')))
     } finally {
@@ -114,49 +139,49 @@ export function UserListPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
-        <Card className="!p-4">
+        <Card
+          onClick={() => toggleRoleFilter('')}
+          className={`!p-4 ${roleFilter === '' ? 'ring-2 ring-sand-100/40' : ''}`}
+        >
           <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('admin.users.statsTotal')}</p>
           <p className="mt-1.5 text-2xl font-bold text-sand-100">{stats?.total ?? '—'}</p>
         </Card>
-        <Card className="!p-4">
+        <Card
+          onClick={() => toggleRoleFilter('admin')}
+          className={`!p-4 ${roleFilter === 'admin' ? 'ring-2 ring-turquoise-400' : ''}`}
+        >
           <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('admin.users.statsAdmins')}</p>
           <p className="mt-1.5 text-2xl font-bold text-turquoise-400">{stats?.admins ?? '—'}</p>
         </Card>
-        <Card className="!p-4">
+        <Card
+          onClick={() => toggleRoleFilter('manager')}
+          className={`!p-4 ${roleFilter === 'manager' ? 'ring-2 ring-amber-400' : ''}`}
+        >
           <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('admin.users.statsManagers')}</p>
           <p className="mt-1.5 text-2xl font-bold text-amber-400">{stats?.managers ?? '—'}</p>
         </Card>
-        <Card className="!p-4">
+        <Card
+          onClick={() => toggleRoleFilter('student')}
+          className={`!p-4 ${roleFilter === 'student' ? 'ring-2 ring-mint-400' : ''}`}
+        >
           <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('admin.users.statsStudents')}</p>
           <p className="mt-1.5 text-2xl font-bold text-mint-400">{stats?.students ?? '—'}</p>
         </Card>
       </div>
 
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="max-w-xs">
-          <Select
-            label={t('admin.users.roleFilter')}
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value as Role | '')}
-          >
-            <option value="">{t('admin.users.allRoles')}</option>
-            <option value="admin">{roleLabels.admin}</option>
-            <option value="manager">{roleLabels.manager}</option>
-            <option value="student">{roleLabels.student}</option>
-          </Select>
+      {users && users.length > 0 && (
+        <div className="flex max-w-80 items-center gap-2 rounded-full border border-navy-700 bg-navy-900 px-4 py-2.5 transition-colors focus-within:border-turquoise-400 focus-within:ring-4 focus-within:ring-turquoise-400/15">
+          <Search className="h-4 w-4 shrink-0 text-sand-300" />
+          <input
+            type="search"
+            autoComplete="off"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t('admin.users.searchPlaceholder')}
+            className="w-full bg-transparent text-sm text-sand-100 outline-none placeholder:text-sand-400"
+          />
         </div>
-        {users && users.length > 0 && (
-          <div className="flex max-w-80 items-center gap-2 rounded-full border border-navy-700 bg-navy-900 px-4 py-2.5">
-            <Search className="h-4 w-4 shrink-0 text-sand-300" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t('admin.users.searchPlaceholder')}
-              className="w-full bg-transparent text-sm text-sand-100 outline-none placeholder:text-sand-400"
-            />
-          </div>
-        )}
-      </div>
+      )}
 
       {error && <Alert variant="error" message={error} />}
       {deleteError && <Alert variant="error" message={deleteError} />}
@@ -256,11 +281,12 @@ export function UserListPage() {
         confirmLabel={t('admin.common.save')}
         isLoading={isSavingPassword}
         onConfirm={handleSetPassword}
-        onCancel={() => setPasswordTarget(null)}
+        onCancel={closePasswordDialog}
       >
         <Input
           label={t('admin.users.newPassword')}
           type="password"
+          autoComplete="new-password"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
           required

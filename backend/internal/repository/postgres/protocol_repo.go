@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -221,6 +222,14 @@ func (r *ProtocolRepo) Delete(ctx context.Context, id uuid.UUID) error {
 		return repository.ErrNotFound
 	}
 	return nil
+}
+
+func (r *ProtocolRepo) DeleteOlderThan(ctx context.Context, cutoff time.Time) (int64, error) {
+	tag, err := r.db.Exec(ctx, `DELETE FROM protocols WHERE created_at < $1`, cutoff)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
 }
 
 func (r *ProtocolRepo) WithVoteLock(ctx context.Context, protocolID uuid.UUID, fn func(ctx context.Context, protocol *domain.Protocol, tx repository.ProtocolTx) error) error {

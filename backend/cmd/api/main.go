@@ -80,6 +80,7 @@ func main() {
 	petitionTemplateService := service.NewPetitionTemplateService(petitionTemplateRepo)
 	protocolTemplateService := service.NewProtocolTemplateService(protocolTemplateRepo)
 	contractTemplateService := service.NewContractTemplateService(contractTemplateRepo)
+	retentionService := service.NewRetentionService(protocolRepo, contractRepo, applicationRepo, cfg.DataRetentionPeriod)
 
 	// Once a protocol's vote tally resolves to approved, auto-generate
 	// contracts for its applications.
@@ -103,12 +104,16 @@ func main() {
 		Upload:           handler.NewUploadHandler(cfg.UploadDir),
 		PetitionTemplate: handler.NewPetitionTemplateHandler(petitionTemplateService),
 		ContractTemplate: handler.NewContractTemplateHandler(contractTemplateService),
+		Retention:        handler.NewRetentionHandler(retentionService),
 	}
 
 	router := apihttp.NewRouter(cfg.JWTSecret, cfg.UploadDir, handlers)
 
 	stopExpiryChecker := startContractExpiryChecker(contractService, cfg.ContractExpiryCheckInterval)
 	defer stopExpiryChecker()
+
+	stopRetentionCleaner := startRetentionCleaner(retentionService, cfg.DataRetentionCheckInterval)
+	defer stopRetentionCleaner()
 
 	log.Printf("listening on :%s", cfg.ServerPort)
 	if err := router.Run(":" + cfg.ServerPort); err != nil {
@@ -138,6 +143,36 @@ func startContractExpiryChecker(contracts *service.ContractService, interval tim
 					log.Printf("contract deadline reminder failed: %v", err)
 				} else if n > 0 {
 					log.Printf("sent %d contract deadline reminder(s)", n)
+				}
+			case <-done:
+				return
+			}
+		}
+	}()
+	return func() {
+		ticker.Stop()
+		close(done)
+	}
+}
+
+// startRetentionCleaner runs RetentionService.PurgeExpired on a ticker, so
+// year-old applications/contracts/protocols get deleted without needing an
+// external cron (the same sweep is also exposed as
+// POST /api/v1/admin/retention/purge). Returns a stop func.
+func startRetentionCleaner(retention *service.RetentionService, interval time.Duration) func() {
+	ticker := time.NewTicker(interval)
+	done := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				ctx := context.Background()
+				result, err := retention.PurgeExpired(ctx)
+				if err != nil {
+					log.Printf("data retention purge failed: %v", err)
+				} else if result.ProtocolsDeleted > 0 || result.ContractsDeleted > 0 || result.ApplicationsDeleted > 0 {
+					log.Printf("data retention purge: %d protocol(s), %d contract(s), %d application(s) deleted",
+						result.ProtocolsDeleted, result.ContractsDeleted, result.ApplicationsDeleted)
 				}
 			case <-done:
 				return

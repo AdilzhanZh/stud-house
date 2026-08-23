@@ -2,12 +2,18 @@ import { renderHtmlPagesToPdf } from './pdf'
 import { getProtocolTemplate } from '../api/protocolTemplateApi'
 import { formatDate } from './dateFormat'
 
+export interface ProtocolStudentEntry {
+  name: string
+  dormitoryName: string
+}
+
 export interface ProtocolFieldValues {
   protocolNumber: number
   protocolDate?: string
-  // Full names of the selected students, in the order they should be
-  // numbered in the "Қаулы етілді" resolution list.
-  studentNames: string[]
+  // The selected students paired with their dormitory, in the order they
+  // should be numbered in the "Қаулы етілді" resolution list — each renders
+  // as "name — dormitory" so it's clear at a glance who goes where.
+  students: ProtocolStudentEntry[]
 }
 
 // The saved template stores {{student_list}} as
@@ -26,10 +32,10 @@ function fillProtocolTemplate(pages: string[], values: Required<ProtocolFieldVal
 
       if (key === 'student_list') {
         const fragment = document.createDocumentFragment()
-        values.studentNames.forEach((name, i) => {
+        values.students.forEach(({ name, dormitoryName }, i) => {
           const p = document.createElement('p')
           p.style.margin = '0 0 2px'
-          p.textContent = `${i + 1}. ${name};`
+          p.textContent = `${i + 1}. ${name} — ${dormitoryName};`
           fragment.appendChild(p)
         })
         el.replaceWith(fragment)

@@ -32,6 +32,11 @@ const (
 	ApprovalPending  ApprovalStatus = "pending"
 	ApprovalApproved ApprovalStatus = "approved"
 	ApprovalRejected ApprovalStatus = "rejected"
+	// ApprovalGraduated is set by AcademicYearService's yearly course
+	// rollover once a student's course would pass their academic degree's
+	// MaxCourse — they've finished the program and can no longer log in,
+	// same as ApprovalRejected but with its own message.
+	ApprovalGraduated ApprovalStatus = "graduated"
 )
 
 type User struct {

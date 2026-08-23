@@ -55,6 +55,14 @@ type Config struct {
 	// POST /api/v1/admin/retention/purge for cron-less environments/manual
 	// testing.
 	DataRetentionCheckInterval time.Duration
+
+	// AcademicYearCheckInterval is how often the background job checks
+	// whether the July 30 course-rollover is due (see
+	// AcademicYearService.Run) — deliberately checked repeatedly rather
+	// than fired once at a precise instant, so a server outage on the
+	// cutoff day just delays it to the next check instead of skipping it.
+	// Also exposed as POST /api/v1/admin/academic-year/rollover.
+	AcademicYearCheckInterval time.Duration
 }
 
 func Load() (*Config, error) {
@@ -115,6 +123,12 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	cfg.DataRetentionCheckInterval = time.Duration(retentionCheckHours) * time.Hour
+
+	academicYearCheckHours, err := strconv.Atoi(getEnv("ACADEMIC_YEAR_CHECK_INTERVAL_HOURS", "12"))
+	if err != nil {
+		return nil, err
+	}
+	cfg.AcademicYearCheckInterval = time.Duration(academicYearCheckHours) * time.Hour
 
 	return cfg, nil
 }

@@ -1,0 +1,1 @@
+DROP TABLE academic_year_rollover_state;

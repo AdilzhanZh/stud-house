@@ -27,6 +27,7 @@ type Handlers struct {
 	TransferRequest  *handler.TransferRequestHandler
 	Upload           *handler.UploadHandler
 	Retention        *handler.RetentionHandler
+	AcademicYear     *handler.AcademicYearHandler
 }
 
 func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
@@ -68,6 +69,7 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 				adminGroup.PATCH("/users/:id/password", h.User.SetPassword)
 
 				adminGroup.POST("/retention/purge", h.Retention.Purge)
+				adminGroup.POST("/academic-year/rollover", h.AcademicYear.Rollover)
 			}
 
 			// Read-only for any authenticated role.

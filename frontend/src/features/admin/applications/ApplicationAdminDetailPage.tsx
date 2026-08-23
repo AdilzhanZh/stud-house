@@ -7,6 +7,7 @@ import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
 import { StatusBadge } from '../../../components/StatusBadge'
 import { ApplicationJourneyStepper } from '../../../components/ApplicationJourneyStepper'
+import { FloorCorridorMap } from '../../../components/FloorCorridorMap'
 import { extractErrorMessage } from '../../../api/client'
 import { getApplication } from '../../../api/applicationApi'
 import { cancelApprovedApplication, decideApplication } from '../../../api/applicationAdminApi'
@@ -14,13 +15,15 @@ import { getDormitory } from '../../../api/dormitoryApi'
 import { listRoomResidents, listRoomsByDormitory } from '../../../api/roomApi'
 import { listUsers } from '../../../api/adminUserApi'
 import { listBenefits, listStudentBenefits } from '../../../api/benefitApi'
+import { getStudentProfile } from '../../../api/profileApi'
 import { applicationStatusToJourneyStep } from '../../applications/statusHelpers'
 import { formatDateTime } from '../../../utils/dateFormat'
 import { bilingualField } from '../../../utils/bilingualField'
+import { RoomRestrictionsDialog } from '../rooms/RoomRestrictionsDialog'
 import type { ApplicationDetail } from '../../../types/applications'
 import type { Dormitory } from '../../../types/dormitories'
 import type { Benefit } from '../../../types/benefits'
-import type { Room } from '../../../types/rooms'
+import type { Gender, Room } from '../../../types/rooms'
 import type { User } from '../../../types'
 
 interface RoomWithOccupancy extends Room {
@@ -36,10 +39,13 @@ export function ApplicationAdminDetailPage() {
 
   const [application, setApplication] = useState<ApplicationDetail | null>(null)
   const [student, setStudent] = useState<User | null>(null)
+  const [studentGender, setStudentGender] = useState<Gender | null>(null)
   const [dormitory, setDormitory] = useState<Dormitory | null>(null)
   const [studentBenefitNames, setStudentBenefitNames] = useState<string[]>([])
   const [rooms, setRooms] = useState<RoomWithOccupancy[]>([])
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
+  const [selectedFloor, setSelectedFloor] = useState<string | null>(null)
+  const [restrictionsRoom, setRestrictionsRoom] = useState<RoomWithOccupancy | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
   const [panel, setPanel] = useState<ActionPanel>(null)
@@ -52,14 +58,16 @@ export function ApplicationAdminDetailPage() {
     getApplication(id)
       .then(async (app) => {
         setApplication(app)
-        const [users, dorm, studentBenefits, benefits, roomList] = await Promise.all([
+        const [users, dorm, studentBenefits, benefits, roomList, profile] = await Promise.all([
           listUsers('student'),
           getDormitory(app.dormitory_id),
           listStudentBenefits(app.student_id).catch(() => []),
           listBenefits().catch(() => [] as Benefit[]),
           listRoomsByDormitory(app.dormitory_id).catch(() => []),
+          getStudentProfile(app.student_id).catch(() => null),
         ])
         setStudent(users.find((u) => u.id === app.student_id) ?? null)
+        setStudentGender(profile?.gender ?? null)
         setDormitory(dorm)
         const benefitNamesById = Object.fromEntries(
           benefits.map((b) => [b.id, bilingualField(b.name_kk, b.name_ru, i18n.language)]),
@@ -150,6 +158,29 @@ export function ApplicationAdminDetailPage() {
     }
   }
 
+  // A room whose gender restriction doesn't match the applicant is still
+  // shown (flagged with a dot on the tile) but clicking it opens the
+  // restriction editor instead of selecting it for assignment — the
+  // manager must either pick a different room or relax the restriction.
+  function isGenderMismatch(room: Room): boolean {
+    return room.restrictions.gender != null && studentGender != null && room.restrictions.gender !== studentGender
+  }
+
+  function handleSelectRoom(roomId: string) {
+    const room = rooms.find((r) => r.id === roomId)
+    if (!room) return
+    if (isGenderMismatch(room)) {
+      setRestrictionsRoom(room)
+      return
+    }
+    setSelectedRoomId((prev) => (prev === roomId ? null : roomId))
+  }
+
+  function handleRestrictionsSaved(updated: Room) {
+    setRooms((prev) => prev.map((r) => (r.id === updated.id ? { ...r, restrictions: updated.restrictions } : r)))
+    setRestrictionsRoom(null)
+  }
+
   if (loadError) return <Alert variant="error" message={loadError} />
   if (!application) return <p className="text-sm text-sand-300">{t('admin.common.loading')}</p>
 
@@ -158,6 +189,20 @@ export function ApplicationAdminDetailPage() {
   // /applications/{id}, which flips it back to 'pending' before a manager
   // can act again), so no action buttons render for it.
   const canDecide = application.status === 'pending'
+
+  // Grouped by floor so a large dormitory's rooms don't all render at once
+  // in one long flat grid — matches the floor-tab pattern already used by
+  // the student wizard's and the dormitory-management page's room maps.
+  const roomsByFloor = Object.entries(
+    rooms.reduce<Record<number, RoomWithOccupancy[]>>((byFloor, room) => {
+      const floor = room.floor ?? 0
+      byFloor[floor] = [...(byFloor[floor] ?? []), room]
+      return byFloor
+    }, {}),
+  ).sort(([a], [b]) => Number(a) - Number(b))
+  const activeFloor =
+    selectedFloor && roomsByFloor.some(([floor]) => floor === selectedFloor) ? selectedFloor : roomsByFloor[0]?.[0]
+  const activeFloorRooms = roomsByFloor.find(([floor]) => floor === activeFloor)?.[1] ?? []
 
   return (
     <div className="flex flex-col gap-4">
@@ -281,32 +326,49 @@ export function ApplicationAdminDetailPage() {
               {rooms.length === 0 ? (
                 <p className="text-sm text-sand-300">{t('admin.applications.noRooms')}</p>
               ) : (
-                <div className="flex flex-wrap gap-2">
-                  {rooms.map((r) => {
-                    const full = r.residentCount >= r.capacity
-                    const selected = selectedRoomId === r.id
-                    const preferred = application.preferred_room_id === r.id
-                    return (
-                      <button
-                        key={r.id}
-                        disabled={full}
-                        onClick={() => setSelectedRoomId(selected ? null : r.id)}
-                        className={`rounded-xl px-3.5 py-2 text-sm font-semibold ${
-                          full
-                            ? 'cursor-not-allowed bg-navy-800 text-sand-400 opacity-50'
-                            : selected
-                              ? 'border-2 border-turquoise-500 bg-turquoise-500/10 text-turquoise-400'
-                              : 'border border-navy-700 bg-navy-900 text-sand-200'
-                        }`}
-                      >
-                        {r.room_number}
-                        {preferred && ` ★ ${t('admin.applications.studentPreferred')}`}
-                      </button>
-                    )
-                  })}
+                <div className="flex flex-col gap-3">
+                  {roomsByFloor.length > 1 && (
+                    <div className="flex flex-wrap gap-2">
+                      {roomsByFloor.map(([floor]) => (
+                        <button
+                          key={floor}
+                          type="button"
+                          onClick={() => setSelectedFloor(floor)}
+                          className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                            floor === activeFloor
+                              ? 'bg-turquoise-500 text-white'
+                              : 'bg-navy-800 text-sand-300 hover:bg-navy-700'
+                          }`}
+                        >
+                          {t('admin.dormitories.floorLabel', { floor })}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <FloorCorridorMap
+                    rooms={activeFloorRooms.map((r) => ({
+                      id: r.id,
+                      room_number: r.room_number,
+                      capacity: r.capacity,
+                      residentCount: r.residentCount,
+                      warning: isGenderMismatch(r),
+                    }))}
+                    selectedRoomId={selectedRoomId ?? undefined}
+                    onSelectRoom={handleSelectRoom}
+                    disableFull
+                  />
+                  {selectedRoomId && (
+                    <p className="text-xs text-sand-300">
+                      {t('admin.applications.roomSelected', {
+                        room: rooms.find((r) => r.id === selectedRoomId)?.room_number,
+                      })}
+                      {application.preferred_room_id === selectedRoomId && ` ★ ${t('admin.applications.studentPreferred')}`}
+                    </p>
+                  )}
                 </div>
               )}
               <p className="mt-2.5 text-xs text-sand-300">{t('admin.applications.roomAssignHint')}</p>
+              <p className="mt-1 text-xs text-sand-300">{t('admin.applications.genderMismatchLegend')}</p>
             </Card>
           )}
 
@@ -367,6 +429,12 @@ export function ApplicationAdminDetailPage() {
           </Card>
         </div>
       </div>
+
+      <RoomRestrictionsDialog
+        room={restrictionsRoom}
+        onClose={() => setRestrictionsRoom(null)}
+        onSaved={handleRestrictionsSaved}
+      />
     </div>
   )
 }

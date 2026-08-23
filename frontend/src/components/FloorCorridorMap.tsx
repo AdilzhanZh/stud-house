@@ -5,6 +5,12 @@ interface CorridorRoom {
   room_number: string
   capacity: number
   residentCount: number
+  // Shows a small corner dot without disabling the tile — e.g. the admin
+  // assignment grid uses this for a room whose gender restriction doesn't
+  // match the applicant: still visible and clickable (so it can be
+  // inspected/fixed), just flagged as needing attention before it can be
+  // picked.
+  warning?: boolean
 }
 
 interface FloorCorridorMapProps {
@@ -56,6 +62,9 @@ function RoomTile({
         selected ? 'ring-2 ring-turquoise-400' : ''
       }`}
     >
+      {room.warning && (
+        <span className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-amber-400" />
+      )}
       <span className="text-xs font-semibold leading-none">{room.room_number}</span>
       <span className="mt-1 text-[10px] leading-none opacity-80">
         {room.residentCount}/{room.capacity}

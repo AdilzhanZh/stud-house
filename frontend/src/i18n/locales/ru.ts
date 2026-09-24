@@ -797,7 +797,7 @@ export const ru: typeof kk = {
     placeStudent: {
       title: 'Заселить студента',
       description: 'Заселите студента, который уже относится к общежитию, но ещё не в комнате — без заявки',
-      searchPlaceholder: 'Поиск по имени или ИИН...',
+      searchPlaceholder: 'Поиск по ФИО, ИИН или email...',
       loadError: 'Не удалось загрузить список студентов',
       notFound: 'Студент не найден',
       empty: 'Нет студентов, ожидающих заселения',
@@ -844,7 +844,7 @@ export const ru: typeof kk = {
       newPassword: 'Новый пароль',
       loadPendingError: 'Не удалось загрузить заявки на регистрацию',
       noPendingStudents: 'Ожидающих регистраций нет',
-      pendingSearchPlaceholder: 'Поиск по ФИО или ИИН...',
+      pendingSearchPlaceholder: 'Поиск по ФИО, ИИН или email...',
       noPendingSearchResults: 'По запросу ничего не найдено',
       notFound: 'Пользователь не найден',
       assignCommitteeTitle: 'Назначение комиссии — {{name}}',
@@ -859,7 +859,7 @@ export const ru: typeof kk = {
       registerStudentHint:
         'Аккаунт студента создаётся сразу подтверждённым и активным — подтверждение email не требуется.',
       registerStudentFailed: 'Не удалось добавить студента',
-      searchPlaceholder: 'Поиск по ФИО или ИИН...',
+      searchPlaceholder: 'Поиск по ФИО, ИИН или email...',
       noSearchResults: 'По запросу ничего не найдено',
       statsTotal: 'Всего пользователей',
       statsAdmins: 'Админы',

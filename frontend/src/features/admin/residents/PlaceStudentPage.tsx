@@ -13,6 +13,7 @@ import { addResident, listRoomAvailability } from '../../../api/roomApi'
 import { getStudentProfile } from '../../../api/profileApi'
 import { listStudentBenefits } from '../../../api/benefitApi'
 import { RoomRestrictionsDialog } from '../rooms/RoomRestrictionsDialog'
+import { matchesPersonSearch } from '../../../utils/personSearch'
 import { adminCellClass, adminPageHeading, adminRowClickableClass, adminTableWrapClass, adminTheadClass } from '../adminTable'
 import type { TFunction } from 'i18next'
 import type { User } from '../../../types'
@@ -145,11 +146,8 @@ export function PlaceStudentPage() {
 
   const visibleStudents = useMemo(() => {
     if (!students) return null
-    const q = search.trim().toLowerCase()
-    if (!q) return students
-    return students.filter(
-      (s) => s.full_name.toLowerCase().includes(q) || (s.iin ?? '').includes(q),
-    )
+    if (!search.trim()) return students
+    return students.filter((s) => matchesPersonSearch(search, s))
   }, [students, search])
 
   function selectStudent(student: User) {

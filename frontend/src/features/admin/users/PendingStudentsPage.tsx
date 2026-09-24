@@ -6,6 +6,7 @@ import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
 import { extractErrorMessage } from '../../../api/client'
 import { decideStudentApproval, listPendingStudents } from '../../../api/adminUserApi'
+import { matchesPersonSearch } from '../../../utils/personSearch'
 import type { User } from '../../../types'
 
 export function PendingStudentsPage() {
@@ -26,11 +27,8 @@ export function PendingStudentsPage() {
 
   const visibleStudents = useMemo(() => {
     if (!students) return null
-    const q = search.trim().toLowerCase()
-    if (!q) return students
-    return students.filter(
-      (s) => s.full_name.toLowerCase().includes(q) || (s.iin ?? '').includes(q),
-    )
+    if (!search.trim()) return students
+    return students.filter((s) => matchesPersonSearch(search, s))
   }, [students, search])
 
   async function handleDecision(id: string, action: 'approve' | 'reject') {

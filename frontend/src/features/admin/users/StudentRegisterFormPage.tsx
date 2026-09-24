@@ -49,7 +49,7 @@ export function StudentRegisterFormPage() {
         course: Number(values.course),
         academic_degree: values.academic_degree,
       })
-      navigate('/admin/students/pending')
+      navigate('/admin/users')
     } catch (error) {
       setServerError(extractErrorMessage(error, t('admin.users.registerStudentFailed')))
     }
@@ -57,7 +57,7 @@ export function StudentRegisterFormPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Button variant="secondary" className="self-start" onClick={() => navigate('/admin/students/pending')}>
+      <Button variant="secondary" className="self-start" onClick={() => navigate('/admin/users')}>
         ← {t('admin.common.back')}
       </Button>
 

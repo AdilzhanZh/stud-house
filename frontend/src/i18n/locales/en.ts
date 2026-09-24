@@ -793,7 +793,7 @@ export const en: typeof kk = {
     placeStudent: {
       title: 'Place a student',
       description: 'Place a student who already belongs to the dormitory but has no room yet, without an application',
-      searchPlaceholder: 'Search by name or IIN...',
+      searchPlaceholder: 'Search by name, IIN or email...',
       loadError: 'Failed to load the student list',
       notFound: 'No students found',
       empty: 'No students are waiting to be placed',
@@ -840,7 +840,7 @@ export const en: typeof kk = {
       newPassword: 'New password',
       loadPendingError: 'Failed to load pending accounts',
       noPendingStudents: 'No pending accounts',
-      pendingSearchPlaceholder: 'Search by name or IIN...',
+      pendingSearchPlaceholder: 'Search by name, IIN or email...',
       noPendingSearchResults: 'No results found',
       notFound: 'User not found',
       assignCommitteeTitle: 'Assign committee — {{name}}',
@@ -855,7 +855,7 @@ export const en: typeof kk = {
       registerStudentHint:
         "The student's account is created already approved and active — no email confirmation is required.",
       registerStudentFailed: 'Failed to add student',
-      searchPlaceholder: 'Search by name or IIN...',
+      searchPlaceholder: 'Search by name, IIN or email...',
       noSearchResults: 'No results found',
       statsTotal: 'Total users',
       statsAdmins: 'Admins',

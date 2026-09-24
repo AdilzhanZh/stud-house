@@ -794,7 +794,7 @@ export const kk = {
     placeStudent: {
       title: 'Студентті орналастыру',
       description: 'Жатақханада тұрған, бірақ бөлмеге орналастырылмаған студентті өтінішсіз орналастырыңыз',
-      searchPlaceholder: 'Аты-жөні немесе ЖСН бойынша іздеу...',
+      searchPlaceholder: 'Аты-жөні, ЖСН немесе email бойынша іздеу...',
       loadError: 'Студенттер тізімін жүктеу сәтсіз аяқталды',
       notFound: 'Студент табылмады',
       empty: 'Орналастыруды күтіп тұрған студент жоқ',
@@ -841,7 +841,7 @@ export const kk = {
       newPassword: 'Жаңа құпия сөз',
       loadPendingError: 'Тіркелгілерді жүктеу сәтсіз аяқталды',
       noPendingStudents: 'Күтіп тұрған тіркелгі жоқ',
-      pendingSearchPlaceholder: 'Аты-жөні немесе ЖСН бойынша іздеу...',
+      pendingSearchPlaceholder: 'Аты-жөні, ЖСН немесе email бойынша іздеу...',
       noPendingSearchResults: 'Іздеу нәтижесі табылмады',
       notFound: 'Пайдаланушы табылмады',
       assignCommitteeTitle: 'Комиссия тағайындау — {{name}}',
@@ -856,7 +856,7 @@ export const kk = {
       registerStudentHint:
         'Студенттің тіркелгісі бірден расталған және белсенді түрде жасалады — email растауы қажет емес.',
       registerStudentFailed: 'Студентті қосу сәтсіз аяқталды',
-      searchPlaceholder: 'Аты-жөні немесе ЖСН бойынша іздеу...',
+      searchPlaceholder: 'Аты-жөні, ЖСН немесе email бойынша іздеу...',
       noSearchResults: 'Іздеу нәтижесі табылмады',
       statsTotal: 'Барлық пайдаланушылар',
       statsAdmins: 'Әкімшілер',

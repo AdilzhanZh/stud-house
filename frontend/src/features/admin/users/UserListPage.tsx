@@ -10,6 +10,7 @@ import { DeleteIconButton } from '../../../components/DeleteIconButton'
 import { Input } from '../../../components/Input'
 import { extractErrorMessage } from '../../../api/client'
 import { deleteUser, listUsers, setUserPassword } from '../../../api/adminUserApi'
+import { matchesPersonSearch } from '../../../utils/personSearch'
 import { useAuth } from '../../auth/useAuth'
 import { roleLabels } from '../../../constants/roles'
 import { adminCellClass, adminPageHeading, adminRowClass, adminTableWrapClass, adminTheadClass } from '../adminTable'
@@ -64,11 +65,8 @@ export function UserListPage() {
   const visibleUsers = useMemo(() => {
     if (!users) return null
     const byRole = roleFilter ? users.filter((u) => u.role === roleFilter) : users
-    const q = search.trim().toLowerCase()
-    if (!q) return byRole
-    return byRole.filter(
-      (u) => u.full_name.toLowerCase().includes(q) || (u.iin ?? '').includes(q),
-    )
+    if (!search.trim()) return byRole
+    return byRole.filter((u) => matchesPersonSearch(search, u))
   }, [users, roleFilter, search])
 
   function toggleRoleFilter(role: Role | '') {

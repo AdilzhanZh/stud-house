@@ -785,7 +785,7 @@ export const en: typeof kk = {
     residents: {
       courseValue: 'Year {{course}}',
       loadError: 'Failed to load residents',
-      searchPlaceholder: 'Search residents...',
+      searchPlaceholder: 'Search by name, IIN or email...',
       course: 'Year',
       movedInAt: 'Moved in',
       notFound: 'No residents found',

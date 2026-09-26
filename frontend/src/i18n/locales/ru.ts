@@ -789,7 +789,7 @@ export const ru: typeof kk = {
     residents: {
       courseValue: '{{course}} курс',
       loadError: 'Не удалось загрузить жильцов',
-      searchPlaceholder: 'Поиск жильца...',
+      searchPlaceholder: 'Поиск по ФИО, ИИН или email...',
       course: 'Курс',
       movedInAt: 'Дата заселения',
       notFound: 'Жилец не найден',

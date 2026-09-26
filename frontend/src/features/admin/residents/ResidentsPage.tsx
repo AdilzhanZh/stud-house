@@ -10,12 +10,15 @@ import { listRoomResidents, listRoomsByDormitory } from '../../../api/roomApi'
 import { listUsers } from '../../../api/adminUserApi'
 import { getStudentProfile } from '../../../api/profileApi'
 import { formatDate } from '../../../utils/dateFormat'
+import { matchesPersonSearch } from '../../../utils/personSearch'
 import { adminCellClass, adminPageHeading, adminRowClass, adminTableWrapClass, adminTheadClass } from '../adminTable'
 
 interface ResidentRow {
   id: string
   studentId: string
   name: string
+  iin: string | null
+  email: string
   dormitoryName: string
   roomNumber: string
   course: number | null
@@ -40,6 +43,8 @@ export function ResidentsPage() {
         const [dormitories, students] = await Promise.all([listDormitories(), listUsers('student')])
         const namesById = Object.fromEntries(students.map((s) => [s.id, s.full_name]))
         const phonesById = Object.fromEntries(students.map((s) => [s.id, s.phone]))
+        const iinsById = Object.fromEntries(students.map((s) => [s.id, s.iin]))
+        const emailsById = Object.fromEntries(students.map((s) => [s.id, s.email]))
 
         const perDorm = await Promise.all(
           dormitories.map(async (d) => {
@@ -77,6 +82,8 @@ export function ResidentsPage() {
             id: r.id,
             studentId: r.studentId,
             name: namesById[r.studentId] ?? r.studentId,
+            iin: iinsById[r.studentId] ?? null,
+            email: emailsById[r.studentId] ?? '',
             dormitoryName: r.dormitoryName,
             roomNumber: r.roomNumber,
             course: courseById[r.studentId] ?? null,
@@ -97,9 +104,8 @@ export function ResidentsPage() {
 
   const visibleRows = useMemo(() => {
     if (!rows) return null
-    const q = search.trim().toLowerCase()
-    if (!q) return rows
-    return rows.filter((r) => r.name.toLowerCase().includes(q))
+    if (!search.trim()) return rows
+    return rows.filter((r) => matchesPersonSearch(search, { full_name: r.name, iin: r.iin, email: r.email }))
   }, [rows, search])
 
   return (

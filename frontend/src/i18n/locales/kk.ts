@@ -786,7 +786,7 @@ export const kk = {
     residents: {
       courseValue: '{{course}}-курс',
       loadError: 'Тұрғындарды жүктеу сәтсіз аяқталды',
-      searchPlaceholder: 'Тұрғынды іздеу...',
+      searchPlaceholder: 'Аты-жөні, ЖСН немесе email бойынша іздеу...',
       course: 'Курс',
       movedInAt: 'Орналасқан күні',
       notFound: 'Тұрғын табылмады',

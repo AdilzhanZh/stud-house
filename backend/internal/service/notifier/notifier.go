@@ -42,7 +42,7 @@ func (n *Notifier) Notify(ctx context.Context, userID uuid.UUID, notifType domai
 	}
 
 	if n.mailer.Enabled() {
-		if user, err := n.users.GetByID(ctx, userID); err == nil && user.Role == domain.RoleStudent {
+		if user, err := n.users.GetByID(ctx, userID); err == nil && user.Role == domain.RoleStudent && user.Email != "" {
 			go func(email, subject, body string) {
 				if err := n.mailer.Send(email, subject, body); err != nil {
 					log.Printf("failed to send notification email to %s: %v", email, err)

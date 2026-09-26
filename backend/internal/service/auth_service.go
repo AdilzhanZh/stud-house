@@ -110,16 +110,25 @@ type studentRegistrationInput struct {
 // the same email/IIN (see isReplaceableStudent), and creates the user +
 // student_profiles rows with the given approvalStatus — the one thing the
 // two call sites (self-registration vs. admin/manager creation) disagree
-// about.
+// about. requireEmail is also call-site-specific: a self-registering
+// applicant must give a real email, but a student an admin/manager vouches
+// for in person doesn't need one — they log in with their IIN either way
+// (see AuthService.Login) — so an empty email is left as '' rather than
+// rejected.
 func createStudentAccount(
 	ctx context.Context,
 	users repository.UserRepository,
 	profiles repository.StudentProfileRepository,
 	in studentRegistrationInput,
 	approvalStatus domain.ApprovalStatus,
+	requireEmail bool,
 ) (*domain.User, error) {
-	if in.FullName == "" || in.Email == "" || in.Password == "" || in.IIN == "" {
-		return nil, apperror.BadRequest("аты-жөні, email, ЖСН (ИИН) және құпия сөз міндетті")
+	if in.FullName == "" || in.Password == "" || in.IIN == "" || (requireEmail && in.Email == "") {
+		msg := "аты-жөні, ЖСН (ИИН) және құпия сөз міндетті"
+		if requireEmail {
+			msg = "аты-жөні, email, ЖСН (ИИН) және құпия сөз міндетті"
+		}
+		return nil, apperror.BadRequest(msg)
 	}
 	if len(in.Password) < 8 {
 		return nil, apperror.BadRequest("құпия сөз кемінде 8 таңбадан тұруы керек")
@@ -137,13 +146,19 @@ func createStudentAccount(
 		return nil, apperror.BadRequest(fmt.Sprintf("курс 1 мен %d аралығында болуы керек", in.AcademicDegree.MaxCourse()))
 	}
 
-	existingByEmail, err := users.GetByEmail(ctx, in.Email)
-	if err == nil {
-		if !isReplaceableStudent(existingByEmail) {
-			return nil, apperror.Conflict("бұл email-мен пайдаланушы бұрыннан бар")
+	// A blank email has nothing to deduplicate against — it's not stored
+	// uniquely (see migration 000076), so there is no "existing" row to find.
+	var existingByEmail *domain.User
+	if in.Email != "" {
+		var err error
+		existingByEmail, err = users.GetByEmail(ctx, in.Email)
+		if err == nil {
+			if !isReplaceableStudent(existingByEmail) {
+				return nil, apperror.Conflict("бұл email-мен пайдаланушы бұрыннан бар")
+			}
+		} else if !errors.Is(err, repository.ErrNotFound) {
+			return nil, err
 		}
-	} else if !errors.Is(err, repository.ErrNotFound) {
-		return nil, err
 	}
 
 	existingByIIN, err := users.GetByIIN(ctx, in.IIN)
@@ -217,7 +232,7 @@ func (s *AuthService) RegisterStudent(ctx context.Context, fullName, email, phon
 	return createStudentAccount(ctx, s.users, s.profiles, studentRegistrationInput{
 		FullName: fullName, Email: email, Phone: phone, Password: password, IIN: iin,
 		Gender: gender, Course: course, AcademicDegree: academicDegree,
-	}, domain.ApprovalPending)
+	}, domain.ApprovalPending, true)
 }
 
 type TokenPair struct {

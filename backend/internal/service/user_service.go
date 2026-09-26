@@ -86,12 +86,14 @@ func (s *UserService) CreateUser(ctx context.Context, fullName, email, phone, pa
 // with the same fields collected during self-registration (see
 // AuthService.RegisterStudent), already approved — a manager/admin vouching
 // for the student in person is itself the trust self-registration otherwise
-// has to earn through the manager-approval queue.
+// has to earn through the manager-approval queue. Unlike self-registration,
+// email is optional here: the student logs in with their IIN either way
+// (see AuthService.Login).
 func (s *UserService) CreateStudent(ctx context.Context, fullName, email, phone, password, iin string, gender domain.Gender, course int16, academicDegree domain.AcademicDegree) (*domain.User, error) {
 	return createStudentAccount(ctx, s.users, s.profiles, studentRegistrationInput{
 		FullName: fullName, Email: email, Phone: phone, Password: password, IIN: iin,
 		Gender: gender, Course: course, AcademicDegree: academicDegree,
-	}, domain.ApprovalApproved)
+	}, domain.ApprovalApproved, false)
 }
 
 func (s *UserService) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {

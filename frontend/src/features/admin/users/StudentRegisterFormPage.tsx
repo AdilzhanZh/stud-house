@@ -10,11 +10,13 @@ import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
 import { extractErrorMessage } from '../../../api/client'
 import { createStudent } from '../../../api/adminUserApi'
-import { buildRegisterSchema, type RegisterFormValues } from '../../auth/schemas'
+import { buildAdminStudentSchema, type AdminStudentFormValues } from '../../auth/schemas'
 
-// Same fields/validation as public self-registration (see RegisterPage), but
-// submits to POST /admin/students: the account is created already
-// approved and email-verified, with no confirmation step to wait on.
+// Same fields as public self-registration (see RegisterPage), but submits to
+// POST /admin/students: the account is created already approved, and email
+// is optional here — a manager/admin vouches for the student in person, and
+// the student logs in with their IIN either way, so there's no need for a
+// working email like self-registration relies on for the approval flow.
 export function StudentRegisterFormPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -26,13 +28,13 @@ export function StudentRegisterFormPage() {
     watch,
     resetField,
     formState: { errors, isSubmitting },
-  } = useForm<RegisterFormValues>({ resolver: zodResolver(buildRegisterSchema(t)) })
+  } = useForm<AdminStudentFormValues>({ resolver: zodResolver(buildAdminStudentSchema(t)) })
 
   const academicDegree = watch('academic_degree')
   const courseOptions =
     academicDegree === 'master' ? [1, 2] : academicDegree === 'doctorate' ? [1, 2, 3] : [1, 2, 3, 4]
 
-  async function onSubmit(values: RegisterFormValues) {
+  async function onSubmit(values: AdminStudentFormValues) {
     setServerError(null)
     try {
       const fullName = [values.aty, values.familiya, values.tegi]
@@ -41,7 +43,7 @@ export function StudentRegisterFormPage() {
         .join(' ')
       await createStudent({
         full_name: fullName,
-        email: values.email,
+        email: values.email ?? '',
         phone: values.phone,
         iin: values.iin,
         password: values.password,
@@ -85,7 +87,6 @@ export function StudentRegisterFormPage() {
             type="email"
             autoComplete="email"
             error={errors.email?.message}
-            required
             {...register('email')}
           />
           <Input

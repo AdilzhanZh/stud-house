@@ -44,7 +44,7 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 
 type createStudentRequest struct {
 	FullName       string                `json:"full_name" binding:"required"`
-	Email          string                `json:"email" binding:"required,email"`
+	Email          string                `json:"email" binding:"omitempty,email"`
 	Phone          string                `json:"phone"`
 	Password       string                `json:"password" binding:"required"`
 	IIN            string                `json:"iin" binding:"required"`

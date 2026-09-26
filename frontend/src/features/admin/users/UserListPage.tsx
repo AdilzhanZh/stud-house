@@ -202,7 +202,7 @@ export function UserListPage() {
               {visibleUsers?.map((u) => (
                 <tr key={u.id} className={`${adminRowClass} cursor-pointer`} onClick={() => setDetailsTarget(u)}>
                   <td className={`${adminCellClass} font-semibold text-sand-100`}>{u.full_name}</td>
-                  <td className={`${adminCellClass} text-sand-300`}>{u.email}</td>
+                  <td className={`${adminCellClass} text-sand-300`}>{u.email || '—'}</td>
                   <td className={`${adminCellClass} text-sand-300`}>{roleLabels[u.role]}</td>
                   <td className={`${adminCellClass} text-sand-300`}>{u.is_committee_member ? t('admin.users.yes') : '—'}</td>
                   <td className={`${adminCellClass} text-sand-300`}>{u.is_chairperson ? t('admin.users.yes') : '—'}</td>
@@ -307,7 +307,7 @@ export function UserListPage() {
             <dl className="mt-4 flex flex-col gap-2.5 text-sm">
               <div className="flex justify-between gap-4">
                 <dt className="text-sand-300">Email</dt>
-                <dd className="text-right text-sand-100">{detailsTarget.email}</dd>
+                <dd className="text-right text-sand-100">{detailsTarget.email || '—'}</dd>
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="text-sand-300">{t('admin.users.phone')}</dt>

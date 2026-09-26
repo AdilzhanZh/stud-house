@@ -304,7 +304,7 @@ export function ApplicationAdminDetailPage() {
             <div className="flex flex-col gap-2 text-sm">
               <div className="flex justify-between gap-3">
                 <span className="text-sand-300">Email</span>
-                <span className="font-semibold text-sand-100">{student?.email}</span>
+                <span className="font-semibold text-sand-100">{student?.email || '—'}</span>
               </div>
               <div className="flex justify-between gap-3">
                 <span className="text-sand-300">{t('admin.applications.phone')}</span>

@@ -33,8 +33,8 @@ export interface CreateStudentPayload {
 }
 
 // Admin/manager creates a student account directly — same fields as public
-// self-registration, but the account is already approved and email-verified
-// (no confirmation step to wait on).
+// self-registration, but the account is already approved, and email may be
+// left blank ('') since the student logs in with their IIN either way.
 export async function createStudent(payload: CreateStudentPayload): Promise<User> {
   const { data } = await apiClient.post<{ data: User }>('/admin/students', payload)
   return data.data

@@ -62,7 +62,10 @@ export function RoomRestrictionsDialog({ room, onClose, onSaved }: RoomRestricti
       <Select
         label={t('admin.rooms.genderRestriction')}
         value={gender}
-        onChange={(e) => setGender(e.target.value as Gender | 'shared')}
+        onChange={(e) => {
+          setGender(e.target.value as Gender | 'shared')
+          setError(null)
+        }}
       >
         <option value="shared">{t('admin.rooms.sharedGender')}</option>
         <option value="male">{t('admin.dormitories.male')}</option>

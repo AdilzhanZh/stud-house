@@ -22,7 +22,7 @@ export function RoomFormPage() {
   const [roomNumber, setRoomNumber] = useState('')
   const [floor, setFloor] = useState('')
   const [capacity, setCapacity] = useState('')
-  const [gender, setGender] = useState<Gender | 'any' | ''>('')
+  const [gender, setGender] = useState<Gender | 'shared' | ''>('')
   const [courses, setCourses] = useState<number[]>([])
   const [degrees, setDegrees] = useState<AcademicDegree[]>([])
 
@@ -38,7 +38,7 @@ export function RoomFormPage() {
         setRoomNumber(room.room_number)
         setFloor(room.floor != null ? String(room.floor) : '')
         setCapacity(String(room.capacity))
-        setGender(room.restrictions.gender ?? 'any')
+        setGender(room.restrictions.gender ?? 'shared')
         setCourses(room.restrictions.courses ?? [])
         setDegrees(room.restrictions.degrees ?? [])
         setOwnerDormitoryId(room.dormitory_id)
@@ -76,7 +76,7 @@ export function RoomFormPage() {
     try {
       const room = isEdit && roomId ? await updateRoom(roomId, payload) : await createRoom(dormitoryId!, payload)
       await updateRoomRestrictions(room.id, {
-        gender: gender === 'any' ? null : gender || null,
+        gender: gender === 'shared' ? null : gender || null,
         courses,
         degrees,
         benefit_ids: room.restrictions?.benefit_ids ?? [],
@@ -129,13 +129,13 @@ export function RoomFormPage() {
         <Select
           label={t('admin.rooms.genderRestriction')}
           value={gender}
-          onChange={(e) => setGender(e.target.value as Gender | 'any' | '')}
+          onChange={(e) => setGender(e.target.value as Gender | 'shared' | '')}
           required
         >
           <option value="" disabled>
             {t('admin.common.select')}
           </option>
-          <option value="any">{t('admin.rooms.anyGender')}</option>
+          <option value="shared">{t('admin.rooms.sharedGender')}</option>
           <option value="male">{t('admin.dormitories.male')}</option>
           <option value="female">{t('admin.dormitories.female')}</option>
         </Select>

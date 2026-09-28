@@ -115,9 +115,18 @@ func (r *RoomRepo) UpdateRestrictions(ctx context.Context, id uuid.UUID, restric
 	return nil
 }
 
+// Delete maps a foreign-key violation (e.g. an application still referencing
+// this room via assigned_room_id/preferred_room_id, or a transfer request via
+// current_room_id/requested_room_id) to ErrConflict — mirrors
+// DormitoryRepo.Delete. room_residents itself cascades on room deletion, but
+// RoomService.Delete refuses to get here while active residents remain.
 func (r *RoomRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	tag, err := r.db.Exec(ctx, `DELETE FROM rooms WHERE id = $1`, id)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+			return repository.ErrConflict
+		}
 		return err
 	}
 	if tag.RowsAffected() == 0 {

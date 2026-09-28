@@ -41,6 +41,10 @@ export async function updateRoom(id: string, payload: RoomPayload): Promise<Room
   return data.data
 }
 
+export async function deleteRoom(id: string): Promise<void> {
+  await apiClient.delete(`/rooms/${id}`)
+}
+
 export async function updateRoomRestrictions(
   id: string,
   restrictions: RoomRestrictions,

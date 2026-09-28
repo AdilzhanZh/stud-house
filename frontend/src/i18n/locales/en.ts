@@ -563,6 +563,7 @@ export const en: typeof kk = {
       deleteConfirm: 'Delete the dormitory "{{name}}"? This action cannot be undone.',
       male: 'Male',
       female: 'Female',
+      shared: 'Shared',
       coursesRestriction: 'Year {{courses}}',
       benefitsRestriction: '{{count}} benefits',
       unrestricted: 'No restrictions',
@@ -621,7 +622,7 @@ export const en: typeof kk = {
       capacityLabel: 'Number of seats',
       floorLabel: 'Floor',
       genderRestriction: 'Gender restriction',
-      anyGender: 'Any',
+      sharedGender: 'Shared',
       editRestrictionsTitle: 'Edit room {{room}} restriction',
       genderMismatchDialogHint:
         "This room's gender restriction doesn't match the applicant. Relax it here, or cancel and pick a different room. A change is rejected if it would no longer fit a current resident.",
@@ -643,6 +644,9 @@ export const en: typeof kk = {
       transferTitle: '{{name}} — transfer to another room',
       transferFailed: 'Failed to transfer the resident',
       chooseDormitoryFirst: 'Select a dormitory first',
+      deleteTitle: 'Delete room',
+      deleteConfirm: 'Delete room {{room}}? This action cannot be undone.',
+      deleteFailed: 'Failed to delete the room',
     },
     benefits: {
       editTitle: 'Edit benefit',

@@ -566,6 +566,7 @@ export const ru: typeof kk = {
       deleteConfirm: 'Удалить общежитие «{{name}}»? Это действие нельзя отменить.',
       male: 'Мужской',
       female: 'Женский',
+      shared: 'Общая',
       coursesRestriction: '{{courses}} курс',
       benefitsRestriction: '{{count}} льгот',
       unrestricted: 'Без ограничений',
@@ -624,7 +625,7 @@ export const ru: typeof kk = {
       capacityLabel: 'Количество мест',
       floorLabel: 'Этаж (Floor)',
       genderRestriction: 'Ограничение по полу',
-      anyGender: 'Любой',
+      sharedGender: 'Общая',
       editRestrictionsTitle: 'Изменить ограничение комнаты {{room}}',
       genderMismatchDialogHint:
         'Ограничение по полу этой комнаты не подходит заявителю. Измените его здесь или отмените и выберите другую комнату. Изменение будет отклонено, если оно не подойдёт текущему жильцу.',
@@ -646,6 +647,9 @@ export const ru: typeof kk = {
       transferTitle: '{{name}} — переселение в другую комнату',
       transferFailed: 'Не удалось переселить жильца',
       chooseDormitoryFirst: 'Сначала выберите общежитие',
+      deleteTitle: 'Удалить комнату',
+      deleteConfirm: 'Удалить комнату {{room}}? Это действие нельзя отменить.',
+      deleteFailed: 'Не удалось удалить комнату',
     },
     benefits: {
       editTitle: 'Редактирование льготы',

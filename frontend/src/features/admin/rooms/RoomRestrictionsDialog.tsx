@@ -21,12 +21,12 @@ interface RoomRestrictionsDialogProps {
 // fit an existing resident, surfaced here as a normal form error.
 export function RoomRestrictionsDialog({ room, onClose, onSaved }: RoomRestrictionsDialogProps) {
   const { t } = useTranslation()
-  const [gender, setGender] = useState<Gender | 'any'>('any')
+  const [gender, setGender] = useState<Gender | 'shared'>('shared')
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
-    setGender(room?.restrictions.gender ?? 'any')
+    setGender(room?.restrictions.gender ?? 'shared')
     setError(null)
   }, [room])
 
@@ -36,7 +36,7 @@ export function RoomRestrictionsDialog({ room, onClose, onSaved }: RoomRestricti
     setIsSaving(true)
     try {
       const updated = await updateRoomRestrictions(room.id, {
-        gender: gender === 'any' ? null : gender,
+        gender: gender === 'shared' ? null : gender,
         courses: room.restrictions.courses,
         degrees: room.restrictions.degrees,
         benefit_ids: room.restrictions.benefit_ids,
@@ -62,9 +62,9 @@ export function RoomRestrictionsDialog({ room, onClose, onSaved }: RoomRestricti
       <Select
         label={t('admin.rooms.genderRestriction')}
         value={gender}
-        onChange={(e) => setGender(e.target.value as Gender | 'any')}
+        onChange={(e) => setGender(e.target.value as Gender | 'shared')}
       >
-        <option value="any">{t('admin.rooms.anyGender')}</option>
+        <option value="shared">{t('admin.rooms.sharedGender')}</option>
         <option value="male">{t('admin.dormitories.male')}</option>
         <option value="female">{t('admin.dormitories.female')}</option>
       </Select>

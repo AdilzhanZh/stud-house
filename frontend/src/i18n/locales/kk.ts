@@ -563,6 +563,7 @@ export const kk = {
       deleteConfirm: '"{{name}}" жатақханасын өшіргіңіз келе ме? Бұл әрекетті қайтару мүмкін емес.',
       male: 'Ер',
       female: 'Әйел',
+      shared: 'Ортақ',
       coursesRestriction: '{{courses}} курс',
       benefitsRestriction: '{{count}} льгота',
       unrestricted: 'Шектеусіз',
@@ -621,7 +622,7 @@ export const kk = {
       capacityLabel: 'Орын саны',
       floorLabel: 'Қабат (Floor)',
       genderRestriction: 'Жынысы бойынша шектеу',
-      anyGender: 'Кез келген',
+      sharedGender: 'Ортақ',
       editRestrictionsTitle: '{{room}}-бөлменің шектеуін өзгерту',
       genderMismatchDialogHint:
         'Бұл бөлменің жыныс шектеуі өтініш берушіге сай келмейді. Мұнда өзгертіңіз немесе бас тартып, басқа бөлме таңдаңыз. Қазіргі тұрғынға сай келмесе, өзгеріс қабылданбайды.',
@@ -643,6 +644,9 @@ export const kk = {
       transferTitle: '{{name}} — бөлме ауыстыру',
       transferFailed: 'Бөлме ауыстыру сәтсіз аяқталды',
       chooseDormitoryFirst: 'Алдымен жатақхананы таңдаңыз',
+      deleteTitle: 'Бөлмені өшіру',
+      deleteConfirm: '{{room}} бөлмесін өшіргіңіз келе ме? Бұл әрекетті қайтару мүмкін емес.',
+      deleteFailed: 'Бөлмені өшіру сәтсіз аяқталды',
     },
     benefits: {
       editTitle: 'Льготаны өзгерту',

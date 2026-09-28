@@ -143,10 +143,27 @@ func (s *RoomService) Update(ctx context.Context, id uuid.UUID, in RoomInput) (*
 	return s.GetByID(ctx, id)
 }
 
+// Delete refuses to remove a room that still has active residents — since
+// room_residents cascades on room deletion, deleting it out from under them
+// would silently erase their residency history instead of releasing them
+// through MoveOutResident (which also notifies the student). A room still
+// referenced by an application/transfer request surfaces as a conflict too
+// (see RoomRepo.Delete).
 func (s *RoomService) Delete(ctx context.Context, id uuid.UUID) error {
+	residents, err := s.rooms.ListActiveResidents(ctx, id)
+	if err != nil {
+		return err
+	}
+	if len(residents) > 0 {
+		return apperror.Conflict("бөлмеде тұрғындар бар, оны өшірмес бұрын алдымен оларды шығарыңыз")
+	}
+
 	if err := s.rooms.Delete(ctx, id); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return apperror.NotFound("бөлме табылмады")
+		}
+		if errors.Is(err, repository.ErrConflict) {
+			return apperror.Conflict("бұл бөлмеге тіркелген өтініш немесе ауысу сұранысы бар, оны өшіру мүмкін емес")
 		}
 		return err
 	}

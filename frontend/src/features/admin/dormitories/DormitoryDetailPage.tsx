@@ -6,10 +6,12 @@ import { ChevronLeft } from 'lucide-react'
 import { Card } from '../../../components/Card'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
+import { ConfirmDialog } from '../../../components/ConfirmDialog'
+import { DeleteIconButton } from '../../../components/DeleteIconButton'
 import { FloorCorridorMap } from '../../../components/FloorCorridorMap'
 import { extractErrorMessage } from '../../../api/client'
 import { getDormitory, getDormitoryCapacity } from '../../../api/dormitoryApi'
-import { listRoomResidents, listRoomsByDormitory } from '../../../api/roomApi'
+import { deleteRoom, listRoomResidents, listRoomsByDormitory } from '../../../api/roomApi'
 import { adminCellClass, adminPageHeading, adminRowClass, adminTableWrapClass, adminTheadClass } from '../adminTable'
 import type { Dormitory, DormitoryCapacity } from '../../../types/dormitories'
 import type { Room } from '../../../types/rooms'
@@ -22,6 +24,8 @@ function restrictionsSummary(room: Room, t: TFunction): string {
   const parts: string[] = []
   if (room.restrictions.gender) {
     parts.push(room.restrictions.gender === 'male' ? t('admin.dormitories.male') : t('admin.dormitories.female'))
+  } else {
+    parts.push(t('admin.dormitories.shared'))
   }
   if ((room.restrictions.courses ?? []).length > 0) {
     parts.push(t('admin.dormitories.coursesRestriction', { courses: room.restrictions.courses.join(',') }))
@@ -43,7 +47,11 @@ export function DormitoryDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [selectedFloor, setSelectedFloor] = useState<string | null>(null)
 
-  useEffect(() => {
+  const [deleteTarget, setDeleteTarget] = useState<RoomRow | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  function load() {
     if (!id) return
     Promise.all([getDormitory(id), getDormitoryCapacity(id), listRoomsByDormitory(id)])
       .then(async ([d, cap, roomList]) => {
@@ -58,7 +66,24 @@ export function DormitoryDetailPage() {
         setRooms(withResidents)
       })
       .catch((err) => setError(extractErrorMessage(err, t('admin.common.loadError'))))
-  }, [id])
+  }
+
+  useEffect(load, [id])
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleteError(null)
+    setIsDeleting(true)
+    try {
+      await deleteRoom(deleteTarget.id)
+      setDeleteTarget(null)
+      load()
+    } catch (err) {
+      setDeleteError(extractErrorMessage(err, t('admin.rooms.deleteFailed')))
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   if (error) return <Alert variant="error" message={error} />
   if (!dormitory || !capacity || !rooms) return <p className="text-sm text-sand-300">{t('admin.common.loading')}</p>
@@ -92,6 +117,8 @@ export function DormitoryDetailPage() {
         <ChevronLeft className="h-4 w-4" /> {t('admin.layout.dormitories')}
       </button>
       <h1 className={adminPageHeading}>{dormitory.name} · {t('admin.dormitories.roomsWord')}</h1>
+
+      {deleteError && <Alert variant="error" message={deleteError} />}
 
       <Card>
         <p className="text-sm text-sand-300">{dormitory.address}</p>
@@ -200,6 +227,7 @@ export function DormitoryDetailPage() {
                     >
                       {t('admin.layout.residents')}
                     </button>
+                    <DeleteIconButton onClick={() => setDeleteTarget(room)} />
                   </div>
                 </td>
               </tr>
@@ -214,6 +242,16 @@ export function DormitoryDetailPage() {
           </tbody>
         </table>
       </Card>
+
+      <ConfirmDialog
+        open={deleteTarget != null}
+        title={t('admin.rooms.deleteTitle')}
+        message={t('admin.rooms.deleteConfirm', { room: deleteTarget?.room_number })}
+        danger
+        isLoading={isDeleting}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   )
 }

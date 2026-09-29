@@ -55,6 +55,9 @@ func (s *RoomService) Create(ctx context.Context, dormitoryID uuid.UUID, in Room
 	if in.Capacity <= 0 {
 		return nil, apperror.BadRequest("сыйымдылық оң сан болуы керек")
 	}
+	if in.Floor == nil {
+		return nil, apperror.BadRequest("қабат көрсетілуі міндетті")
+	}
 	if _, err := s.dormitories.GetByID(ctx, dormitoryID); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return nil, apperror.NotFound("жатақхана табылмады")
@@ -122,6 +125,9 @@ func (s *RoomService) Update(ctx context.Context, id uuid.UUID, in RoomInput) (*
 	}
 	if in.Capacity <= 0 {
 		return nil, apperror.BadRequest("сыйымдылық оң сан болуы керек")
+	}
+	if in.Floor == nil {
+		return nil, apperror.BadRequest("қабат көрсетілуі міндетті")
 	}
 	category := in.Category
 	if category == "" {

@@ -90,8 +90,14 @@ export function DormitoryDetailPage() {
 
   const floorGroups = Object.entries(
     rooms.reduce<Record<number, RoomRow[]>>((byFloor, room) => {
-      if (room.floor == null) return byFloor
-      byFloor[room.floor] = [...(byFloor[room.floor] ?? []), room]
+      // A null floor (legacy data from before floor was required, or written
+      // by something that bypassed that check) must still show up somewhere
+      // — grouping it under 0 like the other floor-tab views (RoomPicker,
+      // PlaceStudentPage, ApplicationAdminDetailPage) do, rather than
+      // dropping the room entirely, which made it invisible here yet still
+      // block recreating it under the same room number (unique constraint).
+      const floor = room.floor ?? 0
+      byFloor[floor] = [...(byFloor[floor] ?? []), room]
       return byFloor
     }, {}),
   ).sort(([a], [b]) => Number(a) - Number(b))

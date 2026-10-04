@@ -24,6 +24,8 @@ import { getStudentProfile } from '../../../api/profileApi'
 import { listBenefits, listStudentBenefits } from '../../../api/benefitApi'
 import { bilingualField } from '../../../utils/bilingualField'
 import { formatDate } from '../../../utils/dateFormat'
+import { canManage } from '../../../constants/roles'
+import { useAuth } from '../../auth/useAuth'
 import type { Room, RoomResident } from '../../../types/rooms'
 import type { Application } from '../../../types/applications'
 import type { Dormitory } from '../../../types/dormitories'
@@ -39,6 +41,10 @@ export function RoomResidentsView() {
   const { t, i18n } = useTranslation()
   const { roomId } = useParams<{ roomId: string }>()
   const navigate = useNavigate()
+  // Users without the manager position see residents read-only: no
+  // placing, transferring or moving out, and no (manager-only) applications.
+  const { user } = useAuth()
+  const isManager = canManage(user)
 
   const [room, setRoom] = useState<Room | null>(null)
   const [residents, setResidents] = useState<RoomResident[] | null>(null)
@@ -73,7 +79,7 @@ export function RoomResidentsView() {
       getRoom(roomId),
       listRoomResidents(roomId),
       listUsers('student'),
-      listApplications('settled'),
+      isManager ? listApplications('settled') : Promise.resolve([] as Application[]),
       listDormitories(),
     ])
       .then(([r, residentList, studentList, settled, dormitoryList]) => {
@@ -86,7 +92,7 @@ export function RoomResidentsView() {
       .catch((err) => setError(extractErrorMessage(err, t('admin.common.loadError'))))
   }
 
-  useEffect(load, [roomId])
+  useEffect(load, [roomId, isManager])
 
   useEffect(() => {
     if (!transferDormitoryId) {
@@ -250,26 +256,28 @@ export function RoomResidentsView() {
                       {formatDate(r.moved_in_at)}
                     </p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      type="button"
-                      aria-label={t('admin.rooms.transfer')}
-                      title={t('admin.rooms.transfer')}
-                      className="flex h-9 w-9 items-center justify-center rounded-xl text-turquoise-400 transition-colors hover:bg-turquoise-500/10"
-                      onClick={() => openTransfer(r)}
-                    >
-                      <ArrowLeftRight className="h-4.5 w-4.5" />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={t('admin.rooms.release')}
-                      title={t('admin.rooms.release')}
-                      className="flex h-9 w-9 items-center justify-center rounded-xl text-clay-400 transition-colors hover:bg-clay-500/10"
-                      onClick={() => setReleaseTarget(r)}
-                    >
-                      <DoorOpen className="h-4.5 w-4.5" />
-                    </button>
-                  </div>
+                  {isManager && (
+                    <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        aria-label={t('admin.rooms.transfer')}
+                        title={t('admin.rooms.transfer')}
+                        className="flex h-9 w-9 items-center justify-center rounded-xl text-turquoise-400 transition-colors hover:bg-turquoise-500/10"
+                        onClick={() => openTransfer(r)}
+                      >
+                        <ArrowLeftRight className="h-4.5 w-4.5" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={t('admin.rooms.release')}
+                        title={t('admin.rooms.release')}
+                        className="flex h-9 w-9 items-center justify-center rounded-xl text-clay-400 transition-colors hover:bg-clay-500/10"
+                        onClick={() => setReleaseTarget(r)}
+                      >
+                        <DoorOpen className="h-4.5 w-4.5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {transferTarget?.id === r.id && (
@@ -323,42 +331,44 @@ export function RoomResidentsView() {
         )}
       </Card>
 
-      <Card>
-        <div className="mb-3 flex items-center gap-2.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-navy-800">
-            <UserPlus className="h-4.5 w-4.5 text-turquoise-400" />
-          </span>
-          <p className="text-[15px] font-bold text-sand-100">{t('admin.rooms.addResident')}</p>
-        </div>
-        {assignError && <Alert variant="error" message={assignError} />}
-        {eligibleApplications.length === 0 ? (
-          <p className="text-sm text-sand-300">{t('admin.rooms.noEligibleStudents')}</p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            <Select
-              label={t('admin.applications.student')}
-              value={selectedStudentId}
-              onChange={(e) => setSelectedStudentId(e.target.value)}
-            >
-              <option value="">{t('admin.common.select')}</option>
-              {eligibleApplications.map((a) => (
-                <option key={a.id} value={a.student_id}>
-                  {namesById[a.student_id] ?? a.student_id}
-                  {a.preferred_room_id === room.id ? ` ${t('admin.rooms.preferredThisRoom')}` : ''}
-                </option>
-              ))}
-            </Select>
-            <Button
-              onClick={handleAssign}
-              isLoading={isAssigning}
-              disabled={!selectedStudentId}
-              className="self-start"
-            >
-              {t('admin.common.add')}
-            </Button>
+      {isManager && (
+        <Card>
+          <div className="mb-3 flex items-center gap-2.5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-navy-800">
+              <UserPlus className="h-4.5 w-4.5 text-turquoise-400" />
+            </span>
+            <p className="text-[15px] font-bold text-sand-100">{t('admin.rooms.addResident')}</p>
           </div>
-        )}
-      </Card>
+          {assignError && <Alert variant="error" message={assignError} />}
+          {eligibleApplications.length === 0 ? (
+            <p className="text-sm text-sand-300">{t('admin.rooms.noEligibleStudents')}</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <Select
+                label={t('admin.applications.student')}
+                value={selectedStudentId}
+                onChange={(e) => setSelectedStudentId(e.target.value)}
+              >
+                <option value="">{t('admin.common.select')}</option>
+                {eligibleApplications.map((a) => (
+                  <option key={a.id} value={a.student_id}>
+                    {namesById[a.student_id] ?? a.student_id}
+                    {a.preferred_room_id === room.id ? ` ${t('admin.rooms.preferredThisRoom')}` : ''}
+                  </option>
+                ))}
+              </Select>
+              <Button
+                onClick={handleAssign}
+                isLoading={isAssigning}
+                disabled={!selectedStudentId}
+                className="self-start"
+              >
+                {t('admin.common.add')}
+              </Button>
+            </div>
+          )}
+        </Card>
+      )}
 
       <ConfirmDialog
         open={releaseTarget != null}

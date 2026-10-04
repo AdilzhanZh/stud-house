@@ -15,15 +15,17 @@ var ErrInvalidToken = errors.New("invalid or expired access token")
 type Claims struct {
 	UserID            uuid.UUID   `json:"sub"`
 	Role              domain.Role `json:"role"`
+	IsManager         bool        `json:"is_manager"`
 	IsCommitteeMember bool        `json:"is_committee_member"`
 	IsChairperson     bool        `json:"is_chairperson"`
 	jwt.RegisteredClaims
 }
 
-func NewAccessToken(secret string, ttl time.Duration, userID uuid.UUID, role domain.Role, isCommitteeMember, isChairperson bool) (string, error) {
+func NewAccessToken(secret string, ttl time.Duration, userID uuid.UUID, role domain.Role, isManager, isCommitteeMember, isChairperson bool) (string, error) {
 	claims := Claims{
 		UserID:            userID,
 		Role:              role,
+		IsManager:         isManager,
 		IsCommitteeMember: isCommitteeMember,
 		IsChairperson:     isChairperson,
 		RegisteredClaims: jwt.RegisteredClaims{

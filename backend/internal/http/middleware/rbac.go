@@ -33,8 +33,36 @@ func RequireRole(allowed ...domain.Role) gin.HandlerFunc {
 	}
 }
 
+// RequireManager must run after RequireAuth. Manager is a position (an
+// admin-granted flag on role=user), not a role, so this checks the flag
+// from the JWT claims; the admin always passes.
+func RequireManager() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !CanManage(c) {
+			response.Error(c, apperror.Forbidden("бұл әрекетті орындауға құқығыңыз жоқ"))
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// RequireManagerOrCommitteeMember must run after RequireAuth. It lets
+// committee members without the manager position read the protocols they
+// vote on.
+func RequireManagerOrCommitteeMember() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !CanManage(c) && !IsCommitteeMember(c) {
+			response.Error(c, apperror.Forbidden("бұл әрекетті орындауға құқығыңыз жоқ"))
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
 // RequireCommitteeMember must run after RequireAuth. Committee membership is
-// an admin-toggled flag on a manager, not a separate role, so this checks
+// an admin-toggled flag on a user, not a separate role, so this checks
 // the flag from the JWT claims instead of Role().
 func RequireCommitteeMember() gin.HandlerFunc {
 	return func(c *gin.Context) {

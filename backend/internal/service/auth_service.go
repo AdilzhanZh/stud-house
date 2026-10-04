@@ -293,7 +293,7 @@ func (s *AuthService) Login(ctx context.Context, login, password string) (*Token
 }
 
 func (s *AuthService) issueTokenPair(ctx context.Context, user *domain.User) (*TokenPair, error) {
-	accessToken, err := jwtutil.NewAccessToken(s.jwtSecret, s.accessTTL, user.ID, user.Role, user.IsCommitteeMember, user.IsChairperson)
+	accessToken, err := jwtutil.NewAccessToken(s.jwtSecret, s.accessTTL, user.ID, user.Role, user.IsManager, user.IsCommitteeMember, user.IsChairperson)
 	if err != nil {
 		return nil, err
 	}

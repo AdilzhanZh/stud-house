@@ -26,8 +26,7 @@ func NewProtocolHandler(protocols *service.ProtocolService, applications *servic
 // only for their own application — mirrors ContractHandler's method of the
 // same name exactly.
 func (h *ProtocolHandler) canAccessApplication(c *gin.Context, applicationID uuid.UUID) bool {
-	role, _ := middleware.Role(c)
-	if role == domain.RoleAdmin || role == domain.RoleManager {
+	if middleware.CanManage(c) {
 		return true
 	}
 	app, err := h.applications.GetByID(c.Request.Context(), applicationID)
@@ -80,7 +79,8 @@ func (h *ProtocolHandler) Create(c *gin.Context) {
 	response.Created(c, protocolDTO(protocol))
 }
 
-// List is manager/admin-only: optionally filtered by ?status=.
+// List is for managers/admin and committee members (who vote on these):
+// optionally filtered by ?status=.
 func (h *ProtocolHandler) List(c *gin.Context) {
 	var status *domain.ProtocolStatus
 	if raw := c.Query("status"); raw != "" {
@@ -110,8 +110,7 @@ func (h *ProtocolHandler) EligibleApplications(c *gin.Context) {
 	response.OK(c, applicationsDTO(list))
 }
 
-// GetDetail is manager/admin-only (committee members are always managers —
-// see is_committee_member — so this already covers them).
+// GetDetail is for managers/admin and committee members (who vote on these).
 func (h *ProtocolHandler) GetDetail(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {

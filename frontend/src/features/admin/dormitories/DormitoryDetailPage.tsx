@@ -13,6 +13,8 @@ import { extractErrorMessage } from '../../../api/client'
 import { getDormitory, getDormitoryCapacity } from '../../../api/dormitoryApi'
 import { deleteRoom, listRoomResidents, listRoomsByDormitory } from '../../../api/roomApi'
 import { adminCellClass, adminPageHeading, adminRowClass, adminTableWrapClass, adminTheadClass } from '../adminTable'
+import { canManage } from '../../../constants/roles'
+import { useAuth } from '../../auth/useAuth'
 import type { Dormitory, DormitoryCapacity } from '../../../types/dormitories'
 import type { Room } from '../../../types/rooms'
 
@@ -40,6 +42,9 @@ export function DormitoryDetailPage() {
   const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  // Users without the manager position get this section read-only.
+  const { user } = useAuth()
+  const isManager = canManage(user)
 
   const [dormitory, setDormitory] = useState<Dormitory | null>(null)
   const [capacity, setCapacity] = useState<DormitoryCapacity | null>(null)
@@ -160,7 +165,9 @@ export function DormitoryDetailPage() {
 
       <div className="flex items-center justify-between">
         <h2 className="font-heading text-lg text-sand-100">{t('admin.dormitories.roomsWord')}</h2>
-        <Button onClick={() => navigate(`/admin/dormitories/${id}/rooms/new`)}>{t('admin.dormitories.newRoom')}</Button>
+        {isManager && (
+          <Button onClick={() => navigate(`/admin/dormitories/${id}/rooms/new`)}>{t('admin.dormitories.newRoom')}</Button>
+        )}
       </div>
 
       {floorGroups.length > 0 && (
@@ -221,19 +228,21 @@ export function DormitoryDetailPage() {
                 <td className={`${adminCellClass} text-sand-300`}>{restrictionsSummary(room, t)}</td>
                 <td className={adminCellClass}>
                   <div className="flex gap-3">
-                    <button
-                      className="font-semibold text-turquoise-400 hover:text-turquoise-300"
-                      onClick={() => navigate(`/admin/rooms/${room.id}/edit`)}
-                    >
-                      {t('admin.common.edit')}
-                    </button>
+                    {isManager && (
+                      <button
+                        className="font-semibold text-turquoise-400 hover:text-turquoise-300"
+                        onClick={() => navigate(`/admin/rooms/${room.id}/edit`)}
+                      >
+                        {t('admin.common.edit')}
+                      </button>
+                    )}
                     <button
                       className="font-semibold text-turquoise-400 hover:text-turquoise-300"
                       onClick={() => navigate(`/admin/rooms/${room.id}/residents`)}
                     >
                       {t('admin.layout.residents')}
                     </button>
-                    <DeleteIconButton onClick={() => setDeleteTarget(room)} />
+                    {isManager && <DeleteIconButton onClick={() => setDeleteTarget(room)} />}
                   </div>
                 </td>
               </tr>

@@ -215,8 +215,8 @@ type residenceResponse struct {
 	MovedInAt   time.Time `json:"moved_in_at"`
 }
 
-// GetMyResidence is available to the owning student or admin/manager
-// (reuses canAccessStudentResource from user_handler.go): the current active
+// GetMyResidence is available to the owning student or staff
+// (reuses canReadStudentResource from user_handler.go): the current active
 // room + its dormitory, or 404 if the student has none.
 func (h *RoomHandler) GetMyResidence(c *gin.Context) {
 	studentID, err := uuid.Parse(c.Param("id"))
@@ -224,7 +224,7 @@ func (h *RoomHandler) GetMyResidence(c *gin.Context) {
 		response.Error(c, apperror.BadRequest("студент идентификаторы дұрыс емес"))
 		return
 	}
-	if !canAccessStudentResource(c, studentID) {
+	if !canReadStudentResource(c, studentID) {
 		response.Error(c, apperror.Forbidden("тек өз тұрғылықты жеріңізді ғана көре аласыз"))
 		return
 	}

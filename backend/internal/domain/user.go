@@ -11,12 +11,15 @@ type Role string
 const (
 	RoleAdmin   Role = "admin"
 	RoleStudent Role = "student"
-	RoleManager Role = "manager"
+	// RoleUser is staff with read-only access to dormitories by default.
+	// "Manager" is no longer a role but a position (User.IsManager) admin
+	// grants on top of it, which unlocks full management access.
+	RoleUser Role = "user"
 )
 
 func (r Role) Valid() bool {
 	switch r {
-	case RoleAdmin, RoleStudent, RoleManager:
+	case RoleAdmin, RoleStudent, RoleUser:
 		return true
 	default:
 		return false
@@ -47,16 +50,23 @@ type User struct {
 	IIN          *string
 	PasswordHash string
 	Role         Role
-	// IsCommitteeMember is admin-toggled, only meaningful for role=manager —
-	// committee membership is an elected flag on top of the manager role,
-	// not a separate role. IsChairperson is a further flag on top of that
-	// (at most one true at a time, enforced by a DB partial unique index).
+	// IsManager, IsCommitteeMember and IsChairperson are admin-assigned
+	// positions, only meaningful for role=user — none is a separate role.
+	// IsChairperson is a further flag on top of IsCommitteeMember (at most
+	// one true at a time, enforced by a DB partial unique index).
+	IsManager         bool
 	IsCommitteeMember bool
 	IsChairperson     bool
 	ApprovalStatus    ApprovalStatus
 	AvatarURL         *string
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
+}
+
+// CanManage reports whether a user with this role/position combination has
+// full management access: the admin, or a user holding the manager position.
+func CanManage(role Role, isManager bool) bool {
+	return role == RoleAdmin || (role == RoleUser && isManager)
 }
 
 type Gender string

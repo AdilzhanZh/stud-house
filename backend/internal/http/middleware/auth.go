@@ -15,6 +15,7 @@ import (
 const (
 	ctxUserID            = "user_id"
 	ctxRole              = "role"
+	ctxIsManager         = "is_manager"
 	ctxIsCommitteeMember = "is_committee_member"
 	ctxIsChairperson     = "is_chairperson"
 )
@@ -46,6 +47,7 @@ func RequireAuth(jwtSecret string) gin.HandlerFunc {
 
 		c.Set(ctxUserID, claims.UserID)
 		c.Set(ctxRole, claims.Role)
+		c.Set(ctxIsManager, claims.IsManager)
 		c.Set(ctxIsCommitteeMember, claims.IsCommitteeMember)
 		c.Set(ctxIsChairperson, claims.IsChairperson)
 		c.Next()
@@ -68,6 +70,22 @@ func Role(c *gin.Context) (domain.Role, bool) {
 	}
 	role, ok := v.(domain.Role)
 	return role, ok
+}
+
+func IsManager(c *gin.Context) bool {
+	v, ok := c.Get(ctxIsManager)
+	if !ok {
+		return false
+	}
+	b, _ := v.(bool)
+	return b
+}
+
+// CanManage reports whether the caller has full management access — the
+// admin, or a user holding the manager position (see domain.CanManage).
+func CanManage(c *gin.Context) bool {
+	role, _ := Role(c)
+	return domain.CanManage(role, IsManager(c))
 }
 
 func IsChairperson(c *gin.Context) bool {

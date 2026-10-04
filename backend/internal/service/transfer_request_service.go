@@ -152,14 +152,8 @@ func (s *TransferRequestService) Decide(ctx context.Context, actorID, transferRe
 
 func (s *TransferRequestService) notifyManagersNewTransferRequest(ctx context.Context, tr *domain.TransferRequest) {
 	const body = "Жаңа бөлме/жатақхана ауыстыру өтініші қаралуды күтуде."
-	for _, role := range []domain.Role{domain.RoleAdmin, domain.RoleManager} {
-		staff, err := s.users.ListByRole(ctx, role)
-		if err != nil {
-			continue
-		}
-		for _, u := range staff {
-			_ = s.notifier.Notify(ctx, u.ID, domain.NotificationTransferRequestUpdate, "Жаңа ауыстыру өтініші", body, nil)
-		}
+	for _, u := range listManagementStaff(ctx, s.users) {
+		_ = s.notifier.Notify(ctx, u.ID, domain.NotificationTransferRequestUpdate, "Жаңа ауыстыру өтініші", body, nil)
 	}
 }
 

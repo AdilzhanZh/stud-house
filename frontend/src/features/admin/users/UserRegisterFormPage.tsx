@@ -34,7 +34,7 @@ export function UserRegisterFormPage() {
         .map((part) => part.trim())
         .filter(Boolean)
         .join(' ')
-      await createUser({ full_name: fullName, email, phone, password, role: 'manager' })
+      await createUser({ full_name: fullName, email, phone, password, role: 'user' })
       navigate('/admin/users')
     } catch (err) {
       setError(extractErrorMessage(err, t('admin.users.registerFailed')))
@@ -49,7 +49,7 @@ export function UserRegisterFormPage() {
         ← {t('admin.common.back')}
       </Button>
 
-      <Card title={t('admin.users.registerManager')}>
+      <Card title={t('admin.users.registerUser')}>
         <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
           {error && <Alert variant="error" message={error} />}
           <Input label={t('admin.users.firstName')} value={aty} onChange={(e) => setAty(e.target.value)} required />

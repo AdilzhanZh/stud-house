@@ -18,6 +18,7 @@ type userResponse struct {
 	Phone             string    `json:"phone"`
 	IIN               *string   `json:"iin"`
 	Role              string    `json:"role"`
+	IsManager         bool      `json:"is_manager"`
 	IsCommitteeMember bool      `json:"is_committee_member"`
 	IsChairperson     bool      `json:"is_chairperson"`
 	ApprovalStatus    string    `json:"approval_status"`
@@ -34,6 +35,7 @@ func userDTO(u *domain.User) userResponse {
 		Phone:             u.Phone,
 		IIN:               u.IIN,
 		Role:              string(u.Role),
+		IsManager:         u.IsManager,
 		IsCommitteeMember: u.IsCommitteeMember,
 		IsChairperson:     u.IsChairperson,
 		ApprovalStatus:    string(u.ApprovalStatus),

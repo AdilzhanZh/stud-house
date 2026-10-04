@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'student' | 'manager'
+export type Role = 'admin' | 'student' | 'user'
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 
@@ -9,8 +9,11 @@ export interface User {
   phone: string
   iin: string | null
   role: Role
-  // Committee membership is an admin-elected flag on a manager, not a
-  // separate role. is_chairperson is a further flag on top of that.
+  // Manager, committee member and chairperson are admin-assigned positions
+  // on a role=user account, not separate roles. is_manager unlocks full
+  // management access; is_chairperson is a further flag on top of
+  // is_committee_member.
+  is_manager: boolean
   is_committee_member: boolean
   is_chairperson: boolean
   approval_status: ApprovalStatus

@@ -48,6 +48,7 @@ import { TransferRequestListPage } from './features/admin/requests/TransferReque
 import { ProtectedRoute } from './routes/ProtectedRoute'
 import { RoleBasedRedirect } from './routes/RoleBasedRedirect'
 import { useAuthBootstrap } from './features/auth/useAuthBootstrap'
+import { canManage } from './constants/roles'
 
 function App() {
   const isReady = useAuthBootstrap()
@@ -84,41 +85,50 @@ function App() {
         </Route>
       </Route>
 
-      <Route element={<ProtectedRoute allowedRoles={['admin', 'manager']} />}>
+      <Route element={<ProtectedRoute allowedRoles={['admin', 'user']} />}>
         <Route element={<AdminLayout />}>
+          {/* Every staff user: the dashboard and read-only dormitories. */}
           <Route path="/admin/dashboard" element={<DashboardPage />} />
-          <Route path="/admin/residents" element={<ResidentsPage />} />
-          <Route path="/admin/residents/place" element={<PlaceStudentPage />} />
-          <Route path="/admin/notifications/broadcast" element={<NotificationBroadcastPage />} />
           <Route path="/admin/dormitories" element={<DormitoryListPage />} />
-          <Route path="/admin/dormitories/new" element={<DormitoryFormPage />} />
-          <Route path="/admin/dormitories/:id/edit" element={<DormitoryFormPage />} />
           <Route path="/admin/dormitories/:id" element={<DormitoryDetailPage />} />
-          <Route path="/admin/dormitories/:dormitoryId/rooms/new" element={<RoomFormPage />} />
-          <Route path="/admin/rooms/:roomId/edit" element={<RoomFormPage />} />
           <Route path="/admin/rooms/:roomId/residents" element={<RoomResidentsView />} />
-          <Route path="/admin/documents" element={<DocumentListPage />} />
-          <Route path="/admin/benefits/new" element={<BenefitFormPage />} />
-          <Route path="/admin/benefits/:id/edit" element={<BenefitFormPage />} />
-          <Route path="/admin/students/pending" element={<PendingStudentsPage />} />
-          <Route path="/admin/students/new" element={<StudentRegisterFormPage />} />
 
-          <Route path="/admin/applications" element={<ApplicationQueuePage />} />
-          <Route path="/admin/applications/petition-template" element={<PetitionTemplatePage />} />
-          <Route path="/admin/applications/:id" element={<ApplicationAdminDetailPage />} />
-          <Route path="/admin/protocols" element={<ProtocolListPage />} />
-          <Route path="/admin/protocols/new" element={<ProtocolCreatePage />} />
-          <Route path="/admin/protocols/template" element={<ProtocolTemplatePage />} />
-          <Route path="/admin/protocols/:id" element={<ProtocolDetailPage />} />
-          <Route path="/committee/protocols" element={<CommitteeProtocolListPage />} />
+          {/* Committee members vote here whether or not they're managers. */}
+          <Route element={<ProtectedRoute allow={(u) => canManage(u) || u.is_committee_member} />}>
+            <Route path="/admin/protocols/:id" element={<ProtocolDetailPage />} />
+            <Route path="/committee/protocols" element={<CommitteeProtocolListPage />} />
+          </Route>
 
-          <Route path="/admin/contracts" element={<ContractsAndPaymentsPage />} />
-          <Route path="/admin/contracts/contract-template" element={<ContractTemplatePage />} />
-          <Route path="/admin/contracts/:id" element={<ContractDetailPage />} />
-          <Route path="/admin/exit-requests" element={<ExitRequestListPage />} />
-          <Route path="/admin/transfer-requests" element={<TransferRequestListPage />} />
+          {/* Admin, or a user holding the manager position. */}
+          <Route element={<ProtectedRoute allow={canManage} />}>
+            <Route path="/admin/residents" element={<ResidentsPage />} />
+            <Route path="/admin/residents/place" element={<PlaceStudentPage />} />
+            <Route path="/admin/notifications/broadcast" element={<NotificationBroadcastPage />} />
+            <Route path="/admin/dormitories/new" element={<DormitoryFormPage />} />
+            <Route path="/admin/dormitories/:id/edit" element={<DormitoryFormPage />} />
+            <Route path="/admin/dormitories/:dormitoryId/rooms/new" element={<RoomFormPage />} />
+            <Route path="/admin/rooms/:roomId/edit" element={<RoomFormPage />} />
+            <Route path="/admin/documents" element={<DocumentListPage />} />
+            <Route path="/admin/benefits/new" element={<BenefitFormPage />} />
+            <Route path="/admin/benefits/:id/edit" element={<BenefitFormPage />} />
+            <Route path="/admin/students/pending" element={<PendingStudentsPage />} />
+            <Route path="/admin/students/new" element={<StudentRegisterFormPage />} />
 
-          <Route path="/admin/users" element={<UserListPage />} />
+            <Route path="/admin/applications" element={<ApplicationQueuePage />} />
+            <Route path="/admin/applications/petition-template" element={<PetitionTemplatePage />} />
+            <Route path="/admin/applications/:id" element={<ApplicationAdminDetailPage />} />
+            <Route path="/admin/protocols" element={<ProtocolListPage />} />
+            <Route path="/admin/protocols/new" element={<ProtocolCreatePage />} />
+            <Route path="/admin/protocols/template" element={<ProtocolTemplatePage />} />
+
+            <Route path="/admin/contracts" element={<ContractsAndPaymentsPage />} />
+            <Route path="/admin/contracts/contract-template" element={<ContractTemplatePage />} />
+            <Route path="/admin/contracts/:id" element={<ContractDetailPage />} />
+            <Route path="/admin/exit-requests" element={<ExitRequestListPage />} />
+            <Route path="/admin/transfer-requests" element={<TransferRequestListPage />} />
+
+            <Route path="/admin/users" element={<UserListPage />} />
+          </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
             <Route path="/admin/users/new" element={<UserRegisterFormPage />} />

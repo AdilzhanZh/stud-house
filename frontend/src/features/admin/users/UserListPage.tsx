@@ -27,7 +27,7 @@ export function UserListPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const roleFilterParam = searchParams.get('role')
   const roleFilter: Role | '' =
-    roleFilterParam === 'admin' || roleFilterParam === 'manager' || roleFilterParam === 'student'
+    roleFilterParam === 'admin' || roleFilterParam === 'user' || roleFilterParam === 'student'
       ? roleFilterParam
       : ''
   const [search, setSearch] = useState('')
@@ -57,7 +57,7 @@ export function UserListPage() {
     return {
       total: users.length,
       admins: users.filter((u) => u.role === 'admin').length,
-      managers: users.filter((u) => u.role === 'manager').length,
+      users: users.filter((u) => u.role === 'user').length,
       students: users.filter((u) => u.role === 'student').length,
     }
   }, [users])
@@ -130,7 +130,7 @@ export function UserListPage() {
           <Button onClick={() => navigate('/admin/students/new')}>{t('admin.users.registerStudent')}</Button>
           {currentUser?.role === 'admin' && (
             <Button variant="secondary" onClick={() => navigate('/admin/users/new')}>
-              {t('admin.users.registerManager')}
+              {t('admin.users.registerUser')}
             </Button>
           )}
         </div>
@@ -152,11 +152,11 @@ export function UserListPage() {
           <p className="mt-1.5 text-2xl font-bold text-turquoise-400">{stats?.admins ?? '—'}</p>
         </Card>
         <Card
-          onClick={() => toggleRoleFilter('manager')}
-          className={`!p-4 ${roleFilter === 'manager' ? 'ring-2 ring-amber-400' : ''}`}
+          onClick={() => toggleRoleFilter('user')}
+          className={`!p-4 ${roleFilter === 'user' ? 'ring-2 ring-amber-400' : ''}`}
         >
-          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('admin.users.statsManagers')}</p>
-          <p className="mt-1.5 text-2xl font-bold text-amber-400">{stats?.managers ?? '—'}</p>
+          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('admin.users.statsUsers')}</p>
+          <p className="mt-1.5 text-2xl font-bold text-amber-400">{stats?.users ?? '—'}</p>
         </Card>
         <Card
           onClick={() => toggleRoleFilter('student')}
@@ -193,6 +193,7 @@ export function UserListPage() {
                 <th className={adminCellClass}>{t('admin.users.fullName')}</th>
                 <th className={adminCellClass}>Email</th>
                 <th className={adminCellClass}>{t('admin.users.role')}</th>
+                <th className={adminCellClass}>{t('admin.users.manager')}</th>
                 <th className={adminCellClass}>{t('admin.users.committeeMember')}</th>
                 <th className={adminCellClass}>{t('admin.users.chairperson')}</th>
                 {currentUser?.role === 'admin' && <th className={adminCellClass}>{t('admin.dormitories.actions')}</th>}
@@ -204,13 +205,14 @@ export function UserListPage() {
                   <td className={`${adminCellClass} font-semibold text-sand-100`}>{u.full_name}</td>
                   <td className={`${adminCellClass} text-sand-300`}>{u.email || '—'}</td>
                   <td className={`${adminCellClass} text-sand-300`}>{roleLabels[u.role]}</td>
+                  <td className={`${adminCellClass} text-sand-300`}>{u.is_manager ? t('admin.users.yes') : '—'}</td>
                   <td className={`${adminCellClass} text-sand-300`}>{u.is_committee_member ? t('admin.users.yes') : '—'}</td>
                   <td className={`${adminCellClass} text-sand-300`}>{u.is_chairperson ? t('admin.users.yes') : '—'}</td>
                   {currentUser?.role === 'admin' && (
                     <td className={adminCellClass} onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
                         <div className="flex h-8 w-8 shrink-0 items-center justify-center">
-                          {u.role === 'manager' && (
+                          {u.role === 'user' && (
                             <button
                               type="button"
                               aria-label={t('admin.users.assignRoleCommittee')}
@@ -245,14 +247,14 @@ export function UserListPage() {
               ))}
               {users.length === 0 && (
                 <tr>
-                  <td className={`${adminCellClass} text-sand-300`} colSpan={6}>
+                  <td className={`${adminCellClass} text-sand-300`} colSpan={7}>
                     {t('admin.users.empty')}
                   </td>
                 </tr>
               )}
               {users.length > 0 && visibleUsers?.length === 0 && (
                 <tr>
-                  <td className={`${adminCellClass} text-sand-300`} colSpan={6}>
+                  <td className={`${adminCellClass} text-sand-300`} colSpan={7}>
                     {t('admin.users.noSearchResults')}
                   </td>
                 </tr>
@@ -320,6 +322,10 @@ export function UserListPage() {
               <div className="flex justify-between gap-4">
                 <dt className="text-sand-300">{t('admin.users.role')}</dt>
                 <dd className="text-right text-sand-100">{roleLabels[detailsTarget.role]}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-sand-300">{t('admin.users.manager')}</dt>
+                <dd className="text-right text-sand-100">{detailsTarget.is_manager ? t('admin.users.yes') : '—'}</dd>
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="text-sand-300">{t('admin.users.committeeMember')}</dt>

@@ -130,13 +130,7 @@ func (s *ExitRequestService) notifyStudentDecision(ctx context.Context, e *domai
 
 func (s *ExitRequestService) notifyManagersNewExitRequest(ctx context.Context, e *domain.ExitRequest) {
 	const body = "Жаңа шығу өтініші қаралуды күтуде."
-	for _, role := range []domain.Role{domain.RoleAdmin, domain.RoleManager} {
-		staff, err := s.users.ListByRole(ctx, role)
-		if err != nil {
-			continue
-		}
-		for _, u := range staff {
-			_ = s.notifier.Notify(ctx, u.ID, domain.NotificationExitRequestUpdate, "Жаңа шығу өтініші", body, nil)
-		}
+	for _, u := range listManagementStaff(ctx, s.users) {
+		_ = s.notifier.Notify(ctx, u.ID, domain.NotificationExitRequestUpdate, "Жаңа шығу өтініші", body, nil)
 	}
 }

@@ -20,12 +20,15 @@ type UserRepository interface {
 	GetByEmail(ctx context.Context, email string) (*domain.User, error)
 	GetByIIN(ctx context.Context, iin string) (*domain.User, error)
 	UpdateRole(ctx context.Context, id uuid.UUID, role domain.Role) error
+	UpdateManager(ctx context.Context, id uuid.UUID, isManager bool) error
 	UpdateCommitteeMember(ctx context.Context, id uuid.UUID, isCommitteeMember bool) error
+	// ListManagers returns every role=user holding the manager position.
+	ListManagers(ctx context.Context) ([]*domain.User, error)
 	UpdateChairperson(ctx context.Context, id uuid.UUID, isChairperson bool) error
 	UpdateAvatar(ctx context.Context, id uuid.UUID, avatarURL *string) error
 	ListByRole(ctx context.Context, role domain.Role) ([]*domain.User, error)
 	// ListCommitteeMembers returns every user with is_committee_member = true
-	// (a flag on managers, elected by admin — not a separate role).
+	// (a flag on role=user, elected by admin — not a separate role).
 	ListCommitteeMembers(ctx context.Context) ([]*domain.User, error)
 	// List optionally filters by role (nil = every user), for the admin
 	// panel's user list (frontend kezeng 4: GET /admin/users?role=).

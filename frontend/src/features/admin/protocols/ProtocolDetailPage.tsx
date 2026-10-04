@@ -12,6 +12,7 @@ import { deleteProtocol, getProtocolDetail, voteProtocol } from '../../../api/pr
 import { downloadProtocolPdf, getFilledProtocolPages } from '../../../utils/protocolPdf'
 import { formatDate } from '../../../utils/dateFormat'
 import { useAuth } from '../../auth/useAuth'
+import { canManage } from '../../../constants/roles'
 import type { ProtocolDetail } from '../../../types/protocols'
 
 export function ProtocolDetailPage() {
@@ -139,10 +140,14 @@ export function ProtocolDetailPage() {
 
   const myVote = protocol.votes.find((v) => v.committee_member_id === user.id)
   const canVote = user.is_committee_member && protocol.status === 'pending' && !myVote?.decision
+  // Committee members without the manager position reach this page from the
+  // committee list and can't manage (delete) protocols.
+  const isManager = canManage(user)
+  const backPath = isManager ? '/admin/protocols' : '/committee/protocols'
 
   return (
     <div className="flex flex-col gap-6">
-      <Button variant="secondary" className="self-start" onClick={() => navigate('/admin/protocols')}>
+      <Button variant="secondary" className="self-start" onClick={() => navigate(backPath)}>
         ← {t('admin.common.back')}
       </Button>
 
@@ -159,7 +164,7 @@ export function ProtocolDetailPage() {
           <Button variant="secondary" onClick={handleDownload} isLoading={isDownloading}>
             {t('admin.protocols.download')}
           </Button>
-          {protocol.status === 'pending' && (
+          {isManager && protocol.status === 'pending' && (
             <Button variant="danger" onClick={() => setDeleteOpen(true)}>
               {t('common.delete')}
             </Button>

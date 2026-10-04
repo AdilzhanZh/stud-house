@@ -63,9 +63,8 @@ func (h *TransferRequestHandler) Get(c *gin.Context) {
 		response.Error(c, err)
 		return
 	}
-	role, _ := middleware.Role(c)
 	userID, _ := middleware.UserID(c)
-	if role != domain.RoleAdmin && role != domain.RoleManager && tr.StudentID != userID {
+	if !middleware.CanManage(c) && tr.StudentID != userID {
 		response.Error(c, apperror.Forbidden("бұл ауыстыру сұранысын көруге құқығыңыз жоқ"))
 		return
 	}

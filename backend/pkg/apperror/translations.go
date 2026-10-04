@@ -244,9 +244,13 @@ var staticTranslations = map[string]translation{
 		"Необходимо выбрать хотя бы один столбец",
 		"At least one column must be selected",
 	},
-	"комиссия мүшелігі тек менеджерге ғана тағайындалады": {
-		"Членство в комиссии назначается только менеджеру",
-		"Committee membership can only be assigned to a manager",
+	"комиссия мүшелігі тек пайдаланушыға ғана тағайындалады": {
+		"Членство в комиссии назначается только пользователю",
+		"Committee membership can only be assigned to a user",
+	},
+	"менеджер лауазымы тек пайдаланушыға ғана тағайындалады": {
+		"Должность менеджера назначается только пользователю",
+		"The manager position can only be assigned to a user",
 	},
 	"көрсетілген құжат жарамсыз":       {"Указанный документ недействителен", "The specified document is invalid"},
 	"льгота идентификаторы дұрыс емес": {"Неверный идентификатор льготы", "Invalid benefit identifier"},

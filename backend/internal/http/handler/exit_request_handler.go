@@ -61,9 +61,8 @@ func (h *ExitRequestHandler) Get(c *gin.Context) {
 		response.Error(c, err)
 		return
 	}
-	role, _ := middleware.Role(c)
 	userID, _ := middleware.UserID(c)
-	if role != domain.RoleAdmin && role != domain.RoleManager && er.StudentID != userID {
+	if !middleware.CanManage(c) && er.StudentID != userID {
 		response.Error(c, apperror.Forbidden("бұл шығу сұранысын көруге құқығыңыз жоқ"))
 		return
 	}

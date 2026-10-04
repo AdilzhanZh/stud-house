@@ -43,6 +43,7 @@ export function useAuthBootstrap(): boolean {
           ? {
               ...cachedUser,
               role: claims.role,
+              is_manager: claims.is_manager,
               is_committee_member: claims.is_committee_member,
               is_chairperson: claims.is_chairperson,
             }

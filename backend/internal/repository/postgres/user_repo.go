@@ -22,19 +22,19 @@ func NewUserRepo(db *pgxpool.Pool) *UserRepo {
 }
 
 const userColumns = `
-	id, full_name, email, phone, iin, password_hash, role, is_committee_member,
-	is_chairperson, approval_status, avatar_url, created_at, updated_at`
+	id, full_name, email, phone, iin, password_hash, role, is_manager,
+	is_committee_member, is_chairperson, approval_status, avatar_url, created_at, updated_at`
 
 func (r *UserRepo) Create(ctx context.Context, u *domain.User) error {
 	const q = `
 		INSERT INTO users (
-			full_name, email, phone, iin, password_hash, role, is_committee_member,
-			is_chairperson, approval_status
+			full_name, email, phone, iin, password_hash, role, is_manager,
+			is_committee_member, is_chairperson, approval_status
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING id, created_at, updated_at`
 	err := r.db.QueryRow(ctx, q,
-		u.FullName, u.Email, u.Phone, u.IIN, u.PasswordHash, string(u.Role), u.IsCommitteeMember, u.IsChairperson,
+		u.FullName, u.Email, u.Phone, u.IIN, u.PasswordHash, string(u.Role), u.IsManager, u.IsCommitteeMember, u.IsChairperson,
 		string(u.ApprovalStatus),
 	).Scan(&u.ID, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
@@ -72,6 +72,38 @@ func (r *UserRepo) UpdateRole(ctx context.Context, id uuid.UUID, role domain.Rol
 		return repository.ErrNotFound
 	}
 	return nil
+}
+
+func (r *UserRepo) UpdateManager(ctx context.Context, id uuid.UUID, isManager bool) error {
+	const q = `UPDATE users SET is_manager = $2, updated_at = now() WHERE id = $1`
+	tag, err := r.db.Exec(ctx, q, id, isManager)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return repository.ErrNotFound
+	}
+	return nil
+}
+
+// ListManagers returns every user holding the manager position (not the
+// admin), e.g. to notify them of new requests awaiting review.
+func (r *UserRepo) ListManagers(ctx context.Context) ([]*domain.User, error) {
+	q := `SELECT ` + userColumns + ` FROM users WHERE role = 'user' AND is_manager = true ORDER BY full_name`
+	rows, err := r.db.Query(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*domain.User
+	for rows.Next() {
+		u, err := scanUserRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, u)
+	}
+	return out, rows.Err()
 }
 
 // UpdateCommitteeMember toggles the flag directly — unlike chairperson,
@@ -327,8 +359,8 @@ func scanUserRow(row rowScanner) (*domain.User, error) {
 	var role string
 	var approvalStatus string
 	err := row.Scan(
-		&u.ID, &u.FullName, &u.Email, &u.Phone, &u.IIN, &u.PasswordHash, &role, &u.IsCommitteeMember,
-		&u.IsChairperson, &approvalStatus, &u.AvatarURL, &u.CreatedAt, &u.UpdatedAt,
+		&u.ID, &u.FullName, &u.Email, &u.Phone, &u.IIN, &u.PasswordHash, &role, &u.IsManager,
+		&u.IsCommitteeMember, &u.IsChairperson, &approvalStatus, &u.AvatarURL, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

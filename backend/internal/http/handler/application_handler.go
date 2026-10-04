@@ -154,8 +154,7 @@ func (h *ApplicationHandler) List(c *gin.Context) {
 // only for their own application (mirrors ContractHandler's helper of the
 // same name for the same ownership rule).
 func canAccessApplication(c *gin.Context, app *domain.Application) bool {
-	role, _ := middleware.Role(c)
-	if role == domain.RoleAdmin || role == domain.RoleManager {
+	if middleware.CanManage(c) {
 		return true
 	}
 	userID, ok := middleware.UserID(c)

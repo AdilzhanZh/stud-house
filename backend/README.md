@@ -68,7 +68,7 @@ migrations/              — golang-migrate SQL миграциялары
 
 | Кесте | Мақсаты |
 |---|---|
-| `users` | барлық пайдаланушылар, `role` enum (`admin/student/manager/committee_member`), `is_chairperson` флагы (тек `committee_member`-ге) |
+| `users` | барлық пайдаланушылар, `role` enum (`admin/student/user`); `is_manager`, `is_committee_member`, `is_chairperson` — тек `user`-ге берілетін лауазым флагтары |
 | `student_profiles` | `gender`, `course` — бөлме шектеуін (restriction) тексеру үшін |
 | `dormitories`, `dormitory_images` | жатақханалар және олардың суреттері |
 | `rooms` | бөлмелер, `restrictions` — JSONB (`gender`, `courses`, `benefit_ids`) |

@@ -25,12 +25,12 @@ func NewUserService(users repository.UserRepository, profiles repository.Student
 	return &UserService{users: users, profiles: profiles, mailer: m}
 }
 
-// CreateUser is admin-only: it can create admin/manager, but never student —
+// CreateUser is admin-only: it can create admin/user, but never student —
 // a student account is created either by the student themself via
 // AuthService.RegisterStudent, or by an admin/manager via CreateStudent
 // below (which, unlike this method, also collects the student-only profile
-// fields). Committee membership isn't set here — admin elects a manager onto
-// the committee afterward via SetCommitteeMember.
+// fields). Positions (manager, committee member) aren't set here — admin
+// grants them afterward via SetManager/SetCommitteeMember.
 func (s *UserService) CreateUser(ctx context.Context, fullName, email, phone, password string, role domain.Role) (*domain.User, error) {
 	if !role.Valid() {
 		return nil, apperror.BadRequest("рөл жарамсыз")
@@ -107,6 +107,20 @@ func (s *UserService) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, 
 	return user, nil
 }
 
+// listManagementStaff returns the admin plus every user holding the manager
+// position — everyone who reviews student requests. Lookup errors are
+// swallowed: it only feeds best-effort notifications.
+func listManagementStaff(ctx context.Context, users repository.UserRepository) []*domain.User {
+	var staff []*domain.User
+	if admins, err := users.ListByRole(ctx, domain.RoleAdmin); err == nil {
+		staff = append(staff, admins...)
+	}
+	if managers, err := users.ListManagers(ctx); err == nil {
+		staff = append(staff, managers...)
+	}
+	return staff
+}
+
 // adminAlreadyExists reports whether an admin exists other than excludeID —
 // the system only ever allows a single admin account.
 func (s *UserService) adminAlreadyExists(ctx context.Context, excludeID *uuid.UUID) (bool, error) {
@@ -122,9 +136,9 @@ func (s *UserService) adminAlreadyExists(ctx context.Context, excludeID *uuid.UU
 	return false, nil
 }
 
-// UpdateRole is admin-only. Changing a user's role away from manager
-// implicitly clears both the committee-member and chairperson flags, since
-// neither makes sense off that role.
+// UpdateRole is admin-only. Changing a user's role away from user
+// implicitly clears the manager, committee-member and chairperson
+// positions, since none makes sense off that role.
 func (s *UserService) UpdateRole(ctx context.Context, id uuid.UUID, role domain.Role) error {
 	if !role.Valid() {
 		return apperror.BadRequest("рөл жарамсыз")
@@ -142,32 +156,51 @@ func (s *UserService) UpdateRole(ctx context.Context, id uuid.UUID, role domain.
 			return apperror.Conflict("жүйеде тек бір ғана админ бола алады")
 		}
 	}
-	if err := s.users.UpdateRole(ctx, id, role); err != nil {
-		return err
-	}
-	if role != domain.RoleManager {
+	// Positions are cleared before the role changes: the DB rejects any
+	// position flag on a non-user row (chk_positions_require_user_role).
+	if role != domain.RoleUser {
 		if user.IsChairperson {
 			if err := s.users.UpdateChairperson(ctx, id, false); err != nil {
 				return err
 			}
 		}
 		if user.IsCommitteeMember {
-			return s.users.UpdateCommitteeMember(ctx, id, false)
+			if err := s.users.UpdateCommitteeMember(ctx, id, false); err != nil {
+				return err
+			}
+		}
+		if user.IsManager {
+			if err := s.users.UpdateManager(ctx, id, false); err != nil {
+				return err
+			}
 		}
 	}
-	return nil
+	return s.users.UpdateRole(ctx, id, role)
 }
 
-// SetCommitteeMember is admin-only ("менеджерлер арасынан админ сайлайды") —
-// only valid for users with role=manager. Revoking membership implicitly
+// SetManager is admin-only: grants or revokes the manager position, which
+// unlocks full management access for a role=user account.
+func (s *UserService) SetManager(ctx context.Context, id uuid.UUID, isManager bool) error {
+	user, err := s.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if user.Role != domain.RoleUser {
+		return apperror.BadRequest("менеджер лауазымы тек пайдаланушыға ғана тағайындалады")
+	}
+	return s.users.UpdateManager(ctx, id, isManager)
+}
+
+// SetCommitteeMember is admin-only ("пайдаланушылар арасынан админ сайлайды") —
+// only valid for users with role=user. Revoking membership implicitly
 // clears the chairperson flag too.
 func (s *UserService) SetCommitteeMember(ctx context.Context, id uuid.UUID, isCommitteeMember bool) error {
 	user, err := s.GetByID(ctx, id)
 	if err != nil {
 		return err
 	}
-	if user.Role != domain.RoleManager {
-		return apperror.BadRequest("комиссия мүшелігі тек менеджерге ғана тағайындалады")
+	if user.Role != domain.RoleUser {
+		return apperror.BadRequest("комиссия мүшелігі тек пайдаланушыға ғана тағайындалады")
 	}
 	if err := s.users.UpdateCommitteeMember(ctx, id, isCommitteeMember); err != nil {
 		return err

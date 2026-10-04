@@ -9,6 +9,8 @@ import { listApplications } from '../../../api/applicationAdminApi'
 import { getDormitoryCapacity, listDormitories } from '../../../api/dormitoryApi'
 import { listUsers } from '../../../api/adminUserApi'
 import { formatDate } from '../../../utils/dateFormat'
+import { canManage } from '../../../constants/roles'
+import { useAuth } from '../../auth/useAuth'
 import type { Application } from '../../../types/applications'
 import type { Dormitory, DormitoryCapacity } from '../../../types/dormitories'
 
@@ -33,6 +35,10 @@ interface Stats {
 export function DashboardPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  // Users without the manager position can't see applications — they get
+  // only the dormitory occupancy parts of the dashboard.
+  const { user } = useAuth()
+  const isManager = canManage(user)
   const [stats, setStats] = useState<Stats | null>(null)
   const [recentApps, setRecentApps] = useState<Application[] | null>(null)
   const [dormitoryNamesById, setDormitoryNamesById] = useState<Record<string, string>>({})
@@ -45,12 +51,13 @@ export function DashboardPage() {
 
     async function load() {
       try {
+        const noApplications = Promise.resolve([] as Application[])
         const [pending, needsCorrection, approved, dormitories, students] = await Promise.all([
-          listApplications('pending'),
-          listApplications('needs_correction'),
-          listApplications('approved'),
+          isManager ? listApplications('pending') : noApplications,
+          isManager ? listApplications('needs_correction') : noApplications,
+          isManager ? listApplications('approved') : noApplications,
           listDormitories(),
-          listUsers('student'),
+          isManager ? listUsers('student') : Promise.resolve([]),
         ])
         if (cancelled) return
 
@@ -92,7 +99,7 @@ export function DashboardPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [isManager])
 
   if (error) return <Alert variant="error" message={error} />
 
@@ -100,61 +107,67 @@ export function DashboardPage() {
     <div className="flex flex-col gap-5">
       <h1 className="text-[23px] font-bold text-sand-100">{t('admin.layout.dashboard')}</h1>
 
-      <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-5">
-        <Card className="!p-4">
-          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('admin.dashboard.brandNew')}</p>
-          <p className="mt-1.5 text-2xl font-bold text-sand-100">{stats?.brandNew ?? '—'}</p>
-        </Card>
-        <Card className="!p-4">
-          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('admin.dashboard.pending')}</p>
-          <p className="mt-1.5 text-2xl font-bold text-turquoise-400">{stats?.pending ?? '—'}</p>
-        </Card>
-        <Card className="!p-4">
-          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('admin.dashboard.missingDoc')}</p>
-          <p className="mt-1.5 text-2xl font-bold text-amber-400">{stats?.missingDoc ?? '—'}</p>
-        </Card>
-        <Card className="!p-4">
-          <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('admin.dashboard.approvedToday')}</p>
-          <p className="mt-1.5 text-2xl font-bold text-mint-400">{stats?.approvedToday ?? '—'}</p>
-        </Card>
+      <div className={`grid grid-cols-2 gap-3.5 ${isManager ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
+        {isManager && (
+          <>
+            <Card className="!p-4">
+              <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('admin.dashboard.brandNew')}</p>
+              <p className="mt-1.5 text-2xl font-bold text-sand-100">{stats?.brandNew ?? '—'}</p>
+            </Card>
+            <Card className="!p-4">
+              <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('admin.dashboard.pending')}</p>
+              <p className="mt-1.5 text-2xl font-bold text-turquoise-400">{stats?.pending ?? '—'}</p>
+            </Card>
+            <Card className="!p-4">
+              <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('admin.dashboard.missingDoc')}</p>
+              <p className="mt-1.5 text-2xl font-bold text-amber-400">{stats?.missingDoc ?? '—'}</p>
+            </Card>
+            <Card className="!p-4">
+              <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('admin.dashboard.approvedToday')}</p>
+              <p className="mt-1.5 text-2xl font-bold text-mint-400">{stats?.approvedToday ?? '—'}</p>
+            </Card>
+          </>
+        )}
         <Card className="!p-4">
           <p className="text-[11px] font-semibold tracking-wide text-sand-300 uppercase">{t('admin.dashboard.freeBeds')}</p>
           <p className="mt-1.5 text-2xl font-bold text-sand-100">{stats?.freeBeds ?? '—'}</p>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.6fr_1fr]">
-        <Card>
-          <div className="mb-3 flex items-baseline justify-between">
-            <p className="text-[15px] font-bold text-sand-100">{t('admin.dashboard.recentApplications')}</p>
-            <button
-              onClick={() => navigate('/admin/applications')}
-              className="text-sm font-semibold text-sand-100 hover:text-turquoise-400"
-            >
-              {t('admin.dashboard.seeAll')}
-            </button>
-          </div>
-          <div className="flex flex-col">
-            {recentApps?.map((app) => (
-              <div
-                key={app.id}
-                onClick={() => navigate(`/admin/applications/${app.id}`)}
-                className="flex cursor-pointer items-center justify-between gap-3 border-b border-navy-700 py-3 last:border-0"
+      <div className={`grid grid-cols-1 gap-5 ${isManager ? 'lg:grid-cols-[1.6fr_1fr]' : ''}`}>
+        {isManager && (
+          <Card>
+            <div className="mb-3 flex items-baseline justify-between">
+              <p className="text-[15px] font-bold text-sand-100">{t('admin.dashboard.recentApplications')}</p>
+              <button
+                onClick={() => navigate('/admin/applications')}
+                className="text-sm font-semibold text-sand-100 hover:text-turquoise-400"
               >
-                <div>
-                  <p className="text-sm font-semibold text-sand-100">
-                    {studentNamesById[app.student_id] ?? app.student_id}
-                  </p>
-                  <p className="mt-0.5 text-xs text-sand-300">
-                    {dormitoryNamesById[app.dormitory_id] ?? app.dormitory_id} · {formatDate(app.created_at)}
-                  </p>
+                {t('admin.dashboard.seeAll')}
+              </button>
+            </div>
+            <div className="flex flex-col">
+              {recentApps?.map((app) => (
+                <div
+                  key={app.id}
+                  onClick={() => navigate(`/admin/applications/${app.id}`)}
+                  className="flex cursor-pointer items-center justify-between gap-3 border-b border-navy-700 py-3 last:border-0"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-sand-100">
+                      {studentNamesById[app.student_id] ?? app.student_id}
+                    </p>
+                    <p className="mt-0.5 text-xs text-sand-300">
+                      {dormitoryNamesById[app.dormitory_id] ?? app.dormitory_id} · {formatDate(app.created_at)}
+                    </p>
+                  </div>
+                  <StatusBadge status={app.status} />
                 </div>
-                <StatusBadge status={app.status} />
-              </div>
-            ))}
-            {recentApps?.length === 0 && <p className="py-3 text-sm text-sand-300">{t('admin.dashboard.noApplications')}</p>}
-          </div>
-        </Card>
+              ))}
+              {recentApps?.length === 0 && <p className="py-3 text-sm text-sand-300">{t('admin.dashboard.noApplications')}</p>}
+            </div>
+          </Card>
+        )}
 
         <Card>
           <p className="mb-3.5 text-[15px] font-bold text-sand-100">{t('admin.dashboard.occupancy')}</p>

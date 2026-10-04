@@ -8,10 +8,13 @@ const POLL_INTERVAL_MS = 30_000
 // sidebar's "Өтініш кезегі" link — but counts only applications that arrived
 // after the manager last viewed the queue's pending tab, not every pending
 // application, so the badge clears once they've seen the new ones.
-export function usePendingApplicationsCount(): number {
+// enabled=false skips polling entirely, for staff without access to the
+// underlying (manager-only) endpoint.
+export function usePendingApplicationsCount(enabled = true): number {
   const [count, setCount] = useState(0)
 
   useEffect(() => {
+    if (!enabled) return
     let cancelled = false
 
     async function poll() {
@@ -34,7 +37,7 @@ export function usePendingApplicationsCount(): number {
       clearInterval(interval)
       unsubscribe()
     }
-  }, [])
+  }, [enabled])
 
   return count
 }

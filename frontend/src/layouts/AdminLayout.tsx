@@ -16,6 +16,7 @@ import {
   Users,
 } from 'lucide-react'
 import { useAuth } from '../features/auth/useAuth'
+import { canManage } from '../constants/roles'
 import { Avatar } from '../components/Avatar'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { LanguageSwitcher } from '../components/LanguageSwitcher'
@@ -48,8 +49,24 @@ export function AdminLayout() {
   const { t } = useTranslation()
   const { user, logout } = useAuth()
   const navigate = useNavigate()
-  const pendingStudentsCount = usePendingStudentsCount()
-  const pendingApplicationsCount = usePendingApplicationsCount()
+  // Users without the manager position only see the dashboard, read-only
+  // dormitories and (if elected) committee voting — every other section is
+  // hidden from the nav, not just disabled.
+  const isManager = canManage(user)
+  const pendingStudentsCount = usePendingStudentsCount(isManager)
+  const pendingApplicationsCount = usePendingApplicationsCount(isManager)
+  const panelLabel =
+    user?.role === 'admin'
+      ? t('admin.layout.adminPanel')
+      : isManager
+        ? t('admin.layout.managerPanel')
+        : t('admin.layout.userPanel')
+  const roleLabel =
+    user?.role === 'admin'
+      ? t('admin.layout.adminRole')
+      : isManager
+        ? t('admin.layout.managerRole')
+        : t('admin.layout.userRole')
 
   async function handleLogout() {
     await logout()
@@ -66,7 +83,7 @@ export function AdminLayout() {
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-sand-100">Student House</p>
             <p className="text-xs text-sand-300">
-              {user?.role === 'manager' ? t('admin.layout.managerPanel') : t('admin.layout.adminPanel')}
+              {panelLabel}
             </p>
           </div>
         </div>
@@ -79,68 +96,84 @@ export function AdminLayout() {
               <LayoutDashboard className="h-4.5 w-4.5 shrink-0" />
               {t('admin.layout.dashboard')}
             </NavLink>
-            <NavLink to="/admin/applications" className={navLinkClass}>
-              <ClipboardList className="h-4.5 w-4.5 shrink-0" />
-              {t('admin.layout.applications')}
-              <CountBadge count={pendingApplicationsCount} />
-            </NavLink>
+            {isManager && (
+              <NavLink to="/admin/applications" className={navLinkClass}>
+                <ClipboardList className="h-4.5 w-4.5 shrink-0" />
+                {t('admin.layout.applications')}
+                <CountBadge count={pendingApplicationsCount} />
+              </NavLink>
+            )}
             <NavLink to="/admin/dormitories" className={navLinkClass}>
               <Building2 className="h-4.5 w-4.5 shrink-0" />
               {t('admin.layout.dormitories')}
             </NavLink>
-            <NavLink to="/admin/contracts" className={navLinkClass}>
-              <FileText className="h-4.5 w-4.5 shrink-0" />
-              {t('admin.layout.contracts')}
-            </NavLink>
-            <NavLink to="/admin/residents" end className={navLinkClass}>
-              <Users className="h-4.5 w-4.5 shrink-0" />
-              {t('admin.layout.residents')}
-            </NavLink>
-            <NavLink to="/admin/residents/place" className={navLinkClass}>
-              <UserCheck className="h-4.5 w-4.5 shrink-0" />
-              {t('admin.layout.placeStudent')}
-            </NavLink>
-            <NavLink to="/admin/notifications/broadcast" className={navLinkClass}>
-              <Megaphone className="h-4.5 w-4.5 shrink-0" />
-              {t('admin.layout.broadcast')}
-            </NavLink>
+            {isManager && (
+              <>
+                <NavLink to="/admin/contracts" className={navLinkClass}>
+                  <FileText className="h-4.5 w-4.5 shrink-0" />
+                  {t('admin.layout.contracts')}
+                </NavLink>
+                <NavLink to="/admin/residents" end className={navLinkClass}>
+                  <Users className="h-4.5 w-4.5 shrink-0" />
+                  {t('admin.layout.residents')}
+                </NavLink>
+                <NavLink to="/admin/residents/place" className={navLinkClass}>
+                  <UserCheck className="h-4.5 w-4.5 shrink-0" />
+                  {t('admin.layout.placeStudent')}
+                </NavLink>
+                <NavLink to="/admin/notifications/broadcast" className={navLinkClass}>
+                  <Megaphone className="h-4.5 w-4.5 shrink-0" />
+                  {t('admin.layout.broadcast')}
+                </NavLink>
+              </>
+            )}
           </nav>
 
-          <p className="mt-3 px-3 text-xs font-semibold tracking-wide text-sand-400 uppercase">
-            {t('admin.layout.other')}
-          </p>
+          {(isManager || user?.is_committee_member) && (
+            <p className="mt-3 px-3 text-xs font-semibold tracking-wide text-sand-400 uppercase">
+              {t('admin.layout.other')}
+            </p>
+          )}
           <nav className="flex flex-col gap-0.5">
-            <NavLink to="/admin/documents" className={navLinkClass}>
-              <FileText className="h-4.5 w-4.5 shrink-0" />
-              {t('admin.layout.documents')}
-            </NavLink>
-            <NavLink to="/admin/protocols" className={navLinkClass}>
-              <FileBarChart className="h-4.5 w-4.5 shrink-0" />
-              {t('admin.layout.protocols')}
-            </NavLink>
+            {isManager && (
+              <>
+                <NavLink to="/admin/documents" className={navLinkClass}>
+                  <FileText className="h-4.5 w-4.5 shrink-0" />
+                  {t('admin.layout.documents')}
+                </NavLink>
+                <NavLink to="/admin/protocols" className={navLinkClass}>
+                  <FileBarChart className="h-4.5 w-4.5 shrink-0" />
+                  {t('admin.layout.protocols')}
+                </NavLink>
+              </>
+            )}
             {user?.is_committee_member && (
               <NavLink to="/committee/protocols" className={navLinkClass}>
                 <Gavel className="h-4.5 w-4.5 shrink-0" />
                 {t('admin.layout.committeeProtocols')}
               </NavLink>
             )}
-            <NavLink to="/admin/exit-requests" className={navLinkClass}>
-              <DoorOpen className="h-4.5 w-4.5 shrink-0" />
-              {t('admin.layout.exitRequests')}
-            </NavLink>
-            <NavLink to="/admin/transfer-requests" className={navLinkClass}>
-              <ArrowLeftRight className="h-4.5 w-4.5 shrink-0" />
-              {t('admin.layout.transferRequests')}
-            </NavLink>
-            <NavLink to="/admin/users" className={navLinkClass}>
-              <UserCog className="h-4.5 w-4.5 shrink-0" />
-              {t('admin.layout.users')}
-            </NavLink>
-            <NavLink to="/admin/students/pending" className={navLinkClass}>
-              <UserPlus className="h-4.5 w-4.5 shrink-0" />
-              {t('admin.layout.pendingStudents')}
-              <CountBadge count={pendingStudentsCount} />
-            </NavLink>
+            {isManager && (
+              <>
+                <NavLink to="/admin/exit-requests" className={navLinkClass}>
+                  <DoorOpen className="h-4.5 w-4.5 shrink-0" />
+                  {t('admin.layout.exitRequests')}
+                </NavLink>
+                <NavLink to="/admin/transfer-requests" className={navLinkClass}>
+                  <ArrowLeftRight className="h-4.5 w-4.5 shrink-0" />
+                  {t('admin.layout.transferRequests')}
+                </NavLink>
+                <NavLink to="/admin/users" className={navLinkClass}>
+                  <UserCog className="h-4.5 w-4.5 shrink-0" />
+                  {t('admin.layout.users')}
+                </NavLink>
+                <NavLink to="/admin/students/pending" className={navLinkClass}>
+                  <UserPlus className="h-4.5 w-4.5 shrink-0" />
+                  {t('admin.layout.pendingStudents')}
+                  <CountBadge count={pendingStudentsCount} />
+                </NavLink>
+              </>
+            )}
           </nav>
         </div>
 
@@ -148,9 +181,7 @@ export function AdminLayout() {
           <Avatar fullName={user?.full_name} avatarUrl={user?.avatar_url} sizeClass="h-9 w-9" textClass="text-xs" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-sand-100">{user?.full_name}</p>
-            <p className="text-xs text-sand-300">
-              {user?.role === 'manager' ? t('admin.layout.managerRole') : t('admin.layout.adminRole')}
-            </p>
+            <p className="text-xs text-sand-300">{roleLabel}</p>
           </div>
           <LanguageSwitcher languages={['kk', 'ru']} dropUp />
           <ThemeToggle />

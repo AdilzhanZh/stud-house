@@ -99,11 +99,39 @@ func (h *UserHandler) UpdateRole(c *gin.Context) {
 	response.OK(c, userDTO(user))
 }
 
+type setManagerRequest struct {
+	IsManager bool `json:"is_manager"`
+}
+
+// SetManager is admin-only — grants (or revokes) the manager position.
+func (h *UserHandler) SetManager(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, apperror.BadRequest("пайдаланушы идентификаторы дұрыс емес"))
+		return
+	}
+	var req setManagerRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.BadRequest(err.Error()))
+		return
+	}
+	if err := h.users.SetManager(c.Request.Context(), id, req.IsManager); err != nil {
+		response.Error(c, err)
+		return
+	}
+	user, err := h.users.GetByID(c.Request.Context(), id)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, userDTO(user))
+}
+
 type setCommitteeMemberRequest struct {
 	IsCommitteeMember bool `json:"is_committee_member"`
 }
 
-// SetCommitteeMember is admin-only — elects (or removes) a manager onto the
+// SetCommitteeMember is admin-only — elects (or removes) a user onto the
 // committee.
 func (h *UserHandler) SetCommitteeMember(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
@@ -178,6 +206,12 @@ func (h *UserHandler) List(c *gin.Context) {
 			return
 		}
 		role = &r
+	}
+	// Staff without the manager position only get the student directory —
+	// enough to show who lives in a dormitory's rooms, not the Users section.
+	if !middleware.CanManage(c) {
+		student := domain.RoleStudent
+		role = &student
 	}
 	users, err := h.users.List(c.Request.Context(), role)
 	if err != nil {
@@ -295,7 +329,7 @@ func (h *UserHandler) GetStudentProfile(c *gin.Context) {
 		response.Error(c, apperror.BadRequest("пайдаланушы идентификаторы дұрыс емес"))
 		return
 	}
-	if !canAccessStudentResource(c, id) {
+	if !canReadStudentResource(c, id) {
 		response.Error(c, apperror.Forbidden("тек өз профиліңізді ғана көре аласыз"))
 		return
 	}
@@ -422,11 +456,20 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 	response.OK(c, gin.H{"deleted": true})
 }
 
-// canAccessStudentResource allows admins and managers unconditionally, and a
-// student only when accessing their own resource.
+// canAccessStudentResource allows the admin and managers unconditionally,
+// and a student only when accessing their own resource.
+// canReadStudentResource is canAccessStudentResource for read-only access,
+// additionally letting any role=user staff member in — users without the
+// manager position can still view dormitories' room residents.
+func canReadStudentResource(c *gin.Context, targetID uuid.UUID) bool {
+	if role, _ := middleware.Role(c); role == domain.RoleUser {
+		return true
+	}
+	return canAccessStudentResource(c, targetID)
+}
+
 func canAccessStudentResource(c *gin.Context, targetID uuid.UUID) bool {
-	role, _ := middleware.Role(c)
-	if role == domain.RoleAdmin || role == domain.RoleManager {
+	if middleware.CanManage(c) {
 		return true
 	}
 	userID, ok := middleware.UserID(c)

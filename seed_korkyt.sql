@@ -225,25 +225,25 @@ BEGIN
         (dorm5_id, '102', 2, '{"gender": "female", "courses": [], "benefit_ids": []}'::jsonb, 1, 'superior', 20.00, '2 кереует, 2 тумбочка, 1 үстел, 2 орындық, шкаф, тоңазытқыш', 0, 2);
     END IF;
 
-    -- 5. Seed Users: Manager, Committee members (managers with is_committee_member=true), and Students
+    -- 5. Seed Users: Manager, Committee members (role 'user' with the manager/committee positions), and Students
     -- Manager
     IF NOT EXISTS (SELECT 1 FROM users WHERE email = 'manager@example.com') THEN
-        INSERT INTO users (full_name, email, phone, password_hash, role, approval_status) VALUES
-        ('Сәрсенов Марат', 'manager@example.com', '+7 (777) 111-22-33', pw_hash, 'manager', 'approved');
+        INSERT INTO users (full_name, email, phone, password_hash, role, is_manager, approval_status) VALUES
+        ('Сәрсенов Марат', 'manager@example.com', '+7 (777) 111-22-33', pw_hash, 'user', true, 'approved');
     END IF;
     SELECT id INTO m_id FROM users WHERE email = 'manager@example.com';
 
     -- Committee Member 1
     IF NOT EXISTS (SELECT 1 FROM users WHERE email = 'committee1@example.com') THEN
-        INSERT INTO users (full_name, email, phone, password_hash, role, is_committee_member, approval_status) VALUES
-        ('Әлиева Гүлнәр', 'committee1@example.com', '+7 (777) 222-33-44', pw_hash, 'manager', true, 'approved');
+        INSERT INTO users (full_name, email, phone, password_hash, role, is_manager, is_committee_member, approval_status) VALUES
+        ('Әлиева Гүлнәр', 'committee1@example.com', '+7 (777) 222-33-44', pw_hash, 'user', true, true, 'approved');
     END IF;
     SELECT id INTO c1_id FROM users WHERE email = 'committee1@example.com';
 
     -- Committee Member 2 (Chairperson)
     IF NOT EXISTS (SELECT 1 FROM users WHERE email = 'committee2@example.com') THEN
-        INSERT INTO users (full_name, email, phone, password_hash, role, is_committee_member, is_chairperson, approval_status) VALUES
-        ('Жүсіпов Бауыржан', 'committee2@example.com', '+7 (777) 333-44-55', pw_hash, 'manager', true, true, 'approved');
+        INSERT INTO users (full_name, email, phone, password_hash, role, is_manager, is_committee_member, is_chairperson, approval_status) VALUES
+        ('Жүсіпов Бауыржан', 'committee2@example.com', '+7 (777) 333-44-55', pw_hash, 'user', true, true, true, 'approved');
     END IF;
     SELECT id INTO c2_id FROM users WHERE email = 'committee2@example.com';
 

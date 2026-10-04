@@ -45,8 +45,16 @@ export async function updateUserRole(id: string, role: Role): Promise<User> {
   return data.data
 }
 
-// Admin elects (or removes) a manager onto the committee — only valid for
-// role=manager.
+// Admin grants (or revokes) the manager position — only valid for role=user.
+export async function setManager(id: string, isManager: boolean): Promise<User> {
+  const { data } = await apiClient.patch<{ data: User }>(`/admin/users/${id}/manager`, {
+    is_manager: isManager,
+  })
+  return data.data
+}
+
+// Admin elects (or removes) a user onto the committee — only valid for
+// role=user.
 export async function setCommitteeMember(id: string, isCommitteeMember: boolean): Promise<User> {
   const { data } = await apiClient.patch<{ data: User }>(`/admin/users/${id}/committee-member`, {
     is_committee_member: isCommitteeMember,

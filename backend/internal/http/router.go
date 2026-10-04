@@ -35,8 +35,10 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 	r.Use(middleware.DetectLanguage())
 
 	admin := middleware.RequireRole(domain.RoleAdmin)
-	adminOrManager := middleware.RequireRole(domain.RoleAdmin, domain.RoleManager)
+	adminOrManager := middleware.RequireManager()
+	managerOrCommittee := middleware.RequireManagerOrCommitteeMember()
 	studentOnly := middleware.RequireRole(domain.RoleStudent)
+	staff := middleware.RequireRole(domain.RoleAdmin, domain.RoleUser)
 	committeeOnly := middleware.RequireCommitteeMember()
 	auth := middleware.RequireAuth(jwtSecret)
 
@@ -63,6 +65,7 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 			{
 				adminGroup.POST("/users", h.User.CreateUser)
 				adminGroup.PATCH("/users/:id/role", h.User.UpdateRole)
+				adminGroup.PATCH("/users/:id/manager", h.User.SetManager)
 				adminGroup.PATCH("/users/:id/committee-member", h.User.SetCommitteeMember)
 				adminGroup.PATCH("/committee-members/:id/chairperson", h.User.SetChairperson)
 				adminGroup.DELETE("/users/:id", h.User.DeleteUser)
@@ -128,11 +131,32 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 			protected.GET("/contract-template", h.ContractTemplate.Get)
 
 			// Committee-only: is_committee_member=true, an admin-toggled flag on
-			// a manager (chairperson is a further flag on top of that).
+			// a user (chairperson is a further flag on top of that).
 			committeeGroup := protected.Group("")
 			committeeGroup.Use(committeeOnly)
 			{
 				committeeGroup.PATCH("/protocols/:id/vote", h.Protocol.Vote)
+			}
+
+			// Any staff (admin or role=user): read-only lookups the Dormitories
+			// section needs. Users without the manager position are limited to
+			// the student directory inside the handler.
+			staffGroup := protected.Group("")
+			staffGroup.Use(staff)
+			{
+				staffGroup.GET("/admin/users", h.User.List)
+			}
+
+			// Manager or committee member: committee members who don't hold
+			// the manager position still need to read the protocols they
+			// vote on.
+			protocolReaders := protected.Group("")
+			protocolReaders.Use(managerOrCommittee)
+			{
+				protocolReaders.GET("/protocols", h.Protocol.List)
+				protocolReaders.GET("/protocols/:id", h.Protocol.GetDetail)
+				// Needed client-side to render/download the protocol PDF.
+				protocolReaders.GET("/protocol-template", h.ProtocolTemplate.Get)
 			}
 
 			// Student-only: submitting and managing their own application.
@@ -155,7 +179,7 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 				studentGroup.GET("/transfer-requests/my", h.TransferRequest.ListMine)
 			}
 
-			// Admin+Manager: dormitory/room/benefit management.
+			// Admin + users holding the manager position: everything else.
 			mgmt := protected.Group("")
 			mgmt.Use(adminOrManager)
 			{
@@ -188,7 +212,6 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 				mgmt.POST("/students/:id/benefits", h.Benefit.AssignBenefit)
 				mgmt.DELETE("/students/:id/benefits/:benefitId", h.Benefit.RevokeBenefit)
 
-				mgmt.GET("/admin/users", h.User.List)
 				mgmt.POST("/admin/students", h.User.CreateStudent)
 				mgmt.GET("/admin/students/pending", h.User.ListPendingStudents)
 				mgmt.PATCH("/admin/students/:id/approval", h.User.DecideStudentApproval)
@@ -203,15 +226,12 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 
 				mgmt.POST("/notifications/broadcast", h.Notification.Broadcast)
 
-				mgmt.GET("/protocol-template", h.ProtocolTemplate.Get)
 				mgmt.PUT("/protocol-template", h.ProtocolTemplate.Update)
 
 				mgmt.PUT("/contract-template", h.ContractTemplate.Update)
 
-				mgmt.GET("/protocols", h.Protocol.List)
 				mgmt.POST("/protocols", h.Protocol.Create)
 				mgmt.GET("/protocols/eligible-applications", h.Protocol.EligibleApplications)
-				mgmt.GET("/protocols/:id", h.Protocol.GetDetail)
 				mgmt.DELETE("/protocols/:id", h.Protocol.Delete)
 
 				mgmt.POST("/admin/contracts/expire-check", h.Contract.ExpireCheck)

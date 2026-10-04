@@ -5,18 +5,19 @@ import { Card } from '../../../components/Card'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
 import { extractErrorMessage } from '../../../api/client'
-import { listUsers, setChairperson, setCommitteeMember } from '../../../api/adminUserApi'
+import { listUsers, setChairperson, setCommitteeMember, setManager } from '../../../api/adminUserApi'
 import type { User } from '../../../types'
 
-// Reached only from manager rows in UserListPage — the user stays a manager
-// here, this page only toggles the committee-member/chairperson flags on top
-// of that role.
+// Reached only from role=user rows in UserListPage — the role itself never
+// changes here, this page only toggles the manager, committee-member and
+// chairperson positions on top of it.
 export function RoleAssignPage() {
   const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
   const [user, setUser] = useState<User | null>(null)
+  const [isManager, setIsManager] = useState(false)
   const [isCommitteeMember, setIsCommitteeMember] = useState(false)
   const [isChairperson, setIsChairperson] = useState(false)
 
@@ -36,6 +37,7 @@ export function RoleAssignPage() {
           return
         }
         setUser(found)
+        setIsManager(found.is_manager)
         setIsCommitteeMember(found.is_committee_member)
         setIsChairperson(found.is_chairperson)
       })
@@ -48,6 +50,9 @@ export function RoleAssignPage() {
     setError(null)
     setIsSubmitting(true)
     try {
+      if (isManager !== user?.is_manager) {
+        await setManager(id, isManager)
+      }
       await setCommitteeMember(id, isCommitteeMember)
       if (isCommitteeMember) {
         await setChairperson(id, isChairperson)
@@ -72,6 +77,13 @@ export function RoleAssignPage() {
       <Card title={t('admin.users.assignCommitteeTitle', { name: user.full_name })}>
         <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
           {error && <Alert variant="error" message={error} />}
+          <label className="flex flex-col gap-1 text-sm text-sand-200">
+            <span className="flex items-center gap-2">
+              <input type="checkbox" checked={isManager} onChange={(e) => setIsManager(e.target.checked)} />
+              {t('admin.users.manager')}
+            </span>
+            <span className="pl-6 text-xs text-sand-400">{t('admin.users.managerHint')}</span>
+          </label>
           <label className="flex items-center gap-2 text-sm text-sand-200">
             <input
               type="checkbox"

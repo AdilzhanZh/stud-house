@@ -25,8 +25,7 @@ func NewContractHandler(contracts *service.ContractService, applications *servic
 // canAccessApplication allows admin/manager unconditionally, and a student
 // only for their own application.
 func (h *ContractHandler) canAccessApplication(c *gin.Context, applicationID uuid.UUID) bool {
-	role, _ := middleware.Role(c)
-	if role == domain.RoleAdmin || role == domain.RoleManager {
+	if middleware.CanManage(c) {
 		return true
 	}
 	app, err := h.applications.GetByID(c.Request.Context(), applicationID)

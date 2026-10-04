@@ -220,14 +220,8 @@ func (s *ContractService) RemindApproachingDeadline(ctx context.Context) (int, e
 			continue
 		}
 		body := fmt.Sprintf("Студент (ID: %s) әлі келісімшартқа жауап бермеді, мерзімі %s жақындап қалды.", app.StudentID, contract.ResponseDeadline.Format(time.RFC3339))
-		for _, role := range []domain.Role{domain.RoleAdmin, domain.RoleManager} {
-			staff, err := s.users.ListByRole(ctx, role)
-			if err != nil {
-				continue
-			}
-			for _, u := range staff {
-				_ = s.notifier.Notify(ctx, u.ID, domain.NotificationContractSent, "Келісімшарт мерзімі жақындап қалды", body, &app.ID)
-			}
+		for _, u := range listManagementStaff(ctx, s.users) {
+			_ = s.notifier.Notify(ctx, u.ID, domain.NotificationContractSent, "Келісімшарт мерзімі жақындап қалды", body, &app.ID)
 		}
 		if err := s.contracts.MarkReminderSent(ctx, contract.ID); err != nil {
 			log.Printf("failed to mark reminder sent for contract %s: %v", contract.ID, err)

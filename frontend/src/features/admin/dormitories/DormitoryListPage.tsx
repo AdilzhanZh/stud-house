@@ -9,6 +9,8 @@ import { DeleteIconButton } from '../../../components/DeleteIconButton'
 import { extractErrorMessage } from '../../../api/client'
 import { deleteDormitory, getDormitoryCapacity, listDormitories, listDormitoryImages } from '../../../api/dormitoryApi'
 import { adminPageHeading, adminChipButtonClass } from '../adminTable'
+import { canManage } from '../../../constants/roles'
+import { useAuth } from '../../auth/useAuth'
 import type { Dormitory } from '../../../types/dormitories'
 
 interface Row extends Dormitory {
@@ -25,6 +27,9 @@ const placeholderStyle = {
 export function DormitoryListPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  // Users without the manager position get this section read-only.
+  const { user } = useAuth()
+  const isManager = canManage(user)
   const [rows, setRows] = useState<Row[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -77,7 +82,9 @@ export function DormitoryListPage() {
     <div className="flex flex-col gap-3.5">
       <div className="flex items-center justify-between">
         <h1 className={adminPageHeading}>{t('admin.layout.dormitories')}</h1>
-        <Button onClick={() => navigate('/admin/dormitories/new')}>+ {t('admin.dormitories.new')}</Button>
+        {isManager && (
+          <Button onClick={() => navigate('/admin/dormitories/new')}>+ {t('admin.dormitories.new')}</Button>
+        )}
       </div>
 
       {error && <Alert variant="error" message={error} />}
@@ -117,15 +124,17 @@ export function DormitoryListPage() {
                   style={{ width: `${pct}%` }}
                 />
               </div>
-              <div
-                className="mt-3.5 flex flex-wrap items-center gap-2"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button className={adminChipButtonClass} onClick={() => navigate(`/admin/dormitories/${d.id}/edit`)}>
-                  {t('admin.common.edit')}
-                </button>
-                <DeleteIconButton onClick={() => setDeleteTarget(d)} />
-              </div>
+              {isManager && (
+                <div
+                  className="mt-3.5 flex flex-wrap items-center gap-2"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button className={adminChipButtonClass} onClick={() => navigate(`/admin/dormitories/${d.id}/edit`)}>
+                    {t('admin.common.edit')}
+                  </button>
+                  <DeleteIconButton onClick={() => setDeleteTarget(d)} />
+                </div>
+              )}
             </Card>
           )
         })}

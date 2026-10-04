@@ -53,6 +53,7 @@ export function clearStoredUser(): void {
 interface AccessTokenClaims {
   sub: string
   role: User['role']
+  is_manager: boolean
   is_committee_member: boolean
   is_chairperson: boolean
 }

@@ -65,3 +65,46 @@ func (r *ApplicationDocumentRepo) ListByApplication(ctx context.Context, applica
 	}
 	return out, rows.Err()
 }
+
+func (r *ApplicationDocumentRepo) ListMissingRequired(ctx context.Context, applicationIDs []uuid.UUID) ([]*domain.MissingRequiredDocument, error) {
+	if len(applicationIDs) == 0 {
+		return nil, nil
+	}
+	const q = `
+		SELECT a.id, NULL::uuid, drd.id, rd.name_kk, rd.name_ru
+		FROM applications a
+		JOIN dormitory_required_documents drd ON drd.dormitory_id = a.dormitory_id
+		JOIN required_documents rd ON rd.id = drd.document_id
+		WHERE a.id = ANY($1)
+			AND NOT EXISTS (
+				SELECT 1 FROM application_documents ad
+				WHERE ad.application_id = a.id AND ad.dormitory_required_document_id = drd.id
+			)
+		UNION ALL
+		SELECT a.id, brd.id, NULL::uuid, rd.name_kk, rd.name_ru
+		FROM applications a
+		JOIN student_benefits sb ON sb.student_id = a.student_id
+		JOIN benefit_required_documents brd ON brd.benefit_id = sb.benefit_id
+		JOIN required_documents rd ON rd.id = brd.document_id
+		WHERE a.id = ANY($1)
+			AND NOT EXISTS (
+				SELECT 1 FROM application_documents ad
+				WHERE ad.application_id = a.id AND ad.benefit_required_document_id = brd.id
+			)
+		ORDER BY 1, 4`
+	rows, err := r.db.Query(ctx, q, applicationIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []*domain.MissingRequiredDocument
+	for rows.Next() {
+		m := &domain.MissingRequiredDocument{}
+		if err := rows.Scan(&m.ApplicationID, &m.BenefitRequiredDocumentID, &m.DormitoryRequiredDocumentID, &m.NameKk, &m.NameRu); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}

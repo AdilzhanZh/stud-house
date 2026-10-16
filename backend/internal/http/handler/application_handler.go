@@ -184,6 +184,11 @@ func (h *ApplicationHandler) GetDetail(c *gin.Context) {
 		response.Error(c, err)
 		return
 	}
+	missing, err := h.applications.ListMissingDocuments(c.Request.Context(), id)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
 	history, err := h.applications.ListHistory(c.Request.Context(), id)
 	if err != nil {
 		response.Error(c, err)
@@ -192,6 +197,7 @@ func (h *ApplicationHandler) GetDetail(c *gin.Context) {
 	response.OK(c, applicationDetailResponse{
 		applicationResponse: applicationDTO(app),
 		Documents:           applicationDocumentsDTO(documents),
+		MissingDocuments:    missingDocumentsDTO(missing),
 		History:             applicationStatusHistoriesDTO(history),
 	})
 }

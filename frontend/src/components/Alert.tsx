@@ -13,7 +13,7 @@ const variantClasses: Record<Variant, string> = {
 
 export function Alert({ variant, message }: AlertProps) {
   return (
-    <div className={`rounded-2xl px-4 py-3 text-sm font-medium ${variantClasses[variant]}`} role="alert">
+    <div className={`rounded-2xl px-4 py-3 text-sm font-medium whitespace-pre-line ${variantClasses[variant]}`} role="alert">
       {message}
     </div>
   )

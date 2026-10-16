@@ -493,6 +493,11 @@ var staticTranslations = map[string]translation{
 	"өз аккаунтыңызды жоя алмайсыз":    {"Вы не можете удалить свой аккаунт", "You cannot delete your own account"},
 	"өтініш идентификаторы дұрыс емес": {"Неверный идентификатор заявки", "Invalid application identifier"},
 	"өтініш табылмады":                 {"Заявка не найдена", "Application not found"},
+	"өтініштер таңдалмаған":            {"Заявки не выбраны", "No applications selected"},
+	"өтініштің тексеру нәтижесі өзгерді, оны жеке қараңыз": {
+		"Результат проверки заявки изменился, рассмотрите её отдельно",
+		"The application's check result has changed, review it individually",
+	},
 	"өтініш шешім қабылдауды күтіп тұрған жоқ": {
 		"Заявка не ожидает решения",
 		"The application is not awaiting a decision",

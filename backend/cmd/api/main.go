@@ -72,6 +72,7 @@ func main() {
 	benefitService := service.NewBenefitService(benefitRepo, userRepo, studentBenefitRepo)
 	documentService := service.NewDocumentService(requiredDocumentRepo)
 	applicationService := service.NewApplicationService(applicationRepo, applicationDocumentRepo, dormitoryRepo, roomRepo, roomService, userRepo, notifierService)
+	triageService := service.NewTriageService(applicationRepo, applicationDocumentRepo, roomService, applicationService)
 	notificationService := service.NewNotificationService(notificationRepo, roomRepo, userRepo, notifierService)
 	protocolService := service.NewProtocolService(protocolRepo, applicationRepo, userRepo, dormitoryRepo, roomRepo, notifierService)
 	contractService := service.NewContractService(contractRepo, applicationRepo, protocolRepo, userRepo, roomService, notifierService, cfg.ContractResponseDeadline, cfg.ContractReminderWindow)
@@ -108,6 +109,7 @@ func main() {
 		ContractTemplate: handler.NewContractTemplateHandler(contractTemplateService),
 		Retention:        handler.NewRetentionHandler(retentionService),
 		AcademicYear:     handler.NewAcademicYearHandler(academicYearService),
+		Triage:           handler.NewTriageHandler(triageService),
 	}
 
 	router := apihttp.NewRouter(cfg.JWTSecret, cfg.UploadDir, handlers)

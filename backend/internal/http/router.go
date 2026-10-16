@@ -28,6 +28,7 @@ type Handlers struct {
 	Upload           *handler.UploadHandler
 	Retention        *handler.RetentionHandler
 	AcademicYear     *handler.AcademicYearHandler
+	Triage           *handler.TriageHandler
 }
 
 func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
@@ -220,6 +221,12 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 				mgmt.GET("/applications", h.Application.List)
 				mgmt.PATCH("/applications/:id/decision", h.Application.Decide)
 				mgmt.PATCH("/applications/:id/cancel-approved", h.Application.CancelApproved)
+
+				// Green/yellow/red sorting of pending applications, and the
+				// bulk actions it exists for (see service.TriageService).
+				mgmt.GET("/application-triage", h.Triage.List)
+				mgmt.POST("/application-triage/approve-green", h.Triage.ApproveGreen)
+				mgmt.POST("/application-triage/request-corrections", h.Triage.RequestCorrections)
 
 				mgmt.GET("/petition-template", h.PetitionTemplate.Get)
 				mgmt.PUT("/petition-template", h.PetitionTemplate.Update)

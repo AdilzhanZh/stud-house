@@ -253,6 +253,14 @@ func (s *ApplicationService) ListDocuments(ctx context.Context, applicationID uu
 	return s.documents.ListByApplication(ctx, applicationID)
 }
 
+// ListMissingDocuments lists the required documents still missing from an
+// application — shown on its detail page so the student can upload a
+// correction against the right required-document slot (which is what
+// clears it from TriageService's missing_document check).
+func (s *ApplicationService) ListMissingDocuments(ctx context.Context, applicationID uuid.UUID) ([]*domain.MissingRequiredDocument, error) {
+	return s.documents.ListMissingRequired(ctx, []uuid.UUID{applicationID})
+}
+
 // Resubmit lets the owning student edit their application while it is in
 // needs_correction, moving it back to pending in the same operation. A room
 // hold is released the moment an application enters needs_correction (see

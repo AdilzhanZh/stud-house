@@ -125,8 +125,29 @@ func applicationDocumentsDTO(list []*domain.ApplicationDocument) []applicationDo
 // status history, for the manager's single-application view.
 type applicationDetailResponse struct {
 	applicationResponse
-	Documents []applicationDocumentResponse      `json:"documents"`
-	History   []applicationStatusHistoryResponse `json:"history"`
+	Documents        []applicationDocumentResponse      `json:"documents"`
+	MissingDocuments []missingDocumentResponse          `json:"missing_documents"`
+	History          []applicationStatusHistoryResponse `json:"history"`
+}
+
+type missingDocumentResponse struct {
+	BenefitRequiredDocumentID   *uuid.UUID `json:"benefit_required_document_id"`
+	DormitoryRequiredDocumentID *uuid.UUID `json:"dormitory_required_document_id"`
+	NameKk                      string     `json:"name_kk"`
+	NameRu                      string     `json:"name_ru"`
+}
+
+func missingDocumentsDTO(list []*domain.MissingRequiredDocument) []missingDocumentResponse {
+	out := make([]missingDocumentResponse, 0, len(list))
+	for _, m := range list {
+		out = append(out, missingDocumentResponse{
+			BenefitRequiredDocumentID:   m.BenefitRequiredDocumentID,
+			DormitoryRequiredDocumentID: m.DormitoryRequiredDocumentID,
+			NameKk:                      m.NameKk,
+			NameRu:                      m.NameRu,
+		})
+	}
+	return out
 }
 
 type notificationResponse struct {

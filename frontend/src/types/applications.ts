@@ -52,7 +52,41 @@ export interface ApplicationDocument {
   uploaded_at: string
 }
 
+// A required document (of the application's dormitory or one of the
+// student's benefits) with no upload yet. Exactly one of the two ids is set
+// — pass it back to addApplicationDocument to fill the gap.
+export interface MissingDocument {
+  benefit_required_document_id: string | null
+  dormitory_required_document_id: string | null
+  name_kk: string
+  name_ru: string
+}
+
 export interface ApplicationDetail extends Application {
   documents: ApplicationDocument[]
+  missing_documents: MissingDocument[]
   history: ApplicationStatusHistoryEntry[]
+}
+
+// Green/yellow/red sorting of a pending application by how much manager
+// attention it needs (see backend service.TriageService).
+export type TriageColor = 'green' | 'yellow' | 'red'
+
+export interface TriageReason {
+  code: 'missing_document' | 'room_unavailable'
+  document_name_kk?: string
+  document_name_ru?: string
+  detail?: string
+}
+
+export interface ApplicationTriage {
+  application_id: string
+  color: TriageColor
+  reasons: TriageReason[]
+}
+
+export interface BulkResult {
+  application_id: string
+  ok: boolean
+  error?: string
 }

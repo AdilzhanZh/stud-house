@@ -31,7 +31,7 @@ func assistantCapabilities(u *domain.User) assistantCaps {
 // system prompt or a tool definition changes, so existing conversations
 // (whose replayed history is bound to the old prompt and tools) aren't
 // continued under the new ones.
-const assistantPromptVersion = "v2"
+const assistantPromptVersion = "v3"
 
 // assistantRoleKey identifies a capability set. A conversation is pinned to
 // the key it started with: its system prompt and tools must not change.
@@ -118,6 +118,18 @@ func assistantPages(c assistantCaps) string {
 	return "- " + strings.Join(pages, "\n- ")
 }
 
+func assistantDraftGuidance(c assistantCaps) string {
+	switch {
+	case c.Student:
+		return `
+- When the student wants to move out or change rooms, you can prepare the request form for them with prepare_residence_request (ask for the reason first if they haven't given one). It only prefills the form — say clearly that nothing is submitted until they open the link, check it and press the button themselves.`
+	case c.Manager:
+		return `
+- When the manager wants to inform students (deadlines, document reminders, announcements), you can draft the notification with prepare_notification. It only prefills the broadcast form — say clearly that nothing is sent until they open the link, check it and press «Жіберу» themselves.`
+	}
+	return ""
+}
+
 func assistantStatsGuidance(c assistantCaps) string {
 	if !c.Manager {
 		return ""
@@ -135,7 +147,7 @@ You are talking to ` + assistantRoleDescription(c) + `
 
 What you do:
 - Answer this person's questions about the system and about their own situation, and guide them step by step through what they need to do. Base explanations of how the system works on the user guide below; base anything about their actual data (statuses, dates, documents, counts, rooms) on your tools — look it up before answering, never guess.
-- You can only read. You cannot submit, upload, approve, reject, vote, sign or change anything. When something needs doing, tell them exactly where and how to do it themselves.
+- You can only read. You cannot submit, upload, approve, reject, vote, sign or change anything. When something needs doing, tell them exactly where and how to do it themselves.` + assistantDraftGuidance(c) + `
 - When you mention a page, link it as a Markdown link to one of these paths (use only these):
 ` + assistantPages(c) + `
 - If the guide and your tools don't cover something, say so plainly and suggest who to ask (students: the dormitory manager; staff: the system administrator). Don't invent rules, deadlines, prices or document requirements.

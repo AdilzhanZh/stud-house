@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/url"
 	"strings"
 	"time"
 
@@ -62,6 +63,7 @@ var (
 	forStaff     = func(c assistantCaps) bool { return !c.Student }
 	forManager   = func(c assistantCaps) bool { return c.Manager }
 	forCommittee = func(c assistantCaps) bool { return c.Committee }
+	forAdmin     = func(c assistantCaps) bool { return c.Admin }
 	forEveryone  = func(assistantCaps) bool { return true }
 )
 
@@ -129,6 +131,42 @@ var assistantToolList = []assistantTool{
 		description: "Pending move-out (шығу) and room-transfer (ауыстыру) requests from residents, with student names and reasons.",
 		allowed:     forManager,
 		run:         (*assistantTools).openRequests,
+	},
+	{
+		name:        "prepare_residence_request",
+		description: "Prepare a move-out (kind move_out) or room-transfer (kind room_transfer) request form for the student, prefilled with a reason and, for a transfer, the wanted dormitory. It does NOT submit anything: it returns a link to the prefilled form, which the student reviews and submits themselves. Give them the link as a Markdown link. Fails with an explanation if the student has no room yet or already has an open request of that kind.",
+		properties: map[string]any{
+			"kind":         map[string]any{"type": "string", "enum": []string{"move_out", "room_transfer"}},
+			"reason":       map[string]any{"type": "string", "description": "The reason, in the student's own words, as they'd write it in the form (may be empty)."},
+			"dormitory_id": map[string]any{"type": "string", "description": "For room_transfer: id of the wanted dormitory from list_dormitories, or empty for no preference / move_out."},
+		},
+		required: []string{"kind", "reason", "dormitory_id"},
+		allowed:  forStudent,
+		run:      (*assistantTools).prepareResidenceRequest,
+	},
+	{
+		name:        "prepare_notification",
+		description: "Prepare an in-app notification (Хабарландыру) for the manager to send: audience all students, the residents of one dormitory, or one student. It does NOT send anything: it returns a link to the broadcast form prefilled with the title and text, which the manager reviews and sends themselves. Write the title and text in the language the notification should go out in (Kazakh by default). Give the manager the link as a Markdown link.",
+		properties: map[string]any{
+			"audience":      map[string]any{"type": "string", "enum": []string{"all", "dormitory", "student"}},
+			"dormitory_id":  map[string]any{"type": "string", "description": "For audience dormitory: id from list_dormitories; otherwise empty."},
+			"student_query": map[string]any{"type": "string", "description": "For audience student: the student's full name (or part of it) or IIN, matching exactly one student; otherwise empty."},
+			"title":         map[string]any{"type": "string"},
+			"body":          map[string]any{"type": "string"},
+		},
+		required: []string{"audience", "dormitory_id", "student_query", "title", "body"},
+		allowed:  forManager,
+		run:      (*assistantTools).prepareNotification,
+	},
+	{
+		name:        "list_feedback",
+		description: "Bug reports and suggestions users sent through the feedback form (Профиль → «Ұсыныс немесе қате туралы хабарлау») in the last N days, newest first, at most 100. Use it to summarise or group them by topic.",
+		properties: map[string]any{
+			"days": map[string]any{"type": "integer", "description": "How many days back to look, 1–365."},
+		},
+		required: []string{"days"},
+		allowed:  forAdmin,
+		run:      (*assistantTools).listFeedback,
 	},
 	{
 		name: "query_statistics",
@@ -750,6 +788,171 @@ func (t *assistantTools) queryStatistics(ctx context.Context, _ *domain.User, in
 		return nil, err
 	}
 	return t.d.StatsQuery.Run(ctx, in.SQL)
+}
+
+// ---- form drafts ----
+//
+// These tools never act: they validate the draft and return a link to the
+// real form, prefilled through URL parameters, for the user to review and
+// submit themselves.
+
+func formLink(path string, params url.Values) string {
+	for k, v := range params {
+		if len(v) == 0 || v[0] == "" {
+			params.Del(k)
+		}
+	}
+	return path + "?" + params.Encode()
+}
+
+func (t *assistantTools) prepareResidenceRequest(ctx context.Context, user *domain.User, input json.RawMessage) (any, error) {
+	var in struct {
+		Kind        string `json:"kind"`
+		Reason      string `json:"reason"`
+		DormitoryID string `json:"dormitory_id"`
+	}
+	if err := json.Unmarshal(input, &in); err != nil {
+		return nil, err
+	}
+	resident, err := t.d.Rooms.GetActiveResidentByStudent(ctx, user.ID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, errors.New("the student has no room yet, so there is nothing to move out of or transfer from")
+	}
+	if err != nil {
+		return nil, err
+	}
+	params := url.Values{"draft": {in.Kind}, "reason": {strings.TrimSpace(in.Reason)}}
+	switch in.Kind {
+	case "move_out":
+		if _, err := t.d.ExitRequests.GetActiveByRoomResident(ctx, resident.ID); err == nil {
+			return nil, errors.New("the student already has a pending move-out request")
+		} else if !errors.Is(err, repository.ErrNotFound) {
+			return nil, err
+		}
+	case "room_transfer":
+		if _, err := t.d.TransferRequests.GetActiveByStudent(ctx, user.ID); err == nil {
+			return nil, errors.New("the student already has a pending room-transfer request")
+		} else if !errors.Is(err, repository.ErrNotFound) {
+			return nil, err
+		}
+		if in.DormitoryID != "" {
+			id, err := uuid.Parse(in.DormitoryID)
+			if err != nil {
+				return nil, errors.New("dormitory_id is not a valid id; take it from list_dormitories")
+			}
+			if _, err := t.d.Dormitories.GetByID(ctx, id); err != nil {
+				return nil, errors.New("no such dormitory; take the id from list_dormitories")
+			}
+			params.Set("dormitory_id", id.String())
+		}
+	default:
+		return nil, errors.New("kind must be move_out or room_transfer")
+	}
+	return map[string]string{
+		"link": formLink("/my-residence", params),
+		"note": "Nothing has been submitted. The student must open the link, check the form and submit it.",
+	}, nil
+}
+
+func (t *assistantTools) prepareNotification(ctx context.Context, _ *domain.User, input json.RawMessage) (any, error) {
+	var in struct {
+		Audience     string `json:"audience"`
+		DormitoryID  string `json:"dormitory_id"`
+		StudentQuery string `json:"student_query"`
+		Title        string `json:"title"`
+		Body         string `json:"body"`
+	}
+	if err := json.Unmarshal(input, &in); err != nil {
+		return nil, err
+	}
+	in.Title, in.Body = strings.TrimSpace(in.Title), strings.TrimSpace(in.Body)
+	if in.Title == "" || in.Body == "" {
+		return nil, errors.New("title and body are required")
+	}
+	params := url.Values{"audience": {in.Audience}, "title": {in.Title}, "body": {in.Body}}
+	switch in.Audience {
+	case "all":
+	case "dormitory":
+		id, err := uuid.Parse(in.DormitoryID)
+		if err != nil {
+			return nil, errors.New("audience dormitory needs a dormitory_id from list_dormitories")
+		}
+		if _, err := t.d.Dormitories.GetByID(ctx, id); err != nil {
+			return nil, errors.New("no such dormitory; take the id from list_dormitories")
+		}
+		params.Set("dormitory_id", id.String())
+	case "student":
+		q := strings.ToLower(strings.TrimSpace(in.StudentQuery))
+		if q == "" {
+			return nil, errors.New("audience student needs student_query")
+		}
+		role := domain.RoleStudent
+		students, err := t.d.Users.List(ctx, &role)
+		if err != nil {
+			return nil, err
+		}
+		var matches []*domain.User
+		for _, u := range students {
+			if (u.IIN != nil && *u.IIN == q) || strings.Contains(strings.ToLower(u.FullName), q) {
+				matches = append(matches, u)
+			}
+		}
+		switch len(matches) {
+		case 0:
+			return nil, errors.New("no student matches student_query")
+		case 1:
+			params.Set("student_id", matches[0].ID.String())
+		default:
+			names := make([]string, 0, len(matches))
+			for i, m := range matches {
+				if i == 10 {
+					break
+				}
+				names = append(names, m.FullName)
+			}
+			return nil, fmt.Errorf("student_query matches %d students (%s); ask which one", len(matches), strings.Join(names, ", "))
+		}
+	default:
+		return nil, errors.New("audience must be all, dormitory or student")
+	}
+	return map[string]string{
+		"link": formLink("/admin/notifications/broadcast", params),
+		"note": "Nothing has been sent. The manager must open the link, check the form and send it.",
+	}, nil
+}
+
+func (t *assistantTools) listFeedback(ctx context.Context, user *domain.User, input json.RawMessage) (any, error) {
+	var in struct {
+		Days int `json:"days"`
+	}
+	if err := json.Unmarshal(input, &in); err != nil {
+		return nil, err
+	}
+	if in.Days < 1 || in.Days > 365 {
+		in.Days = 30
+	}
+	// Feedback reaches every admin as a notification (see FeedbackService),
+	// so the admin's own feedback notifications are the feedback log.
+	list, err := t.d.Notifications.ListByUser(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+	since := time.Now().AddDate(0, 0, -in.Days)
+	type item struct {
+		On      string `json:"on"`
+		Message string `json:"message"`
+	}
+	out := []item{}
+	for _, n := range list {
+		if n.Type != domain.NotificationFeedback || n.CreatedAt.Before(since) {
+			continue
+		}
+		if len(out) == 100 {
+			break
+		}
+		out = append(out, item{On: dateOnly(n.CreatedAt), Message: n.Body})
+	}
+	return map[string]any{"days": in.Days, "count": len(out), "feedback": out}, nil
 }
 
 // ---- committee tools ----

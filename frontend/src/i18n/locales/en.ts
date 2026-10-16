@@ -84,6 +84,7 @@ export const en: typeof kk = {
     courseForDegree: 'Select a year matching your degree level',
   },
   assistant: {
+    draftPrefilled: 'The AI assistant filled in this form. Check the text and fix it if needed — nothing is sent until you press the button yourself.',
     title: 'AI assistant',
     subtitle: 'Answers questions about the system and your data',
     open: 'Open the AI assistant',

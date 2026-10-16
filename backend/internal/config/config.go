@@ -70,6 +70,12 @@ type Config struct {
 	AnthropicAPIKey string
 	// DocumentCheckModel is the Claude model that reads the documents.
 	DocumentCheckModel string
+	// AssistantModel / AssistantEffort configure the in-app chat assistant
+	// (enabled by the same ANTHROPIC_API_KEY). AssistantDailyLimit caps
+	// chat messages per user per 24 hours.
+	AssistantModel      string
+	AssistantEffort     string
+	AssistantDailyLimit int
 }
 
 func Load() (*Config, error) {
@@ -90,6 +96,13 @@ func Load() (*Config, error) {
 	cfg.FeedbackEmail = getEnv("FEEDBACK_EMAIL", cfg.SMTPFrom)
 	cfg.AnthropicAPIKey = getEnv("ANTHROPIC_API_KEY", "")
 	cfg.DocumentCheckModel = getEnv("DOCUMENT_CHECK_MODEL", "claude-opus-5-5")
+	cfg.AssistantModel = getEnv("ASSISTANT_MODEL", "claude-opus-5-5")
+	cfg.AssistantEffort = getEnv("ASSISTANT_EFFORT", "low")
+	assistantLimit, err := strconv.Atoi(getEnv("ASSISTANT_DAILY_LIMIT", "50"))
+	if err != nil {
+		return nil, err
+	}
+	cfg.AssistantDailyLimit = assistantLimit
 
 	accessMinutes, err := strconv.Atoi(getEnv("ACCESS_TOKEN_TTL_MINUTES", "15"))
 	if err != nil {

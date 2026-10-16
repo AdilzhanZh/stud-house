@@ -515,6 +515,32 @@ var staticTranslations = map[string]translation{
 		"Формат файла не поддерживается (только PDF, JPG, PNG, WEBP, GIF)",
 		"Unsupported file format (PDF, JPG, PNG, WEBP, GIF only)",
 	},
+	"ЖИ көмекші қазір қолжетімсіз": {"ИИ-помощник сейчас недоступен", "The AI assistant is currently unavailable"},
+	"хабарлама бос":                {"Сообщение пустое", "The message is empty"},
+	"бүгінгі сұрақтар лимиті таусылды, ертең қайталап көріңіз": {
+		"Лимит вопросов на сегодня исчерпан, попробуйте завтра",
+		"You've reached today's question limit, try again tomorrow",
+	},
+	"алдыңғы хабарламаға жауап әлі дайындалып жатыр": {
+		"Ответ на предыдущее сообщение ещё готовится",
+		"The reply to your previous message is still being prepared",
+	},
+	"чат тым ұзақ болды, жаңа чат бастаңыз": {
+		"Чат стал слишком длинным, начните новый",
+		"This chat has grown too long, start a new one",
+	},
+	"ЖИ көмекші жауап бере алмады, қайталап көріңіз": {
+		"ИИ-помощник не смог ответить, попробуйте ещё раз",
+		"The AI assistant could not reply, please try again",
+	},
+	"бұл сұраққа ЖИ көмекші жауап бере алмайды": {
+		"ИИ-помощник не может ответить на этот вопрос",
+		"The AI assistant can't answer this question",
+	},
+	"ЖИ көмекші жауап бере алмады, сұрақты нақтырақ қойып көріңіз": {
+		"ИИ-помощник не смог ответить, попробуйте сформулировать вопрос точнее",
+		"The AI assistant could not reply, try asking more specifically",
+	},
 	"өтініштер таңдалмаған": {"Заявки не выбраны", "No applications selected"},
 	"өтініштің тексеру нәтижесі өзгерді, оны жеке қараңыз": {
 		"Результат проверки заявки изменился, рассмотрите её отдельно",

@@ -1,0 +1,80 @@
+import { Fragment, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
+
+// A deliberately small Markdown subset for assistant replies: paragraphs,
+// "-"/"1." lists, **bold**, `code` and [links](/path). In-app paths become
+// router links; anything else is shown as plain text (the assistant is only
+// told to link in-app pages, so external URLs are never made clickable).
+export function ChatMarkdown({ text, onNavigate }: { text: string; onNavigate?: () => void }) {
+  const blocks: ReactNode[] = []
+  let list: { ordered: boolean; items: string[] } | null = null
+
+  const flush = () => {
+    if (!list) return
+    const Tag = list.ordered ? 'ol' : 'ul'
+    blocks.push(
+      <Tag key={blocks.length} className={`ml-5 flex flex-col gap-1 ${list.ordered ? 'list-decimal' : 'list-disc'}`}>
+        {list.items.map((item, i) => (
+          <li key={i}>{inline(item, onNavigate)}</li>
+        ))}
+      </Tag>,
+    )
+    list = null
+  }
+
+  for (const raw of text.split('\n')) {
+    const line = raw.trim()
+    const bullet = /^[-*•]\s+(.*)$/.exec(line)
+    const numbered = /^\d+[.)]\s+(.*)$/.exec(line)
+    if (bullet || numbered) {
+      const ordered = Boolean(numbered)
+      if (list && list.ordered !== ordered) flush()
+      list ??= { ordered, items: [] }
+      list.items.push((bullet ?? numbered)![1])
+      continue
+    }
+    flush()
+    if (!line) continue
+    const heading = /^#{1,6}\s+(.*)$/.exec(line)
+    blocks.push(
+      <p key={blocks.length} className={heading ? 'font-semibold' : undefined}>
+        {inline(heading ? heading[1] : line, onNavigate)}
+      </p>,
+    )
+  }
+  flush()
+  return <div className="flex flex-col gap-2">{blocks}</div>
+}
+
+function inline(text: string, onNavigate?: () => void): ReactNode {
+  const parts: ReactNode[] = []
+  const re = /\[([^\]]+)\]\(([^)\s]+)\)|\*\*([^*]+)\*\*|`([^`]+)`/g
+  let last = 0
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text))) {
+    if (m.index > last) parts.push(text.slice(last, m.index))
+    if (m[1] !== undefined) {
+      const [label, href] = [m[1], m[2]]
+      parts.push(
+        href.startsWith('/') && !href.startsWith('//') ? (
+          <Link key={m.index} to={href} onClick={onNavigate} className="font-semibold text-turquoise-400 underline underline-offset-2">
+            {label}
+          </Link>
+        ) : (
+          label
+        ),
+      )
+    } else if (m[3] !== undefined) {
+      parts.push(<strong key={m.index}>{m[3]}</strong>)
+    } else {
+      parts.push(
+        <code key={m.index} className="rounded bg-navy-800 px-1 text-[0.9em]">
+          {m[4]}
+        </code>,
+      )
+    }
+    last = re.lastIndex
+  }
+  if (last < text.length) parts.push(text.slice(last))
+  return parts.map((p, i) => <Fragment key={i}>{p}</Fragment>)
+}

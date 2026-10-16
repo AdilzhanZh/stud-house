@@ -30,6 +30,7 @@ type Handlers struct {
 	AcademicYear     *handler.AcademicYearHandler
 	Triage           *handler.TriageHandler
 	Campaign         *handler.CampaignHandler
+	Assistant        *handler.AssistantHandler
 }
 
 func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
@@ -103,6 +104,11 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 			// Any authenticated user: their own password/email.
 			protected.PATCH("/users/me/password", h.User.ChangeOwnPassword)
 			protected.PATCH("/users/me/email", h.User.ChangeOwnEmail)
+
+			// Any authenticated user: the in-app AI assistant. It only looks up
+			// what the caller may see (see service.AssistantService).
+			protected.GET("/assistant/conversation", h.Assistant.Current)
+			protected.POST("/assistant/messages", h.Assistant.Send)
 
 			// Any authenticated user: send a bug report/suggestion to the admins.
 			protected.POST("/feedback", h.Feedback.Send)

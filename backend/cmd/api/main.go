@@ -78,7 +78,25 @@ func main() {
 		log.Print("ANTHROPIC_API_KEY not set — AI document checks are disabled")
 	}
 	triageService := service.NewTriageService(applicationRepo, applicationDocumentRepo, roomService, applicationService)
-	campaignService := service.NewCampaignService(postgres.NewCampaignStatsRepo(pool), triageService)
+	campaignStatsRepo := postgres.NewCampaignStatsRepo(pool)
+	campaignService := service.NewCampaignService(campaignStatsRepo, triageService)
+	assistantService := service.NewAssistantService(postgres.NewAssistantRepo(pool), userRepo, service.NewAssistantTools(service.AssistantToolDeps{
+		Users:            userRepo,
+		Profiles:         studentProfileRepo,
+		Applications:     applicationRepo,
+		Dormitories:      dormitoryRepo,
+		Rooms:            roomRepo,
+		Benefits:         benefitRepo,
+		StudentBenefits:  studentBenefitRepo,
+		Contracts:        contractRepo,
+		Notifications:    notificationRepo,
+		ExitRequests:     exitRequestRepo,
+		TransferRequests: transferRequestRepo,
+		Protocols:        protocolRepo,
+		CampaignStats:    campaignStatsRepo,
+		Triage:           triageService,
+		Campaign:         campaignService,
+	}), cfg.AnthropicAPIKey, cfg.AssistantModel, cfg.AssistantEffort, cfg.AssistantDailyLimit)
 	notificationService := service.NewNotificationService(notificationRepo, roomRepo, userRepo, notifierService)
 	protocolService := service.NewProtocolService(protocolRepo, applicationRepo, userRepo, dormitoryRepo, roomRepo, notifierService)
 	contractService := service.NewContractService(contractRepo, applicationRepo, protocolRepo, userRepo, roomService, notifierService, cfg.ContractResponseDeadline, cfg.ContractReminderWindow)
@@ -117,6 +135,7 @@ func main() {
 		AcademicYear:     handler.NewAcademicYearHandler(academicYearService),
 		Triage:           handler.NewTriageHandler(triageService),
 		Campaign:         handler.NewCampaignHandler(campaignService),
+		Assistant:        handler.NewAssistantHandler(assistantService),
 	}
 
 	router := apihttp.NewRouter(cfg.JWTSecret, cfg.UploadDir, handlers)

@@ -16,6 +16,7 @@ import {
   Users,
 } from 'lucide-react'
 import { useAuth } from '../features/auth/useAuth'
+import { AssistantWidget } from '../features/assistant/AssistantWidget'
 import { canManage } from '../constants/roles'
 import { Avatar } from '../components/Avatar'
 import { ThemeToggle } from '../components/ThemeToggle'
@@ -197,6 +198,8 @@ export function AdminLayout() {
       <main className="min-w-0 flex-1 p-6 md:p-8">
         <Outlet />
       </main>
+
+      <AssistantWidget />
     </div>
   )
 }

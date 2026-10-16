@@ -63,6 +63,13 @@ type Config struct {
 	// cutoff day just delays it to the next check instead of skipping it.
 	// Also exposed as POST /api/v1/admin/academic-year/rollover.
 	AcademicYearCheckInterval time.Duration
+
+	// AnthropicAPIKey enables AI checks of uploaded required documents
+	// (see service.DocumentCheckService). Empty disables them entirely:
+	// uploads are then triaged on completeness alone, as before.
+	AnthropicAPIKey string
+	// DocumentCheckModel is the Claude model that reads the documents.
+	DocumentCheckModel string
 }
 
 func Load() (*Config, error) {
@@ -81,6 +88,8 @@ func Load() (*Config, error) {
 		SMTPFrom:     getEnv("SMTP_FROM", getEnv("SMTP_USERNAME", "")),
 	}
 	cfg.FeedbackEmail = getEnv("FEEDBACK_EMAIL", cfg.SMTPFrom)
+	cfg.AnthropicAPIKey = getEnv("ANTHROPIC_API_KEY", "")
+	cfg.DocumentCheckModel = getEnv("DOCUMENT_CHECK_MODEL", "claude-opus-5-5")
 
 	accessMinutes, err := strconv.Atoi(getEnv("ACCESS_TOKEN_TTL_MINUTES", "15"))
 	if err != nil {

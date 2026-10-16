@@ -32,6 +32,7 @@ type applicationTriageResponse struct {
 	ApplicationID uuid.UUID              `json:"application_id"`
 	Color         string                 `json:"color"`
 	Reasons       []triageReasonResponse `json:"reasons"`
+	Checking      bool                   `json:"checking"`
 }
 
 // List is manager/admin-only: the green/yellow/red sorting of every pending
@@ -47,14 +48,18 @@ func (h *TriageHandler) List(c *gin.Context) {
 	for _, t := range list {
 		reasons := make([]triageReasonResponse, 0, len(t.Reasons))
 		for _, r := range t.Reasons {
+			detail := apperror.Translate(r.Detail, lang)
+			if lang != "kk" && r.DetailRu != "" {
+				detail = r.DetailRu
+			}
 			reasons = append(reasons, triageReasonResponse{
 				Code:           string(r.Code),
 				DocumentNameKk: r.DocumentNameKk,
 				DocumentNameRu: r.DocumentNameRu,
-				Detail:         apperror.Translate(r.Detail, lang),
+				Detail:         detail,
 			})
 		}
-		out = append(out, applicationTriageResponse{ApplicationID: t.ApplicationID, Color: string(t.Color), Reasons: reasons})
+		out = append(out, applicationTriageResponse{ApplicationID: t.ApplicationID, Color: string(t.Color), Reasons: reasons, Checking: t.Checking})
 	}
 	response.OK(c, out)
 }

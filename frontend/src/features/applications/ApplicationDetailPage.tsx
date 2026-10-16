@@ -347,8 +347,13 @@ export function ApplicationDetailPage() {
                         <span className="flex h-7.5 w-7.5 shrink-0 items-center justify-center rounded-full bg-amber-500/15">
                           <AlertCircle className="h-3.5 w-3.5 text-amber-400" strokeWidth={2.5} />
                         </span>
-                        <span className="flex-1 text-sm text-sand-100">
+                        <span className="flex flex-1 flex-col text-sm text-sand-100">
                           {bilingualField(doc.name_kk, doc.name_ru, i18n.language)}
+                          {doc.reason !== 'missing_document' && (
+                            <span className="text-xs text-amber-400">
+                              {t(`appDetail.fixReasons.${doc.reason}`, { detail: doc.detail ?? '' })}
+                            </span>
+                          )}
                         </span>
                         <label className="cursor-pointer text-sm font-semibold text-sand-100 hover:text-turquoise-400">
                           {uploadingMissingKey === missingKey(doc) ? t('appDetail.uploading') : t('appDetail.uploadButton')}

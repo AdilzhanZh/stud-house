@@ -193,14 +193,15 @@ func dormitoryRequiredDocumentsDTO(list []*domain.DormitoryRequiredDocument) []d
 }
 
 type requiredDocumentResponse struct {
-	ID        uuid.UUID `json:"id"`
-	NameKk    string    `json:"name_kk"`
-	NameRu    string    `json:"name_ru"`
-	CreatedAt time.Time `json:"created_at"`
+	ID           uuid.UUID `json:"id"`
+	NameKk       string    `json:"name_kk"`
+	NameRu       string    `json:"name_ru"`
+	ValidityDays *int      `json:"validity_days"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 func requiredDocumentDTO(d *domain.RequiredDocument) requiredDocumentResponse {
-	return requiredDocumentResponse{ID: d.ID, NameKk: d.NameKk, NameRu: d.NameRu, CreatedAt: d.CreatedAt}
+	return requiredDocumentResponse{ID: d.ID, NameKk: d.NameKk, NameRu: d.NameRu, ValidityDays: d.ValidityDays, CreatedAt: d.CreatedAt}
 }
 
 func requiredDocumentsDTO(list []*domain.RequiredDocument) []requiredDocumentResponse {

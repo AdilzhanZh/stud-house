@@ -493,7 +493,29 @@ var staticTranslations = map[string]translation{
 	"өз аккаунтыңызды жоя алмайсыз":    {"Вы не можете удалить свой аккаунт", "You cannot delete your own account"},
 	"өтініш идентификаторы дұрыс емес": {"Неверный идентификатор заявки", "Invalid application identifier"},
 	"өтініш табылмады":                 {"Заявка не найдена", "Application not found"},
-	"өтініштер таңдалмаған":            {"Заявки не выбраны", "No applications selected"},
+	"жарамдылық мерзімі оң сан болуы керек": {
+		"Срок действия должен быть положительным числом",
+		"The validity period must be a positive number",
+	},
+	"құжаттарды ЖИ тексеруі әлі аяқталмаған": {
+		"ИИ-проверка документов ещё не завершена",
+		"The AI document check has not finished yet",
+	},
+	"файл жүйеде сақталмаған (сыртқы сілтеме)": {
+		"Файл не хранится в системе (внешняя ссылка)",
+		"The file is not stored in the system (external link)",
+	},
+	"файл табылмады":      {"Файл не найден", "File not found"},
+	"PDF файлы тым үлкен": {"PDF-файл слишком большой", "The PDF file is too large"},
+	"сурет файлы тым үлкен (5 МБ-тан аспауы керек)": {
+		"Файл изображения слишком большой (не более 5 МБ)",
+		"The image file is too large (5 MB max)",
+	},
+	"файл пішімі қолдау көрсетілмейді (тек PDF, JPG, PNG, WEBP, GIF)": {
+		"Формат файла не поддерживается (только PDF, JPG, PNG, WEBP, GIF)",
+		"Unsupported file format (PDF, JPG, PNG, WEBP, GIF only)",
+	},
+	"өтініштер таңдалмаған": {"Заявки не выбраны", "No applications selected"},
 	"өтініштің тексеру нәтижесі өзгерді, оны жеке қараңыз": {
 		"Результат проверки заявки изменился, рассмотрите её отдельно",
 		"The application's check result has changed, review it individually",

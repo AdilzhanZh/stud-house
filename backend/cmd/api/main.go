@@ -72,6 +72,11 @@ func main() {
 	benefitService := service.NewBenefitService(benefitRepo, userRepo, studentBenefitRepo)
 	documentService := service.NewDocumentService(requiredDocumentRepo)
 	applicationService := service.NewApplicationService(applicationRepo, applicationDocumentRepo, dormitoryRepo, roomRepo, roomService, userRepo, notifierService)
+	documentCheckService := service.NewDocumentCheckService(applicationDocumentRepo, cfg.AnthropicAPIKey, cfg.DocumentCheckModel, cfg.UploadDir)
+	applicationService.SetDocumentChecks(documentCheckService)
+	if !documentCheckService.Enabled() {
+		log.Print("ANTHROPIC_API_KEY not set — AI document checks are disabled")
+	}
 	triageService := service.NewTriageService(applicationRepo, applicationDocumentRepo, roomService, applicationService)
 	campaignService := service.NewCampaignService(postgres.NewCampaignStatsRepo(pool), triageService)
 	notificationService := service.NewNotificationService(notificationRepo, roomRepo, userRepo, notifierService)
@@ -97,7 +102,7 @@ func main() {
 		Room:             handler.NewRoomHandler(roomService),
 		Benefit:          handler.NewBenefitHandler(benefitService),
 		Document:         handler.NewDocumentHandler(documentService),
-		Application:      handler.NewApplicationHandler(applicationService),
+		Application:      handler.NewApplicationHandler(applicationService, triageService),
 		Notification:     handler.NewNotificationHandler(notificationService),
 		Protocol:         handler.NewProtocolHandler(protocolService, applicationService),
 		ProtocolTemplate: handler.NewProtocolTemplateHandler(protocolTemplateService),
@@ -124,6 +129,9 @@ func main() {
 
 	stopAcademicYearChecker := startAcademicYearChecker(academicYearService, cfg.AcademicYearCheckInterval)
 	defer stopAcademicYearChecker()
+
+	stopDocumentChecks := documentCheckService.Start(time.Minute)
+	defer stopDocumentChecks()
 
 	log.Printf("listening on :%s", cfg.ServerPort)
 	if err := router.Run(":" + cfg.ServerPort); err != nil {

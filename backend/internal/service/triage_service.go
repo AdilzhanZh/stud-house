@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -56,6 +57,15 @@ func (s *TriageService) triage(ctx context.Context, apps []*domain.Application) 
 	for _, m := range missing {
 		missingByApp[m.ApplicationID] = append(missingByApp[m.ApplicationID], m)
 	}
+	checks, err := s.documents.ListLatestChecks(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	checksByApp := make(map[uuid.UUID][]*domain.DocumentCheck)
+	for _, c := range checks {
+		checksByApp[c.ApplicationID] = append(checksByApp[c.ApplicationID], c)
+	}
+	today := todayLocal(time.Now())
 
 	out := make([]*domain.ApplicationTriage, 0, len(apps))
 	for _, a := range apps {
@@ -67,15 +77,106 @@ func (s *TriageService) triage(ctx context.Context, apps []*domain.Application) 
 				DocumentNameRu: m.NameRu,
 			})
 		}
+		for _, c := range checksByApp[a.ID] {
+			if c.Status.InProgress() {
+				t.Checking = true
+			}
+			t.Reasons = append(t.Reasons, checkReasons(c, today)...)
+		}
 		if detail, err := s.checkPreferredRoom(ctx, a); err != nil {
 			return nil, err
 		} else if detail != "" {
 			t.Reasons = append(t.Reasons, domain.TriageReason{Code: domain.TriageRoomUnavailable, Detail: detail})
 		}
-		if len(t.Reasons) > 0 {
+		for _, r := range t.Reasons {
+			if r.Code.Red() {
+				t.Color = domain.TriageRed
+				break
+			}
 			t.Color = domain.TriageYellow
 		}
 		out = append(out, t)
+	}
+	return out, nil
+}
+
+func todayLocal(now time.Time) time.Time {
+	local := now.In(kyzylorda)
+	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC)
+}
+
+// checkReasons turns one document's AI check into triage reasons. A
+// document the checker couldn't read or check is never left looking clean:
+// otherwise re-uploading an unreadable file over a flagged one would turn
+// the application green.
+func checkReasons(c *domain.DocumentCheck, today time.Time) []domain.TriageReason {
+	reason := func(code domain.TriageReasonCode, detail, detailRu string) domain.TriageReason {
+		return domain.TriageReason{Code: code, DocumentNameKk: c.NameKk, DocumentNameRu: c.NameRu, Detail: detail, DetailRu: detailRu}
+	}
+	switch c.Status {
+	case domain.DocumentCheckUnsupported:
+		return []domain.TriageReason{reason(domain.TriageUnsupportedFormat, c.Error, "")}
+	case domain.DocumentCheckFailed:
+		return []domain.TriageReason{reason(domain.TriageCheckFailed, "", "")}
+	}
+	if c.Status != domain.DocumentCheckDone || c.Result == nil {
+		return nil
+	}
+	r := c.Result
+	// An unreadable document can't be judged on anything else.
+	if !r.Readable {
+		return []domain.TriageReason{reason(domain.TriageDocumentUnreadable, "", "")}
+	}
+	var out []domain.TriageReason
+	if r.ForgerySigns {
+		out = append(out, reason(domain.TriageSuspectedForgery, r.ForgeryReasonKk, r.ForgeryReasonRu))
+	}
+	if r.NamesStudent == domain.NameMatchNo {
+		out = append(out, reason(domain.TriageNameMismatch, r.HolderFullName, ""))
+	}
+	if !r.MatchesExpectedType {
+		out = append(out, reason(domain.TriageWrongDocumentType, r.DetectedType, r.DetectedType))
+	} else if issued := r.IssuedOn(); issued != nil && c.ValidityDays != nil &&
+		issued.AddDate(0, 0, *c.ValidityDays).Before(today) {
+		out = append(out, reason(domain.TriageDocumentExpired, r.IssueDate, r.IssueDate))
+	}
+	return out
+}
+
+// StudentFixes lists what the student has to upload (again) for an
+// application: missing required documents, plus documents whose AI check
+// found something the student can fix (unreadable, wrong document,
+// expired). Red findings are for managers only and never listed here.
+func (s *TriageService) StudentFixes(ctx context.Context, applicationID uuid.UUID) ([]*domain.MissingRequiredDocument, error) {
+	ids := []uuid.UUID{applicationID}
+	out, err := s.documents.ListMissingRequired(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	for _, m := range out {
+		m.Reason = domain.TriageMissingDocument
+	}
+	checks, err := s.documents.ListLatestChecks(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	today := todayLocal(time.Now())
+	for _, c := range checks {
+		for _, r := range checkReasons(c, today) {
+			if r.Code.Red() {
+				continue
+			}
+			out = append(out, &domain.MissingRequiredDocument{
+				ApplicationID:               applicationID,
+				BenefitRequiredDocumentID:   c.BenefitRequiredDocumentID,
+				DormitoryRequiredDocumentID: c.DormitoryRequiredDocumentID,
+				NameKk:                      c.NameKk,
+				NameRu:                      c.NameRu,
+				Reason:                      r.Code,
+				Detail:                      r.Detail,
+			})
+			break // one entry per document is enough to ask for a re-upload
+		}
 	}
 	return out, nil
 }
@@ -157,6 +258,8 @@ func (s *TriageService) bulk(ctx context.Context, applicationIDs []uuid.UUID, wa
 			r.Error = "өтініш шешім қабылдауды күтіп тұрған жоқ"
 		case t.Color != want:
 			r.Error = "өтініштің тексеру нәтижесі өзгерді, оны жеке қараңыз"
+		case want == domain.TriageGreen && t.Checking:
+			r.Error = "құжаттарды ЖИ тексеруі әлі аяқталмаған"
 		default:
 			if err := act(t); err != nil {
 				var appErr *apperror.AppError
@@ -183,6 +286,14 @@ func correctionComment(reasons []domain.TriageReason) string {
 			docs = append(docs, r.DocumentNameKk)
 		case domain.TriageRoomUnavailable:
 			lines = append(lines, fmt.Sprintf("таңдаған бөлмеңіз қолжетімсіз (%s), басқа бөлме таңдаңыз", r.Detail))
+		case domain.TriageDocumentUnreadable:
+			lines = append(lines, fmt.Sprintf("«%s» оқылмайды, анығырақ көшірмесін жүктеңіз", r.DocumentNameKk))
+		case domain.TriageWrongDocumentType:
+			lines = append(lines, fmt.Sprintf("«%s» орнына басқа құжат жүктелген, дұрысын жүктеңіз", r.DocumentNameKk))
+		case domain.TriageUnsupportedFormat:
+			lines = append(lines, fmt.Sprintf("«%s» файлын ашу мүмкін емес, PDF немесе сурет (JPG, PNG) ретінде жүктеңіз", r.DocumentNameKk))
+		case domain.TriageDocumentExpired:
+			lines = append(lines, fmt.Sprintf("«%s» мерзімі өткен (берілген күні %s), жаңасын жүктеңіз", r.DocumentNameKk, r.Detail))
 		}
 	}
 	if len(docs) > 0 {

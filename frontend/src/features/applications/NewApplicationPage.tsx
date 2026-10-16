@@ -458,6 +458,7 @@ export function NewApplicationPage() {
           <p className="text-sm text-sand-200">
             {allRequiredDocs.length > 0 ? t('wizard.docsHintWithRequired') : t('wizard.docsHintNoneRequired')}
           </p>
+          {allRequiredDocs.length > 0 && <p className="text-xs text-sand-300">{t('wizard.docsAiNotice')}</p>}
           <div className="flex max-w-[560px] flex-col gap-3">
             {dormitoryRequiredDocs.map((doc) => (
               <DocumentCard

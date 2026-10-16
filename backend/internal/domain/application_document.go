@@ -27,4 +27,10 @@ type ApplicationDocument struct {
 	// empty on the object returned by Add (never displayed directly).
 	DisplayNameKk string
 	DisplayNameRu string
+	// CheckStatus/CheckResult/CheckError are the AI document check (see
+	// DocumentCheckService). Add stores CheckStatus as given (pending for a
+	// required-document upload while checks are enabled, else skipped).
+	CheckStatus DocumentCheckStatus
+	CheckResult *DocumentCheckResult
+	CheckError  *string
 }

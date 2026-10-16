@@ -21,12 +21,12 @@ func NewRequiredDocumentRepo(db *pgxpool.Pool) *RequiredDocumentRepo {
 }
 
 func (r *RequiredDocumentRepo) Create(ctx context.Context, d *domain.RequiredDocument) error {
-	const q = `INSERT INTO required_documents (name_kk, name_ru) VALUES ($1, $2) RETURNING id, created_at`
-	return r.db.QueryRow(ctx, q, d.NameKk, d.NameRu).Scan(&d.ID, &d.CreatedAt)
+	const q = `INSERT INTO required_documents (name_kk, name_ru, validity_days) VALUES ($1, $2, $3) RETURNING id, created_at`
+	return r.db.QueryRow(ctx, q, d.NameKk, d.NameRu, d.ValidityDays).Scan(&d.ID, &d.CreatedAt)
 }
 
 func (r *RequiredDocumentRepo) List(ctx context.Context) ([]*domain.RequiredDocument, error) {
-	const q = `SELECT id, name_kk, name_ru, created_at FROM required_documents ORDER BY name_kk`
+	const q = `SELECT id, name_kk, name_ru, validity_days, created_at FROM required_documents ORDER BY name_kk`
 	rows, err := r.db.Query(ctx, q)
 	if err != nil {
 		return nil, err
@@ -36,12 +36,23 @@ func (r *RequiredDocumentRepo) List(ctx context.Context) ([]*domain.RequiredDocu
 	var out []*domain.RequiredDocument
 	for rows.Next() {
 		d := &domain.RequiredDocument{}
-		if err := rows.Scan(&d.ID, &d.NameKk, &d.NameRu, &d.CreatedAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.NameKk, &d.NameRu, &d.ValidityDays, &d.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, d)
 	}
 	return out, rows.Err()
+}
+
+func (r *RequiredDocumentRepo) SetValidityDays(ctx context.Context, id uuid.UUID, validityDays *int) error {
+	tag, err := r.db.Exec(ctx, `UPDATE required_documents SET validity_days = $2 WHERE id = $1`, id, validityDays)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return repository.ErrNotFound
+	}
+	return nil
 }
 
 func (r *RequiredDocumentRepo) Delete(ctx context.Context, id uuid.UUID) error {

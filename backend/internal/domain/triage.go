@@ -8,9 +8,8 @@ import "github.com/google/uuid"
 //   - yellow: something the student can fix themselves (a missing document,
 //     a preferred room that's no longer available) — can be sent back for
 //     correction in bulk;
-//   - red: needs a manager's judgement. Nothing produces red yet; it's
-//     reserved for the AI document checks (contradictory documents,
-//     suspected forgery) planned on top of this.
+//   - red: needs a manager's judgement — the AI document check found a
+//     document about someone else, or signs of tampering.
 type TriageColor string
 
 const (
@@ -29,22 +28,55 @@ const (
 	// same checks ApplicationService.Decide runs on approve (full, held to
 	// capacity by other applicants, or restricted against this student).
 	TriageRoomUnavailable TriageReasonCode = "room_unavailable"
+
+	// Yellow reasons from the AI document check — the student can fix them
+	// by uploading a better document.
+	TriageDocumentUnreadable TriageReasonCode = "document_unreadable"
+	TriageWrongDocumentType  TriageReasonCode = "wrong_document_type"
+	// TriageDocumentExpired: issued longer ago than its RequiredDocument.
+	// ValidityDays allows; Detail is the issue date.
+	TriageDocumentExpired TriageReasonCode = "document_expired"
+	// TriageUnsupportedFormat: the checker can't read the file at all
+	// (e.g. a .docx); Detail says why.
+	TriageUnsupportedFormat TriageReasonCode = "unsupported_format"
+
+	// Red reasons from the AI document check — need a manager's judgement.
+	// TriageNameMismatch: Detail is the name found on the document.
+	TriageNameMismatch TriageReasonCode = "name_mismatch"
+	// TriageSuspectedForgery: Detail/DetailRu say what looked tampered.
+	TriageSuspectedForgery TriageReasonCode = "suspected_forgery"
+	// TriageCheckFailed: the AI check kept failing (API errors), so nobody
+	// has looked at this document yet — a person has to.
+	TriageCheckFailed TriageReasonCode = "check_failed"
 )
 
+// Red reports whether this reason needs a manager's judgement rather than
+// a correction from the student.
+func (c TriageReasonCode) Red() bool {
+	return c == TriageNameMismatch || c == TriageSuspectedForgery || c == TriageCheckFailed
+}
+
 // TriageReason explains one thing that kept an application from being
-// green. DocumentNameKk/Ru are set for missing_document; Detail carries the
-// underlying check's message for room_unavailable.
+// green. DocumentNameKk/Ru name the document for every document reason;
+// Detail carries the specifics (the room check's message, an issue date, a
+// name found on the document, a forgery reason in Kazakh — with DetailRu
+// its Russian version when the model wrote both).
 type TriageReason struct {
 	Code           TriageReasonCode
 	DocumentNameKk string
 	DocumentNameRu string
 	Detail         string
+	DetailRu       string
 }
 
 type ApplicationTriage struct {
 	ApplicationID uuid.UUID
 	Color         TriageColor
 	Reasons       []TriageReason
+	// Checking is set while any of the application's documents is still
+	// waiting on its AI check: the color may still change, so bulk
+	// approval skips it.
+	Checking bool
 }
 
 // MissingRequiredDocument is a required document (from the application's
@@ -57,4 +89,9 @@ type MissingRequiredDocument struct {
 	DormitoryRequiredDocumentID *uuid.UUID
 	NameKk                      string
 	NameRu                      string
+	// Reason is why the student has to upload this slot (again):
+	// missing_document, or one of the yellow AI check reasons. Detail is
+	// that reason's Detail (e.g. the issue date of an expired document).
+	Reason TriageReasonCode
+	Detail string
 }

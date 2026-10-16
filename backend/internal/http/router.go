@@ -209,6 +209,7 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 
 				mgmt.POST("/documents", h.Document.Create)
 				mgmt.GET("/documents", h.Document.List)
+				mgmt.PATCH("/documents/:id/validity", h.Document.SetValidity)
 				mgmt.DELETE("/documents/:id", h.Document.Delete)
 
 				mgmt.POST("/students/:id/benefits", h.Benefit.AssignBenefit)

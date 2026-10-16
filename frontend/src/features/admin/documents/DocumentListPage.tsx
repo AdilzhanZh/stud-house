@@ -12,10 +12,59 @@ import {
   createRequiredDocument,
   deleteRequiredDocument,
   listRequiredDocuments,
+  setRequiredDocumentValidity,
 } from '../../../api/documentApi'
 import { deleteBenefit, listBenefits } from '../../../api/benefitApi'
 import type { RequiredDocument } from '../../../types/documents'
 import type { Benefit } from '../../../types/benefits'
+
+const inputClass =
+  'rounded-[14px] border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sand-100 text-sm outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15'
+
+// "" -> null (never expires); anything else must be a positive whole number.
+function parseValidity(raw: string): number | null | undefined {
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  const n = Number(trimmed)
+  return Number.isInteger(n) && n > 0 ? n : undefined
+}
+
+// Validity period of one catalog entry, saved when the field loses focus.
+function ValidityField({ doc, onSaved, onError }: { doc: RequiredDocument; onSaved: () => void; onError: (msg: string) => void }) {
+  const { t } = useTranslation()
+  const [value, setValue] = useState(doc.validity_days?.toString() ?? '')
+
+  async function save() {
+    const parsed = parseValidity(value)
+    if (parsed === undefined) {
+      onError(t('admin.documents.validityInvalid'))
+      return
+    }
+    if (parsed === doc.validity_days) return
+    try {
+      await setRequiredDocumentValidity(doc.id, parsed)
+      onSaved()
+    } catch (err) {
+      onError(extractErrorMessage(err, t('admin.documents.validitySaveFailed')))
+    }
+  }
+
+  return (
+    <label className="flex items-center gap-2 text-xs text-sand-300">
+      {t('admin.documents.validityLabel')}
+      <input
+        type="number"
+        min={1}
+        inputMode="numeric"
+        placeholder="∞"
+        className={`${inputClass} w-20 !px-2.5 !py-1.5 text-right`}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={save}
+      />
+    </label>
+  )
+}
 
 export function DocumentListPage() {
   const { t, i18n } = useTranslation()
@@ -24,6 +73,7 @@ export function DocumentListPage() {
   const [documents, setDocuments] = useState<RequiredDocument[] | null>(null)
   const [newDocumentNameKk, setNewDocumentNameKk] = useState('')
   const [newDocumentNameRu, setNewDocumentNameRu] = useState('')
+  const [newDocumentValidity, setNewDocumentValidity] = useState('')
   const [documentError, setDocumentError] = useState<string | null>(null)
   const [deleteDocTarget, setDeleteDocTarget] = useState<RequiredDocument | null>(null)
   const [isDeletingDoc, setIsDeletingDoc] = useState(false)
@@ -54,11 +104,17 @@ export function DocumentListPage() {
     const nameKk = newDocumentNameKk.trim()
     const nameRu = newDocumentNameRu.trim()
     if (!nameKk && !nameRu) return
+    const validity = parseValidity(newDocumentValidity)
+    if (validity === undefined) {
+      setDocumentError(t('admin.documents.validityInvalid'))
+      return
+    }
     setDocumentError(null)
     try {
-      await createRequiredDocument(nameKk, nameRu)
+      await createRequiredDocument(nameKk, nameRu, validity)
       setNewDocumentNameKk('')
       setNewDocumentNameRu('')
+      setNewDocumentValidity('')
       loadDocuments()
     } catch (err) {
       setDocumentError(extractErrorMessage(err, t('admin.documents.addFailed')))
@@ -101,10 +157,12 @@ export function DocumentListPage() {
 
       <Card title={t('admin.documents.catalogTitle')}>
         {documentError && <Alert variant="error" message={documentError} />}
+        <p className="mb-3 text-xs text-sand-300">{t('admin.documents.validityHint')}</p>
         <ul className="mb-4 flex flex-col gap-2">
           {documents?.map((d) => (
-            <li key={d.id} className="flex items-center justify-between text-sm">
-              <span className="text-sand-100">{bilingualField(d.name_kk, d.name_ru, i18n.language)}</span>
+            <li key={d.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
+              <span className="flex-1 text-sand-100">{bilingualField(d.name_kk, d.name_ru, i18n.language)}</span>
+              <ValidityField doc={d} onSaved={loadDocuments} onError={setDocumentError} />
               <DeleteIconButton onClick={() => setDeleteDocTarget(d)} />
             </li>
           ))}
@@ -125,6 +183,15 @@ export function DocumentListPage() {
             className="flex-1 rounded-[14px] border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sand-100 text-sm outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
             value={newDocumentNameRu}
             onChange={(e) => setNewDocumentNameRu(e.target.value)}
+          />
+          <input
+            type="number"
+            min={1}
+            inputMode="numeric"
+            placeholder={t('admin.documents.validityPlaceholder')}
+            className={`${inputClass} sm:w-44`}
+            value={newDocumentValidity}
+            onChange={(e) => setNewDocumentValidity(e.target.value)}
           />
           <Button type="button" variant="secondary" onClick={handleAddDocument}>
             {t('admin.common.add')}

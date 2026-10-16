@@ -29,6 +29,13 @@ type ApplicationService struct {
 	rooms        *RoomService
 	users        repository.UserRepository
 	notifier     *notifier.Notifier
+	checks       *DocumentCheckService
+}
+
+// SetDocumentChecks queues every required-document upload for an AI check
+// (see DocumentCheckService) when checks is enabled.
+func (s *ApplicationService) SetDocumentChecks(checks *DocumentCheckService) {
+	s.checks = checks
 }
 
 func NewApplicationService(
@@ -239,6 +246,13 @@ func (s *ApplicationService) AddDocument(ctx context.Context, actorStudentID, ap
 		DormitoryRequiredDocumentID: dormitoryRequiredDocumentID,
 		DocumentName:                documentName,
 		FileURL:                     fileURL,
+		CheckStatus:                 domain.DocumentCheckSkipped,
+	}
+	// Only uploads against a required-document slot are checked: those are
+	// the ones with an expected type to compare against.
+	queueCheck := s.checks.Enabled() && documentName == nil
+	if queueCheck {
+		doc.CheckStatus = domain.DocumentCheckPending
 	}
 	if err := s.documents.Add(ctx, doc); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -246,19 +260,14 @@ func (s *ApplicationService) AddDocument(ctx context.Context, actorStudentID, ap
 		}
 		return nil, err
 	}
+	if queueCheck {
+		s.checks.Wake()
+	}
 	return doc, nil
 }
 
 func (s *ApplicationService) ListDocuments(ctx context.Context, applicationID uuid.UUID) ([]*domain.ApplicationDocument, error) {
 	return s.documents.ListByApplication(ctx, applicationID)
-}
-
-// ListMissingDocuments lists the required documents still missing from an
-// application — shown on its detail page so the student can upload a
-// correction against the right required-document slot (which is what
-// clears it from TriageService's missing_document check).
-func (s *ApplicationService) ListMissingDocuments(ctx context.Context, applicationID uuid.UUID) ([]*domain.MissingRequiredDocument, error) {
-	return s.documents.ListMissingRequired(ctx, []uuid.UUID{applicationID})
 }
 
 // Resubmit lets the owning student edit their application while it is in

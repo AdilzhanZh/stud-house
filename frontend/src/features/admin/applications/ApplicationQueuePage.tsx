@@ -216,12 +216,10 @@ export function ApplicationQueuePage() {
   }
 
   function reasonText(reason: TriageReason): string {
-    if (reason.code === 'missing_document') {
-      return t('admin.applications.triage.missingDocument', {
-        doc: bilingualField(reason.document_name_kk ?? '', reason.document_name_ru ?? '', i18n.language),
-      })
-    }
-    return t('admin.applications.triage.roomUnavailable', { detail: reason.detail ?? '' })
+    return t(`admin.applications.triage.reasons.${reason.code}`, {
+      doc: bilingualField(reason.document_name_kk ?? '', reason.document_name_ru ?? '', i18n.language),
+      detail: reason.detail ?? '',
+    })
   }
 
   function toggleSort(field: 'priority' | 'date') {
@@ -425,6 +423,9 @@ export function ApplicationQueuePage() {
                             >
                               {t(`admin.applications.triage.${triageById[app.id].color}`)}
                             </span>
+                            {triageById[app.id].checking && (
+                              <span className="text-xs text-turquoise-400">{t('admin.applications.triage.checking')}</span>
+                            )}
                             {triageById[app.id].reasons.map((reason, i) => (
                               <span key={i} className="text-xs text-sand-300">
                                 {reasonText(reason)}

@@ -11,8 +11,8 @@ import { getAISettings, updateAISettings, type AISettings, type AISettingsUpdate
 import { formatDateTime } from '../../../utils/dateFormat'
 import { adminPageHeading } from '../adminTable'
 
-// Admin-only: switch the AI features on/off and pick their model, effort
-// and limits. Saved settings apply immediately on the server. The API key
+// Admin-only: switch the AI features on/off and pick their model (typed
+// freely, with the server's suggestions), effort and limits. Saved settings apply immediately on the server. The API key
 // itself stays in the server environment and is only reported as set/unset.
 export function AISettingsPage() {
   const { t } = useTranslation()
@@ -56,17 +56,33 @@ export function AISettingsPage() {
     }
   }
 
-  const modelOptions = settings.models.map((m) => (
-    <option key={m} value={m}>
-      {t(`admin.aiSettings.models.${m}`, { defaultValue: m })}
-    </option>
-  ))
+  const openRouter = settings.provider === 'openrouter'
+  const modelInputProps = {
+    label: t('admin.aiSettings.model'),
+    required: true,
+    list: 'ai-model-suggestions',
+    autoComplete: 'off',
+    spellCheck: false,
+    placeholder: t('admin.aiSettings.modelPlaceholder', { example: settings.models[0] ?? 'claude-opus-5-5' }),
+  }
 
   return (
     <div className="flex max-w-3xl flex-col gap-4">
       <h1 className={adminPageHeading}>{t('admin.aiSettings.title')}</h1>
 
+      {settings.provider && (
+        <p className="text-sm text-sand-300">
+          {t('admin.aiSettings.provider', { name: openRouter ? 'OpenRouter' : 'Anthropic' })}
+        </p>
+      )}
       {!settings.api_key_configured && <Alert variant="warning" message={t('admin.aiSettings.noApiKey')} />}
+      <datalist id="ai-model-suggestions">
+        {settings.models.map((m) => (
+          <option key={m} value={m}>
+            {t(`admin.aiSettings.models.${m}`, { defaultValue: '' })}
+          </option>
+        ))}
+      </datalist>
       {error && <Alert variant="error" message={error} />}
       {saved && <Alert variant="success" message={t('admin.aiSettings.saved')} />}
 
@@ -80,14 +96,11 @@ export function AISettingsPage() {
           toggleLabel={t('admin.aiSettings.enabled')}
         />
         <div className="mt-4 grid gap-4 sm:grid-cols-[1.6fr_1fr_1fr]">
-          <Select
-            label={t('admin.aiSettings.model')}
-            required
+          <Input
+            {...modelInputProps}
             value={form.assistant_model}
             onChange={(e) => set('assistant_model', e.target.value)}
-          >
-            {modelOptions}
-          </Select>
+          />
           <Select
             label={t('admin.aiSettings.effort')}
             required
@@ -111,9 +124,10 @@ export function AISettingsPage() {
           />
         </div>
         <ul className="mt-4 flex list-disc flex-col gap-1 pl-5 text-xs text-sand-300">
+          <li>{t('admin.aiSettings.modelInputHelp')}</li>
           <li>{t('admin.aiSettings.effortHelp')}</li>
           <li>{t('admin.aiSettings.limitHelp')}</li>
-          <li>{t('admin.aiSettings.costHelp')}</li>
+          {!openRouter && <li>{t('admin.aiSettings.costHelp')}</li>}
         </ul>
       </Card>
 
@@ -127,22 +141,28 @@ export function AISettingsPage() {
           toggleLabel={t('admin.aiSettings.enabled')}
         />
         <div className="mt-4 grid gap-4 sm:max-w-sm">
-          <Select
-            label={t('admin.aiSettings.model')}
-            required
+          <Input
+            {...modelInputProps}
             value={form.document_check_model}
             onChange={(e) => set('document_check_model', e.target.value)}
-          >
-            {modelOptions}
-          </Select>
+          />
         </div>
         <p className="mt-4 text-xs text-sand-300">{t('admin.aiSettings.checksOffHelp')}</p>
       </Card>
 
       <Card>
-        <p className="text-xs text-sand-300">{t('admin.aiSettings.modelsHelp')}</p>
-        <p className="mt-2 text-xs text-sand-300">{t('admin.aiSettings.fallbackHelp')}</p>
-        <p className="mt-2 text-xs text-sand-300">{t('admin.aiSettings.privacyHelp')}</p>
+        {openRouter ? (
+          <>
+            <p className="text-xs text-sand-300">{t('admin.aiSettings.modelsHelpOpenRouter')}</p>
+            <p className="mt-2 text-xs text-sand-300">{t('admin.aiSettings.privacyHelpOpenRouter')}</p>
+          </>
+        ) : (
+          <>
+            <p className="text-xs text-sand-300">{t('admin.aiSettings.modelsHelp')}</p>
+            <p className="mt-2 text-xs text-sand-300">{t('admin.aiSettings.fallbackHelp')}</p>
+            <p className="mt-2 text-xs text-sand-300">{t('admin.aiSettings.privacyHelp')}</p>
+          </>
+        )}
       </Card>
 
       <div className="flex flex-wrap items-center justify-between gap-3">

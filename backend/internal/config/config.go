@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -64,15 +65,20 @@ type Config struct {
 	// Also exposed as POST /api/v1/admin/academic-year/rollover.
 	AcademicYearCheckInterval time.Duration
 
-	// AnthropicAPIKey enables AI checks of uploaded required documents
-	// (see service.DocumentCheckService). Empty disables them entirely:
-	// uploads are then triaged on completeness alone, as before.
-	AnthropicAPIKey string
-	// DocumentCheckModel is the Claude model that reads the documents.
+	// AIProvider/AIAPIKey enable AI checks of uploaded required documents
+	// (see service.DocumentCheckService) and the in-app assistant.
+	// OPENROUTER_API_KEY selects OpenRouter, otherwise ANTHROPIC_API_KEY
+	// selects the Anthropic API — except that an OpenRouter key put in
+	// ANTHROPIC_API_KEY (it starts with "sk-or-") is recognised as one.
+	// No key disables both features: uploads are then triaged on
+	// completeness alone, as before.
+	AIProvider string
+	AIAPIKey   string
+	// DocumentCheckModel is the model that reads the documents.
 	DocumentCheckModel string
-	// AssistantModel / AssistantEffort configure the in-app chat assistant
-	// (enabled by the same ANTHROPIC_API_KEY). AssistantDailyLimit caps
-	// chat messages per user per 24 hours.
+	// AssistantModel / AssistantEffort configure the in-app chat assistant.
+	// AssistantDailyLimit caps chat messages per user per 24 hours.
+	// Empty models fall back to the provider's defaults.
 	AssistantModel      string
 	AssistantEffort     string
 	AssistantDailyLimit int
@@ -94,9 +100,9 @@ func Load() (*Config, error) {
 		SMTPFrom:     getEnv("SMTP_FROM", getEnv("SMTP_USERNAME", "")),
 	}
 	cfg.FeedbackEmail = getEnv("FEEDBACK_EMAIL", cfg.SMTPFrom)
-	cfg.AnthropicAPIKey = getEnv("ANTHROPIC_API_KEY", "")
-	cfg.DocumentCheckModel = getEnv("DOCUMENT_CHECK_MODEL", "claude-opus-5-5")
-	cfg.AssistantModel = getEnv("ASSISTANT_MODEL", "claude-opus-5-5")
+	cfg.AIProvider, cfg.AIAPIKey = aiProvider(getEnv("OPENROUTER_API_KEY", ""), getEnv("ANTHROPIC_API_KEY", ""))
+	cfg.DocumentCheckModel = getEnv("DOCUMENT_CHECK_MODEL", "")
+	cfg.AssistantModel = getEnv("ASSISTANT_MODEL", "")
 	cfg.AssistantEffort = getEnv("ASSISTANT_EFFORT", "low")
 	assistantLimit, err := strconv.Atoi(getEnv("ASSISTANT_DAILY_LIMIT", "50"))
 	if err != nil {
@@ -153,6 +159,20 @@ func Load() (*Config, error) {
 	cfg.AcademicYearCheckInterval = time.Duration(academicYearCheckHours) * time.Hour
 
 	return cfg, nil
+}
+
+// aiProvider picks the AI provider from whichever key is set: "openrouter",
+// "anthropic", or "" when there is none.
+func aiProvider(openRouterKey, anthropicKey string) (provider, key string) {
+	switch {
+	case openRouterKey != "":
+		return "openrouter", openRouterKey
+	case strings.HasPrefix(anthropicKey, "sk-or-"):
+		return "openrouter", anthropicKey
+	case anthropicKey != "":
+		return "anthropic", anthropicKey
+	}
+	return "", ""
 }
 
 func getEnv(key, fallback string) string {

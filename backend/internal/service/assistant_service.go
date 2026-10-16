@@ -44,22 +44,37 @@ const (
 // Conversations are stored append-only and replayed exactly (see the
 // assistant_messages migration), and each one is pinned to the role key it
 // started with, so its system prompt and tools never change mid-conversation.
+// Messages are stored in the provider's own format, so OpenRouter
+// conversations get their own role keys (see roleKey).
 type AssistantService struct {
-	repo     repository.AssistantRepository
-	users    repository.UserRepository
-	tools    *assistantTools
-	settings *AISettingsService
-	client   anthropic.Client
+	repo       repository.AssistantRepository
+	users      repository.UserRepository
+	tools      *assistantTools
+	settings   *AISettingsService
+	client     anthropic.Client
+	openRouter *openRouterClient
 }
 
 // NewAssistantService: model, effort, daily limit and on/off come from
 // settings on every message, so an admin's change applies immediately.
 func NewAssistantService(repo repository.AssistantRepository, users repository.UserRepository, tools *assistantTools, settings *AISettingsService, apiKey string) *AssistantService {
 	s := &AssistantService{repo: repo, users: users, tools: tools, settings: settings}
-	if apiKey != "" {
+	switch settings.Provider() {
+	case AIProviderAnthropic:
 		s.client = anthropic.NewClient(option.WithAPIKey(apiKey), option.WithRequestTimeout(assistantTimeout))
+	case AIProviderOpenRouter:
+		s.openRouter = newOpenRouterClient(apiKey, assistantTimeout)
 	}
 	return s
+}
+
+// roleKey is assistantRoleKey, prefixed for OpenRouter so a conversation
+// stored in one provider's message format is never replayed to the other.
+func (s *AssistantService) roleKey(user *domain.User) string {
+	if s.openRouter != nil {
+		return "openrouter:" + assistantRoleKey(user)
+	}
+	return assistantRoleKey(user)
 }
 
 func (s *AssistantService) Enabled() bool { return s != nil && s.settings.AssistantActive() }
@@ -101,7 +116,7 @@ func (s *AssistantService) Current(ctx context.Context, userID uuid.UUID) (*Chat
 	if err != nil {
 		return nil, err
 	}
-	if conv.RoleKey != assistantRoleKey(user) {
+	if conv.RoleKey != s.roleKey(user) {
 		return &ChatConversation{}, nil
 	}
 	msgs, err := s.repo.ListMessages(ctx, conv.ID)
@@ -146,7 +161,7 @@ func (s *AssistantService) Send(ctx context.Context, userID uuid.UUID, conversat
 		return uuid.Nil, nil, apperror.New(429, "rate_limited", "бүгінгі сұрақтар лимиті таусылды, ертең қайталап көріңіз")
 	}
 
-	roleKey := assistantRoleKey(user)
+	roleKey := s.roleKey(user)
 	conv, history, err := s.conversationFor(ctx, user, conversationID, roleKey)
 	if err != nil {
 		return uuid.Nil, nil, err
@@ -155,13 +170,17 @@ func (s *AssistantService) Send(ctx context.Context, userID uuid.UUID, conversat
 	// Per-turn context goes in the user message, never the system prompt:
 	// the system prompt must stay byte-identical for the whole conversation.
 	userText := fmt.Sprintf("[%s · UI: %s]\n%s", time.Now().In(kyzylorda).Format(time.DateOnly), lang, text)
-	userMsg := anthropic.NewBetaUserMessage(anthropic.NewBetaTextBlock(userText))
-	turn := []turnMessage{{param: userMsg, role: "user", display: &text}}
-
-	answer, err := s.runTurn(ctx, user, roleKey, history, &turn)
+	var turn []turnMessage
+	var answer string
+	if s.openRouter != nil {
+		answer, err = s.runTurnOpenRouter(ctx, user, roleKey, history, userText, &turn)
+	} else {
+		answer, err = s.runTurn(ctx, user, roleKey, history, userText, &turn)
+	}
 	if err != nil {
 		return uuid.Nil, nil, err
 	}
+	turn[0].display = &text
 
 	rows := make([]*domain.AssistantMessage, 0, len(turn))
 	for _, m := range turn {
@@ -181,13 +200,18 @@ func (s *AssistantService) Send(ctx context.Context, userID uuid.UUID, conversat
 	return conv.ID, &ChatMessage{Role: "assistant", Text: answer, CreatedAt: last.CreatedAt}, nil
 }
 
+// turnMessage is one message produced in a turn: an Anthropic
+// BetaMessageParam or an OpenRouter orMessage, stored as JSON. role is the
+// stored row's role — OpenRouter tool results (role "tool") are stored as
+// "user" rows, like Anthropic's tool_result blocks.
 type turnMessage struct {
-	param   anthropic.BetaMessageParam
+	param   any
 	role    string
 	display *string
 }
 
-func (s *AssistantService) conversationFor(ctx context.Context, user *domain.User, id *uuid.UUID, roleKey string) (*domain.AssistantConversation, []anthropic.BetaMessageParam, error) {
+// conversationFor returns the conversation and its stored messages, raw.
+func (s *AssistantService) conversationFor(ctx context.Context, user *domain.User, id *uuid.UUID, roleKey string) (*domain.AssistantConversation, []json.RawMessage, error) {
 	if id != nil {
 		conv, err := s.repo.GetConversation(ctx, *id, user.ID)
 		if err != nil && !errors.Is(err, repository.ErrNotFound) {
@@ -201,9 +225,9 @@ func (s *AssistantService) conversationFor(ctx context.Context, user *domain.Use
 			if countUserTurns(msgs) >= assistantMaxTurns {
 				return nil, nil, apperror.BadRequest("чат тым ұзақ болды, жаңа чат бастаңыз")
 			}
-			history := make([]anthropic.BetaMessageParam, 0, len(msgs))
+			history := make([]json.RawMessage, 0, len(msgs))
 			for _, m := range msgs {
-				history = append(history, param.Override[anthropic.BetaMessageParam](m.Content))
+				history = append(history, json.RawMessage(m.Content))
 			}
 			return conv, history, nil
 		}
@@ -229,7 +253,12 @@ func countUserTurns(msgs []*domain.AssistantMessage) int {
 // answer. Every message it produces is appended to turn; the turn is only
 // persisted by the caller once it completed, so a failure leaves no
 // half-finished tool exchange in the stored history.
-func (s *AssistantService) runTurn(ctx context.Context, user *domain.User, roleKey string, history []anthropic.BetaMessageParam, turn *[]turnMessage) (string, error) {
+func (s *AssistantService) runTurn(ctx context.Context, user *domain.User, roleKey string, rawHistory []json.RawMessage, userText string, turn *[]turnMessage) (string, error) {
+	history := make([]anthropic.BetaMessageParam, 0, len(rawHistory))
+	for _, m := range rawHistory {
+		history = append(history, param.Override[anthropic.BetaMessageParam](m))
+	}
+	*turn = append(*turn, turnMessage{param: anthropic.NewBetaUserMessage(anthropic.NewBetaTextBlock(userText)), role: "user"})
 	caps := assistantCapabilities(user)
 	cfg := s.settings.Current()
 	params := anthropic.BetaMessageNewParams{
@@ -286,7 +315,68 @@ func (s *AssistantService) runTurn(ctx context.Context, user *domain.User, roleK
 func turnParams(turn []turnMessage) []anthropic.BetaMessageParam {
 	out := make([]anthropic.BetaMessageParam, 0, len(turn))
 	for _, m := range turn {
-		out = append(out, m.param)
+		out = append(out, m.param.(anthropic.BetaMessageParam))
 	}
 	return out
+}
+
+// runTurnOpenRouter is runTurn for OpenRouter's chat completions API. The
+// system prompt is sent as the first message on every call (not stored).
+func (s *AssistantService) runTurnOpenRouter(ctx context.Context, user *domain.User, roleKey string, history []json.RawMessage, userText string, turn *[]turnMessage) (string, error) {
+	caps := assistantCapabilities(user)
+	cfg := s.settings.Current()
+	system, err := json.Marshal(orMessage{Role: "system", Content: assistantSystemPrompt(caps)})
+	if err != nil {
+		return "", err
+	}
+	req := orRequest{
+		Model:     cfg.AssistantModel,
+		Tools:     s.tools.openRouterDefinitions(caps),
+		Reasoning: &orReasoning{Effort: cfg.AssistantEffort},
+	}
+	*turn = append(*turn, turnMessage{param: orMessage{Role: "user", Content: userText}, role: "user"})
+
+	for round := 0; round < assistantMaxToolRounds; round++ {
+		req.Messages = append([]json.RawMessage{system}, history...)
+		for _, m := range *turn {
+			raw, err := json.Marshal(m.param)
+			if err != nil {
+				return "", err
+			}
+			req.Messages = append(req.Messages, raw)
+		}
+		msg, _, err := s.openRouter.chat(ctx, req)
+		if err != nil {
+			log.Printf("assistant (%s, %s): API call failed: %v", roleKey, cfg.AssistantModel, err)
+			if isOpenRouterRateLimit(err) {
+				return "", apperror.New(429, "rate_limited", "ЖИ модельінің тегін лимиті уақытша таусылды, сәлден кейін қайталап көріңіз")
+			}
+			return "", apperror.New(502, "assistant_failed", "ЖИ көмекші жауап бере алмады, қайталап көріңіз")
+		}
+		// Keep only what is replayed; reasoning_details lets reasoning
+		// models continue their thinking across tool calls.
+		reply := orMessage{Role: "assistant", Content: msg.Content, ToolCalls: msg.ToolCalls, ReasoningDetails: msg.ReasoningDetails}
+		*turn = append(*turn, turnMessage{param: reply, role: "assistant"})
+
+		if len(msg.ToolCalls) == 0 {
+			answer := strings.TrimSpace(msg.textContent())
+			if answer == "" {
+				answer = "…"
+			}
+			(*turn)[len(*turn)-1].display = &answer
+			return answer, nil
+		}
+		for _, call := range msg.ToolCalls {
+			args := call.Function.Arguments
+			if strings.TrimSpace(args) == "" {
+				args = "{}"
+			}
+			out, isErr := s.tools.run(ctx, user, caps, call.Function.Name, json.RawMessage(args))
+			if isErr {
+				out = "Error: " + out
+			}
+			*turn = append(*turn, turnMessage{param: orMessage{Role: "tool", ToolCallID: call.ID, Content: out}, role: "user"})
+		}
+	}
+	return "", apperror.New(502, "assistant_failed", "ЖИ көмекші жауап бере алмады, сұрақты нақтырақ қойып көріңіз")
 }

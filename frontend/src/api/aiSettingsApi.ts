@@ -1,8 +1,10 @@
 import { apiClient } from './client'
 
 export interface AISettings {
-  // ANTHROPIC_API_KEY is set on the server (the key itself is never sent).
+  // An AI API key is set on the server (the key itself is never sent);
+  // provider says whose: '' when there is none.
   api_key_configured: boolean
+  provider: 'anthropic' | 'openrouter' | ''
   assistant_enabled: boolean
   assistant_model: string
   assistant_effort: string
@@ -11,6 +13,7 @@ export interface AISettings {
   document_check_model: string
   updated_by: string | null
   updated_at: string | null
+  // Suggestions only — any model id may be typed in.
   models: string[]
   efforts: string[]
 }

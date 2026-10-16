@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
+	"github.com/invopop/jsonschema"
 
 	"student-house/internal/domain"
 	"student-house/internal/repository"
@@ -52,19 +54,23 @@ Only report forgery signs you can point to. Poor photo quality is a readability 
 // TriageService then turns into yellow/red triage reasons. Checks run in the
 // background (Run) so an upload never waits on the model.
 type DocumentCheckService struct {
-	documents repository.ApplicationDocumentRepository
-	settings  *AISettingsService
-	client    anthropic.Client
-	uploadDir string
-	wake      chan struct{}
+	documents  repository.ApplicationDocumentRepository
+	settings   *AISettingsService
+	client     anthropic.Client
+	openRouter *openRouterClient
+	uploadDir  string
+	wake       chan struct{}
 }
 
 // NewDocumentCheckService: on/off and the model come from settings, read
 // on every check, so an admin's change applies immediately.
 func NewDocumentCheckService(documents repository.ApplicationDocumentRepository, settings *AISettingsService, apiKey, uploadDir string) *DocumentCheckService {
 	s := &DocumentCheckService{documents: documents, settings: settings, uploadDir: uploadDir, wake: make(chan struct{}, 1)}
-	if apiKey != "" {
+	switch settings.Provider() {
+	case AIProviderAnthropic:
 		s.client = anthropic.NewClient(option.WithAPIKey(apiKey), option.WithRequestTimeout(documentCheckTimeout))
+	case AIProviderOpenRouter:
+		s.openRouter = newOpenRouterClient(apiKey, documentCheckTimeout)
 	}
 	return s
 }
@@ -174,15 +180,19 @@ type unsupportedDocumentError struct{ reason string }
 func (e *unsupportedDocumentError) Error() string { return e.reason }
 
 func (s *DocumentCheckService) check(ctx context.Context, doc *domain.PendingDocumentCheck) (*domain.DocumentCheckResult, error) {
-	block, err := s.fileBlock(doc.FileURL)
+	data, mime, err := s.readFile(doc.FileURL)
 	if err != nil {
 		return nil, err
 	}
-
 	prompt := fmt.Sprintf(
 		"Required document this was uploaded as: %q (Russian: %q).\nApplying student's full name: %q.\nToday's date: %s.",
 		doc.ExpectedNameKk, doc.ExpectedNameRu, doc.StudentFullName, time.Now().In(kyzylorda).Format(time.DateOnly),
 	)
+	if s.openRouter != nil {
+		return s.checkOpenRouter(ctx, data, mime, prompt)
+	}
+
+	block := fileBlock(data, mime)
 	var result domain.DocumentCheckResult
 	msg, err := s.client.Beta.Messages.New(ctx, anthropic.BetaMessageNewParams{
 		Model:     anthropic.Model(s.settings.Current().DocumentCheckModel),
@@ -214,39 +224,117 @@ func (s *DocumentCheckService) check(ctx context.Context, doc *domain.PendingDoc
 	return &result, nil
 }
 
-// fileBlock loads a stored upload from local disk as an image or PDF block.
-func (s *DocumentCheckService) fileBlock(fileURL string) (anthropic.BetaContentBlockParamUnion, error) {
-	var none anthropic.BetaContentBlockParamUnion
+// readFile loads a stored upload from local disk and checks it is a PDF or
+// image the model can read.
+func (s *DocumentCheckService) readFile(fileURL string) ([]byte, string, error) {
 	u, err := url.Parse(fileURL)
 	if err != nil || !strings.HasPrefix(u.Path, uploadURLPrefix) {
-		return none, &unsupportedDocumentError{"файл жүйеде сақталмаған (сыртқы сілтеме)"}
+		return nil, "", &unsupportedDocumentError{"файл жүйеде сақталмаған (сыртқы сілтеме)"}
 	}
 	name := path.Base(u.Path)
 	data, err := os.ReadFile(filepath.Join(s.uploadDir, name))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return none, &unsupportedDocumentError{"файл табылмады"}
+			return nil, "", &unsupportedDocumentError{"файл табылмады"}
 		}
-		return none, err
+		return nil, "", err
 	}
 
 	switch mime := http.DetectContentType(data); mime {
 	case "application/pdf":
 		if len(data) > maxPDFBytes {
-			return none, &unsupportedDocumentError{"PDF файлы тым үлкен"}
+			return nil, "", &unsupportedDocumentError{"PDF файлы тым үлкен"}
 		}
-		return anthropic.NewBetaDocumentBlock(anthropic.BetaBase64PDFSourceParam{
-			Data: base64.StdEncoding.EncodeToString(data),
-		}), nil
+		return data, mime, nil
 	case "image/jpeg", "image/png", "image/gif", "image/webp":
 		if len(data) > maxImageBytes {
-			return none, &unsupportedDocumentError{"сурет файлы тым үлкен (5 МБ-тан аспауы керек)"}
+			return nil, "", &unsupportedDocumentError{"сурет файлы тым үлкен (5 МБ-тан аспауы керек)"}
 		}
-		return anthropic.NewBetaImageBlock(anthropic.BetaBase64ImageSourceParam{
-			Data:      base64.StdEncoding.EncodeToString(data),
-			MediaType: anthropic.BetaBase64ImageSourceMediaType(mime),
-		}), nil
+		return data, mime, nil
 	default:
-		return none, &unsupportedDocumentError{"файл пішімі қолдау көрсетілмейді (тек PDF, JPG, PNG, WEBP, GIF)"}
+		return nil, "", &unsupportedDocumentError{"файл пішімі қолдау көрсетілмейді (тек PDF, JPG, PNG, WEBP, GIF)"}
 	}
+}
+
+// fileBlock wraps a file from readFile as an image or PDF block.
+func fileBlock(data []byte, mime string) anthropic.BetaContentBlockParamUnion {
+	if mime == "application/pdf" {
+		return anthropic.NewBetaDocumentBlock(anthropic.BetaBase64PDFSourceParam{
+			Data: base64.StdEncoding.EncodeToString(data),
+		})
+	}
+	return anthropic.NewBetaImageBlock(anthropic.BetaBase64ImageSourceParam{
+		Data:      base64.StdEncoding.EncodeToString(data),
+		MediaType: anthropic.BetaBase64ImageSourceMediaType(mime),
+	})
+}
+
+// documentCheckSchema is DocumentCheckResult's JSON schema, for OpenRouter's
+// structured output. It's also put in the prompt: not every model honours
+// response_format.
+var documentCheckSchema = func() map[string]any {
+	reflector := jsonschema.Reflector{DoNotReference: true}
+	raw, err := json.Marshal(reflector.Reflect(&domain.DocumentCheckResult{}))
+	if err != nil {
+		panic(err)
+	}
+	var schema map[string]any
+	if err := json.Unmarshal(raw, &schema); err != nil {
+		panic(err)
+	}
+	delete(schema, "$schema")
+	delete(schema, "$id")
+	return schema
+}()
+
+// checkOpenRouter is check for OpenRouter. The model must read images; a
+// PDF's text is extracted by OpenRouter's free pdf-text parser, so a
+// scanned PDF without a text layer comes back unreadable.
+func (s *DocumentCheckService) checkOpenRouter(ctx context.Context, data []byte, mime, prompt string) (*domain.DocumentCheckResult, error) {
+	dataURL := "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data)
+	var filePart map[string]any
+	var plugins []map[string]any
+	if mime == "application/pdf" {
+		filePart = map[string]any{"type": "file", "file": map[string]any{"filename": "document.pdf", "file_data": dataURL}}
+		plugins = []map[string]any{{"id": "file-parser", "pdf": map[string]any{"engine": "pdf-text"}}}
+	} else {
+		filePart = map[string]any{"type": "image_url", "image_url": map[string]any{"url": dataURL}}
+	}
+	schema, err := json.Marshal(documentCheckSchema)
+	if err != nil {
+		return nil, err
+	}
+	instructions := prompt + "\n\nAnswer with only a JSON object (no other text) matching this JSON schema:\n" + string(schema)
+
+	var messages []json.RawMessage
+	for _, m := range []orMessage{
+		{Role: "system", Content: documentCheckSystemPrompt},
+		{Role: "user", Content: []any{filePart, map[string]any{"type": "text", "text": instructions}}},
+	} {
+		raw, err := json.Marshal(m)
+		if err != nil {
+			return nil, err
+		}
+		messages = append(messages, raw)
+	}
+	msg, finish, err := s.openRouter.chat(ctx, orRequest{
+		Model:    s.settings.Current().DocumentCheckModel,
+		Messages: messages,
+		ResponseFormat: map[string]any{
+			"type":        "json_schema",
+			"json_schema": map[string]any{"name": "document_check", "strict": true, "schema": documentCheckSchema},
+		},
+		Plugins: plugins,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if finish == "length" {
+		return nil, fmt.Errorf("model response was cut off")
+	}
+	var result domain.DocumentCheckResult
+	if err := json.Unmarshal([]byte(extractJSONObject(msg.textContent())), &result); err != nil {
+		return nil, fmt.Errorf("parsing model output: %w", err)
+	}
+	return &result, nil
 }

@@ -161,6 +161,30 @@ func (t *assistantTools) definitions(c assistantCaps) []anthropic.BetaToolUnionP
 	return out
 }
 
+// openRouterDefinitions are the same tools in the OpenAI function format.
+func (t *assistantTools) openRouterDefinitions(c assistantCaps) []orTool {
+	var out []orTool
+	for _, tool := range assistantToolList {
+		if !tool.allowed(c) {
+			continue
+		}
+		props := tool.properties
+		if props == nil {
+			props = map[string]any{}
+		}
+		schema := map[string]any{"type": "object", "properties": props, "additionalProperties": false}
+		if len(tool.required) > 0 {
+			schema["required"] = tool.required
+		}
+		out = append(out, orTool{Type: "function", Function: orToolFunction{
+			Name:        tool.name,
+			Description: tool.description,
+			Parameters:  schema,
+		}})
+	}
+	return out
+}
+
 // run executes one tool call and returns its result as JSON text, or an
 // error message with isError set.
 func (t *assistantTools) run(ctx context.Context, user *domain.User, c assistantCaps, name string, input any) (string, bool) {

@@ -82,14 +82,16 @@ func main() {
 		AssistantDailyLimit:   cfg.AssistantDailyLimit,
 		DocumentChecksEnabled: true,
 		DocumentCheckModel:    cfg.DocumentCheckModel,
-	}, cfg.AnthropicAPIKey != "")
+	}, cfg.AIProvider)
 	if err := aiSettingsService.Load(context.Background()); err != nil {
 		log.Fatalf("loading AI settings: %v", err)
 	}
-	if cfg.AnthropicAPIKey == "" {
-		log.Print("ANTHROPIC_API_KEY not set — AI document checks and the assistant are disabled")
+	if cfg.AIProvider == "" {
+		log.Print("neither OPENROUTER_API_KEY nor ANTHROPIC_API_KEY set — AI document checks and the assistant are disabled")
+	} else {
+		log.Printf("AI provider: %s", cfg.AIProvider)
 	}
-	documentCheckService := service.NewDocumentCheckService(applicationDocumentRepo, aiSettingsService, cfg.AnthropicAPIKey, cfg.UploadDir)
+	documentCheckService := service.NewDocumentCheckService(applicationDocumentRepo, aiSettingsService, cfg.AIAPIKey, cfg.UploadDir)
 	applicationService.SetDocumentChecks(documentCheckService)
 	triageService := service.NewTriageService(applicationRepo, applicationDocumentRepo, roomService, applicationService)
 	triageService.SetDocumentChecks(documentCheckService)
@@ -111,7 +113,7 @@ func main() {
 		CampaignStats:    campaignStatsRepo,
 		Triage:           triageService,
 		Campaign:         campaignService,
-	}), aiSettingsService, cfg.AnthropicAPIKey)
+	}), aiSettingsService, cfg.AIAPIKey)
 	notificationService := service.NewNotificationService(notificationRepo, roomRepo, userRepo, notifierService)
 	protocolService := service.NewProtocolService(protocolRepo, applicationRepo, userRepo, dormitoryRepo, roomRepo, notifierService)
 	contractService := service.NewContractService(contractRepo, applicationRepo, protocolRepo, userRepo, roomService, notifierService, cfg.ContractResponseDeadline, cfg.ContractReminderWindow)

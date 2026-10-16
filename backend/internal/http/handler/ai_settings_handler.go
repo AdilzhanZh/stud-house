@@ -22,9 +22,11 @@ func NewAISettingsHandler(settings *service.AISettingsService) *AISettingsHandle
 }
 
 type aiSettingsResponse struct {
-	// APIKeyConfigured: ANTHROPIC_API_KEY is set on the server. The key
-	// itself is never exposed or editable here.
+	// APIKeyConfigured: an AI API key is set on the server, and Provider
+	// says whose ("anthropic" or "openrouter"). The key itself is never
+	// exposed or editable here.
 	APIKeyConfigured      bool       `json:"api_key_configured"`
+	Provider              string     `json:"provider"`
 	AssistantEnabled      bool       `json:"assistant_enabled"`
 	AssistantModel        string     `json:"assistant_model"`
 	AssistantEffort       string     `json:"assistant_effort"`
@@ -33,13 +35,15 @@ type aiSettingsResponse struct {
 	DocumentCheckModel    string     `json:"document_check_model"`
 	UpdatedBy             *uuid.UUID `json:"updated_by"`
 	UpdatedAt             *time.Time `json:"updated_at"`
-	Models                []string   `json:"models"`
-	Efforts               []string   `json:"efforts"`
+	// Models are suggestions only — any model id may be typed in.
+	Models  []string `json:"models"`
+	Efforts []string `json:"efforts"`
 }
 
 func (h *AISettingsHandler) respond(c *gin.Context, s domain.AISettings) {
 	response.OK(c, aiSettingsResponse{
 		APIKeyConfigured:      h.settings.APIKeyPresent(),
+		Provider:              h.settings.Provider(),
 		AssistantEnabled:      s.AssistantEnabled,
 		AssistantModel:        s.AssistantModel,
 		AssistantEffort:       s.AssistantEffort,
@@ -48,7 +52,7 @@ func (h *AISettingsHandler) respond(c *gin.Context, s domain.AISettings) {
 		DocumentCheckModel:    s.DocumentCheckModel,
 		UpdatedBy:             s.UpdatedBy,
 		UpdatedAt:             s.UpdatedAt,
-		Models:                service.AIModels,
+		Models:                h.settings.SuggestedModels(c.Request.Context()),
 		Efforts:               service.AIEfforts,
 	})
 }

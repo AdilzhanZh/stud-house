@@ -29,6 +29,7 @@ type Handlers struct {
 	Retention        *handler.RetentionHandler
 	AcademicYear     *handler.AcademicYearHandler
 	Triage           *handler.TriageHandler
+	Campaign         *handler.CampaignHandler
 }
 
 func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
@@ -227,6 +228,9 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 				mgmt.GET("/application-triage", h.Triage.List)
 				mgmt.POST("/application-triage/approve-green", h.Triage.ApproveGreen)
 				mgmt.POST("/application-triage/request-corrections", h.Triage.RequestCorrections)
+
+				// Aggregate intake-campaign progress for the dashboard.
+				mgmt.GET("/campaign-stats", h.Campaign.Get)
 
 				mgmt.GET("/petition-template", h.PetitionTemplate.Get)
 				mgmt.PUT("/petition-template", h.PetitionTemplate.Update)

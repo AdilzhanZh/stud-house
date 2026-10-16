@@ -11,6 +11,7 @@ import { listUsers } from '../../../api/adminUserApi'
 import { formatDate } from '../../../utils/dateFormat'
 import { canManage } from '../../../constants/roles'
 import { useAuth } from '../../auth/useAuth'
+import { CampaignProgress } from './CampaignProgress'
 import type { Application } from '../../../types/applications'
 import type { Dormitory, DormitoryCapacity } from '../../../types/dormitories'
 
@@ -134,7 +135,9 @@ export function DashboardPage() {
         </Card>
       </div>
 
-      <div className={`grid grid-cols-1 gap-5 ${isManager ? 'lg:grid-cols-[1.6fr_1fr]' : ''}`}>
+      {isManager && <CampaignProgress />}
+
+      <div className="grid grid-cols-1 gap-5">
         {isManager && (
           <Card>
             <div className="mb-3 flex items-baseline justify-between">
@@ -169,33 +172,36 @@ export function DashboardPage() {
           </Card>
         )}
 
-        <Card>
-          <p className="mb-3.5 text-[15px] font-bold text-sand-100">{t('admin.dashboard.occupancy')}</p>
-          <div className="flex flex-col gap-3.5">
-            {dormOccupancy?.map(({ dorm, capacity }) => {
-              const pct =
-                capacity.total_capacity > 0
-                  ? Math.min(100, Math.round((capacity.allocated_beds / capacity.total_capacity) * 100))
-                  : 0
-              return (
-                <div key={dorm.id}>
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-sm font-semibold text-sand-100">{dorm.name}</span>
-                    <span className="text-xs text-sand-300">
-                      {capacity.allocated_beds}/{capacity.total_capacity}
-                    </span>
+        {/* Managers get the per-dormitory seat breakdown in CampaignProgress instead. */}
+        {!isManager && (
+          <Card>
+            <p className="mb-3.5 text-[15px] font-bold text-sand-100">{t('admin.dashboard.occupancy')}</p>
+            <div className="flex flex-col gap-3.5">
+              {dormOccupancy?.map(({ dorm, capacity }) => {
+                const pct =
+                  capacity.total_capacity > 0
+                    ? Math.min(100, Math.round((capacity.allocated_beds / capacity.total_capacity) * 100))
+                    : 0
+                return (
+                  <div key={dorm.id}>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-sm font-semibold text-sand-100">{dorm.name}</span>
+                      <span className="text-xs text-sand-300">
+                        {capacity.allocated_beds}/{capacity.total_capacity}
+                      </span>
+                    </div>
+                    <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-navy-800">
+                      <div
+                        className={`h-full rounded-full ${pct > 95 ? 'bg-clay-400' : 'bg-turquoise-500'}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-navy-800">
-                    <div
-                      className={`h-full rounded-full ${pct > 95 ? 'bg-clay-400' : 'bg-turquoise-500'}`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </Card>
+                )
+              })}
+            </div>
+          </Card>
+        )}
       </div>
     </div>
   )

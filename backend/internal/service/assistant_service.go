@@ -172,6 +172,8 @@ func (s *AssistantService) Send(ctx context.Context, userID uuid.UUID, conversat
 	userText := fmt.Sprintf("[%s · UI: %s]\n%s", time.Now().In(kyzylorda).Format(time.DateOnly), lang, text)
 	var turn []turnMessage
 	var answer string
+	var drafts []formDraft
+	ctx = withFormDrafts(ctx, &drafts)
 	if s.openRouter != nil {
 		answer, err = s.runTurnOpenRouter(ctx, user, roleKey, history, userText, &turn)
 	} else {
@@ -181,6 +183,13 @@ func (s *AssistantService) Send(ctx context.Context, userID uuid.UUID, conversat
 		return uuid.Nil, nil, err
 	}
 	turn[0].display = &text
+	// Form drafts become buttons under the reply (see formDraft). They're
+	// added to the displayed text only — never to what's replayed to the
+	// model — so the model's own history stays exactly as it produced it.
+	if len(drafts) > 0 {
+		answer = appendDraftButtons(answer, drafts, lang)
+		turn[len(turn)-1].display = &answer
+	}
 
 	rows := make([]*domain.AssistantMessage, 0, len(turn))
 	for _, m := range turn {
@@ -379,4 +388,25 @@ func (s *AssistantService) runTurnOpenRouter(ctx context.Context, user *domain.U
 		}
 	}
 	return "", apperror.New(502, "assistant_failed", "ЖИ көмекші жауап бере алмады, сұрақты нақтырақ қойып көріңіз")
+}
+
+var draftButtonLabels = map[string]map[string]string{
+	"kk": {"move_out": "Шығу сұранысын ашу", "room_transfer": "Ауыстыру сұранысын ашу", "notification": "Хабарландыруды ашу"},
+	"ru": {"move_out": "Открыть заявку на выселение", "room_transfer": "Открыть заявку на перевод", "notification": "Открыть уведомление"},
+	"en": {"move_out": "Open the move-out request", "room_transfer": "Open the transfer request", "notification": "Open the notification"},
+}
+
+// appendDraftButtons adds one Markdown link per draft on its own line; the
+// chat UI renders a line holding nothing but an in-app link as a button.
+func appendDraftButtons(answer string, drafts []formDraft, lang string) string {
+	labels, ok := draftButtonLabels[lang]
+	if !ok {
+		labels = draftButtonLabels["kk"]
+	}
+	var b strings.Builder
+	b.WriteString(strings.TrimSpace(answer))
+	for _, d := range drafts {
+		fmt.Fprintf(&b, "\n\n[%s](%s)", labels[d.Kind], d.Link)
+	}
+	return b.String()
 }

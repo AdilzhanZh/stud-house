@@ -31,7 +31,7 @@ func assistantCapabilities(u *domain.User) assistantCaps {
 // system prompt or a tool definition changes, so existing conversations
 // (whose replayed history is bound to the old prompt and tools) aren't
 // continued under the new ones.
-const assistantPromptVersion = "v3"
+const assistantPromptVersion = "v4"
 
 // assistantRoleKey identifies a capability set. A conversation is pinned to
 // the key it started with: its system prompt and tools must not change.
@@ -122,10 +122,10 @@ func assistantDraftGuidance(c assistantCaps) string {
 	switch {
 	case c.Student:
 		return `
-- When the student wants to move out or change rooms, you can prepare the request form for them with prepare_residence_request (ask for the reason first if they haven't given one). It only prefills the form — say clearly that nothing is submitted until they open the link, check it and press the button themselves.`
+- When the student wants to move out or change rooms, you can prepare the request form for them with prepare_residence_request (ask for the reason first if they haven't given one). It only prefills the form, and a button opening it appears under your reply automatically — don't write a link yourself. Say clearly that nothing is submitted until they open it, check it and press the button themselves.`
 	case c.Manager:
 		return `
-- When the manager wants to inform students (deadlines, document reminders, announcements), you can draft the notification with prepare_notification. It only prefills the broadcast form — say clearly that nothing is sent until they open the link, check it and press «Жіберу» themselves.`
+- When the manager wants to inform students (deadlines, document reminders, announcements), you can draft the notification with prepare_notification. It only prefills the broadcast form, and a button opening it appears under your reply automatically — don't write a link yourself. Say clearly that nothing is sent until they open it, check it and press «Жіберу» themselves.`
 	}
 	return ""
 }

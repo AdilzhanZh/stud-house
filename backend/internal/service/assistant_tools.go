@@ -134,7 +134,7 @@ var assistantToolList = []assistantTool{
 	},
 	{
 		name:        "prepare_residence_request",
-		description: "Prepare a move-out (kind move_out) or room-transfer (kind room_transfer) request form for the student, prefilled with a reason and, for a transfer, the wanted dormitory. It does NOT submit anything: it returns a link to the prefilled form, which the student reviews and submits themselves. Give them the link as a Markdown link. Fails with an explanation if the student has no room yet or already has an open request of that kind.",
+		description: "Prepare a move-out (kind move_out) or room-transfer (kind room_transfer) request form for the student, prefilled with a reason and, for a transfer, the wanted dormitory. It does NOT submit anything: a button opening the prefilled form is shown under your reply automatically (never write a URL yourself); the student reviews and submits it themselves. Fails with an explanation if the student has no room yet or already has an open request of that kind.",
 		properties: map[string]any{
 			"kind":         map[string]any{"type": "string", "enum": []string{"move_out", "room_transfer"}},
 			"reason":       map[string]any{"type": "string", "description": "The reason, in the student's own words, as they'd write it in the form (may be empty)."},
@@ -146,7 +146,7 @@ var assistantToolList = []assistantTool{
 	},
 	{
 		name:        "prepare_notification",
-		description: "Prepare an in-app notification (Хабарландыру) for the manager to send: audience all students, the residents of one dormitory, or one student. It does NOT send anything: it returns a link to the broadcast form prefilled with the title and text, which the manager reviews and sends themselves. Write the title and text in the language the notification should go out in (Kazakh by default). Give the manager the link as a Markdown link.",
+		description: "Prepare an in-app notification (Хабарландыру) for the manager to send: audience all students, the residents of one dormitory, or one student. It does NOT send anything: a button opening the broadcast form prefilled with the title and text is shown under your reply automatically (never write a URL yourself); the manager reviews and sends it themselves. Write the title and text in the language the notification should go out in (Kazakh by default).",
 		properties: map[string]any{
 			"audience":      map[string]any{"type": "string", "enum": []string{"all", "dormitory", "student"}},
 			"dormitory_id":  map[string]any{"type": "string", "description": "For audience dormitory: id from list_dormitories; otherwise empty."},
@@ -260,6 +260,16 @@ func (t *assistantTools) run(ctx context.Context, user *domain.User, c assistant
 		if err != nil {
 			log.Printf("assistant tool %s failed: %v", name, err)
 			return "lookup failed: " + err.Error(), true
+		}
+		if draft, ok := result.(*formDraft); ok {
+			if drafts, ok := ctx.Value(formDraftsKey{}).(*[]formDraft); ok {
+				*drafts = append(*drafts, *draft)
+			}
+			result = map[string]any{
+				"status":  "prepared",
+				"draft":   draft.Summary,
+				"display": "A button that opens this prefilled form is added under your reply automatically. Do not write any URL or link for it. Tell the user nothing is submitted or sent until they open the form, check it and press the button themselves.",
+			}
 		}
 		out, err := json.Marshal(result)
 		if err != nil {
@@ -796,6 +806,24 @@ func (t *assistantTools) queryStatistics(ctx context.Context, _ *domain.User, in
 // real form, prefilled through URL parameters, for the user to review and
 // submit themselves.
 
+// formDraft is what a prepare_* tool returns. The link never goes to the
+// model — models mangle long encoded URLs (or invent a domain for them) —
+// it is collected for the turn (see withFormDrafts) and shown under the
+// reply as a button by the server itself. The model only sees Summary.
+type formDraft struct {
+	Kind    string
+	Link    string
+	Summary map[string]string
+}
+
+type formDraftsKey struct{}
+
+// withFormDrafts returns a context whose tool calls record their form
+// drafts into *drafts.
+func withFormDrafts(ctx context.Context, drafts *[]formDraft) context.Context {
+	return context.WithValue(ctx, formDraftsKey{}, drafts)
+}
+
 func formLink(path string, params url.Values) string {
 	for k, v := range params {
 		if len(v) == 0 || v[0] == "" {
@@ -848,9 +876,10 @@ func (t *assistantTools) prepareResidenceRequest(ctx context.Context, user *doma
 	default:
 		return nil, errors.New("kind must be move_out or room_transfer")
 	}
-	return map[string]string{
-		"link": formLink("/my-residence", params),
-		"note": "Nothing has been submitted. The student must open the link, check the form and submit it.",
+	return &formDraft{
+		Kind:    in.Kind,
+		Link:    formLink("/my-residence", params),
+		Summary: map[string]string{"kind": in.Kind, "reason": params.Get("reason"), "dormitory_id": params.Get("dormitory_id")},
 	}, nil
 }
 
@@ -915,9 +944,10 @@ func (t *assistantTools) prepareNotification(ctx context.Context, _ *domain.User
 	default:
 		return nil, errors.New("audience must be all, dormitory or student")
 	}
-	return map[string]string{
-		"link": formLink("/admin/notifications/broadcast", params),
-		"note": "Nothing has been sent. The manager must open the link, check the form and send it.",
+	return &formDraft{
+		Kind:    "notification",
+		Link:    formLink("/admin/notifications/broadcast", params),
+		Summary: map[string]string{"audience": in.Audience, "title": in.Title, "body": in.Body},
 	}, nil
 }
 

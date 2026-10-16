@@ -1,10 +1,28 @@
 import { Fragment, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
+// In-app pages links may point to (frontend/src/App.tsx route prefixes).
+const APP_PATH = /^\/(admin|applications|committee|contracts|dashboard|dormitories|my-residence|notifications)(\/|\?|$)/
+
+function inAppPath(href: string): string | null {
+  if (href.startsWith('/') && !href.startsWith('//')) return APP_PATH.test(href) ? href : null
+  try {
+    const url = new URL(href)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
+    const path = url.pathname + url.search
+    return APP_PATH.test(path) ? path : null
+  } catch {
+    return null
+  }
+}
+
 // A deliberately small Markdown subset for assistant replies: paragraphs,
 // "-"/"1." lists, | tables |, **bold**, `code` and [links](/path). In-app paths become
 // router links; anything else is shown as plain text (the assistant is only
-// told to link in-app pages, so external URLs are never made clickable).
+// told to link in-app pages, so external URLs are never made clickable —
+// except that an absolute URL whose path is one of this app's pages, e.g.
+// one a model wrote with a made-up domain, is turned back into that page).
+// A paragraph holding nothing but one in-app link is shown as a button.
 export function ChatMarkdown({ text, onNavigate }: { text: string; onNavigate?: () => void }) {
   const blocks: ReactNode[] = []
   let list: { ordered: boolean; items: string[] } | null = null
@@ -76,6 +94,21 @@ export function ChatMarkdown({ text, onNavigate }: { text: string; onNavigate?: 
     }
     flush()
     if (!line) continue
+    const button = /^\[([^\]]+)\]\(([^)\s]+)\)$/.exec(line)
+    const buttonPath = button ? inAppPath(button[2]) : null
+    if (button && buttonPath) {
+      blocks.push(
+        <Link
+          key={blocks.length}
+          to={buttonPath}
+          onClick={onNavigate}
+          className="inline-flex w-fit items-center rounded-xl bg-turquoise-500 px-3.5 py-2 text-sm font-semibold text-navy-950 hover:bg-turquoise-400"
+        >
+          {button[1]}
+        </Link>,
+      )
+      continue
+    }
     const heading = /^#{1,6}\s+(.*)$/.exec(line)
     blocks.push(
       <p key={blocks.length} className={heading ? 'font-semibold' : undefined}>
@@ -97,9 +130,10 @@ function inline(text: string, onNavigate?: () => void): ReactNode {
     if (m.index > last) parts.push(text.slice(last, m.index))
     if (m[1] !== undefined) {
       const [label, href] = [m[1], m[2]]
+      const path = inAppPath(href)
       parts.push(
-        href.startsWith('/') && !href.startsWith('//') ? (
-          <Link key={m.index} to={href} onClick={onNavigate} className="font-semibold text-turquoise-400 underline underline-offset-2">
+        path ? (
+          <Link key={m.index} to={path} onClick={onNavigate} className="font-semibold text-turquoise-400 underline underline-offset-2">
             {label}
           </Link>
         ) : (

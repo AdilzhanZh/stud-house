@@ -45,25 +45,24 @@ const (
 // assistant_messages migration), and each one is pinned to the role key it
 // started with, so its system prompt and tools never change mid-conversation.
 type AssistantService struct {
-	repo       repository.AssistantRepository
-	users      repository.UserRepository
-	tools      *assistantTools
-	client     anthropic.Client
-	model      string
-	effort     string
-	dailyLimit int
-	enabled    bool
+	repo     repository.AssistantRepository
+	users    repository.UserRepository
+	tools    *assistantTools
+	settings *AISettingsService
+	client   anthropic.Client
 }
 
-func NewAssistantService(repo repository.AssistantRepository, users repository.UserRepository, tools *assistantTools, apiKey, model, effort string, dailyLimit int) *AssistantService {
-	s := &AssistantService{repo: repo, users: users, tools: tools, model: model, effort: effort, dailyLimit: dailyLimit, enabled: apiKey != ""}
-	if s.enabled {
+// NewAssistantService: model, effort, daily limit and on/off come from
+// settings on every message, so an admin's change applies immediately.
+func NewAssistantService(repo repository.AssistantRepository, users repository.UserRepository, tools *assistantTools, settings *AISettingsService, apiKey string) *AssistantService {
+	s := &AssistantService{repo: repo, users: users, tools: tools, settings: settings}
+	if apiKey != "" {
 		s.client = anthropic.NewClient(option.WithAPIKey(apiKey), option.WithRequestTimeout(assistantTimeout))
 	}
 	return s
 }
 
-func (s *AssistantService) Enabled() bool { return s != nil && s.enabled }
+func (s *AssistantService) Enabled() bool { return s != nil && s.settings.AssistantActive() }
 
 // ChatMessage is one message as the chat UI shows it.
 type ChatMessage struct {
@@ -143,7 +142,7 @@ func (s *AssistantService) Send(ctx context.Context, userID uuid.UUID, conversat
 	}
 	if n, err := s.repo.CountUserTurnsSince(ctx, user.ID, time.Now().Add(-24*time.Hour)); err != nil {
 		return uuid.Nil, nil, err
-	} else if n >= s.dailyLimit {
+	} else if n >= s.settings.Current().AssistantDailyLimit {
 		return uuid.Nil, nil, apperror.New(429, "rate_limited", "бүгінгі сұрақтар лимиті таусылды, ертең қайталап көріңіз")
 	}
 
@@ -232,13 +231,14 @@ func countUserTurns(msgs []*domain.AssistantMessage) int {
 // half-finished tool exchange in the stored history.
 func (s *AssistantService) runTurn(ctx context.Context, user *domain.User, roleKey string, history []anthropic.BetaMessageParam, turn *[]turnMessage) (string, error) {
 	caps := assistantCapabilities(user)
+	cfg := s.settings.Current()
 	params := anthropic.BetaMessageNewParams{
-		Model:     anthropic.Model(s.model),
+		Model:     anthropic.Model(cfg.AssistantModel),
 		MaxTokens: 16000,
 		System:    []anthropic.BetaTextBlockParam{{Text: assistantSystemPrompt(caps)}},
 		Tools:     s.tools.definitions(caps),
 		OutputConfig: anthropic.BetaOutputConfigParam{
-			Effort: anthropic.BetaOutputConfigEffort(s.effort),
+			Effort: anthropic.BetaOutputConfigEffort(cfg.AssistantEffort),
 		},
 		// Caches the tools + system prompt (the whole user guide), which
 		// are identical for every conversation of the same role.

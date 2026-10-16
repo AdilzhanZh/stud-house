@@ -541,6 +541,12 @@ var staticTranslations = map[string]translation{
 		"ИИ-помощник не смог ответить, попробуйте сформулировать вопрос точнее",
 		"The AI assistant could not reply, try asking more specifically",
 	},
+	"модель жарамсыз":         {"Недопустимая модель", "Invalid model"},
+	"effort деңгейі жарамсыз": {"Недопустимый уровень effort", "Invalid effort level"},
+	"күндік лимит 1 мен 1000 аралығында болуы керек": {
+		"Дневной лимит должен быть от 1 до 1000",
+		"The daily limit must be between 1 and 1000",
+	},
 	"өтініштер таңдалмаған": {"Заявки не выбраны", "No applications selected"},
 	"өтініштің тексеру нәтижесі өзгерді, оны жеке қараңыз": {
 		"Результат проверки заявки изменился, рассмотрите её отдельно",

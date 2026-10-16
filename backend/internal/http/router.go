@@ -31,6 +31,7 @@ type Handlers struct {
 	Triage           *handler.TriageHandler
 	Campaign         *handler.CampaignHandler
 	Assistant        *handler.AssistantHandler
+	AISettings       *handler.AISettingsHandler
 }
 
 func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
@@ -76,6 +77,10 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 
 				adminGroup.POST("/retention/purge", h.Retention.Purge)
 				adminGroup.POST("/academic-year/rollover", h.AcademicYear.Rollover)
+
+				// AI feature settings (the API key stays in the environment).
+				adminGroup.GET("/ai-settings", h.AISettings.Get)
+				adminGroup.PUT("/ai-settings", h.AISettings.Update)
 			}
 
 			// Read-only for any authenticated role.

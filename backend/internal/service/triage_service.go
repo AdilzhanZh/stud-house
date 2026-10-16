@@ -28,6 +28,13 @@ type TriageService struct {
 	documents    repository.ApplicationDocumentRepository
 	rooms        *RoomService
 	decider      *ApplicationService
+	checks       *DocumentCheckService
+}
+
+// SetDocumentChecks lets triage know whether AI checks are running: while
+// they're switched off, documents still queued for one aren't waited on.
+func (s *TriageService) SetDocumentChecks(checks *DocumentCheckService) {
+	s.checks = checks
 }
 
 func NewTriageService(applications repository.ApplicationRepository, documents repository.ApplicationDocumentRepository, rooms *RoomService, decider *ApplicationService) *TriageService {
@@ -78,7 +85,7 @@ func (s *TriageService) triage(ctx context.Context, apps []*domain.Application) 
 			})
 		}
 		for _, c := range checksByApp[a.ID] {
-			if c.Status.InProgress() {
+			if c.Status.InProgress() && s.checks.Enabled() {
 				t.Checking = true
 			}
 			t.Reasons = append(t.Reasons, checkReasons(c, today)...)

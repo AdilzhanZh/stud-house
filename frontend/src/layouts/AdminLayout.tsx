@@ -2,6 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowLeftRight,
+  Bot,
   Building2,
   ClipboardList,
   DoorOpen,
@@ -174,6 +175,12 @@ export function AdminLayout() {
                   <CountBadge count={pendingStudentsCount} />
                 </NavLink>
               </>
+            )}
+            {user?.role === 'admin' && (
+              <NavLink to="/admin/ai-settings" className={navLinkClass}>
+                <Bot className="h-4.5 w-4.5 shrink-0" />
+                {t('admin.layout.aiSettings')}
+              </NavLink>
             )}
           </nav>
         </div>

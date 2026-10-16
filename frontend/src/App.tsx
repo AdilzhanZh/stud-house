@@ -26,6 +26,7 @@ import { BenefitFormPage } from './features/admin/benefits/BenefitFormPage'
 import { UserListPage } from './features/admin/users/UserListPage'
 import { UserRegisterFormPage } from './features/admin/users/UserRegisterFormPage'
 import { RoleAssignPage } from './features/admin/users/RoleAssignPage'
+import { AISettingsPage } from './features/admin/ai/AISettingsPage'
 import { PendingStudentsPage } from './features/admin/users/PendingStudentsPage'
 import { StudentRegisterFormPage } from './features/admin/users/StudentRegisterFormPage'
 import { DashboardPage } from './features/admin/dashboard/DashboardPage'
@@ -133,6 +134,7 @@ function App() {
           <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
             <Route path="/admin/users/new" element={<UserRegisterFormPage />} />
             <Route path="/admin/users/:id/role" element={<RoleAssignPage />} />
+            <Route path="/admin/ai-settings" element={<AISettingsPage />} />
           </Route>
         </Route>
       </Route>

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"student-house/internal/config"
+	"student-house/internal/domain"
 	apihttp "student-house/internal/http"
 	"student-house/internal/http/handler"
 	"student-house/internal/repository/postgres"
@@ -72,12 +73,26 @@ func main() {
 	benefitService := service.NewBenefitService(benefitRepo, userRepo, studentBenefitRepo)
 	documentService := service.NewDocumentService(requiredDocumentRepo)
 	applicationService := service.NewApplicationService(applicationRepo, applicationDocumentRepo, dormitoryRepo, roomRepo, roomService, userRepo, notifierService)
-	documentCheckService := service.NewDocumentCheckService(applicationDocumentRepo, cfg.AnthropicAPIKey, cfg.DocumentCheckModel, cfg.UploadDir)
-	applicationService.SetDocumentChecks(documentCheckService)
-	if !documentCheckService.Enabled() {
-		log.Print("ANTHROPIC_API_KEY not set — AI document checks are disabled")
+	// Env values are only defaults; an admin can change them (and switch
+	// the features on/off) from the admin panel without a restart.
+	aiSettingsService := service.NewAISettingsService(postgres.NewAISettingsRepo(pool), domain.AISettings{
+		AssistantEnabled:      true,
+		AssistantModel:        cfg.AssistantModel,
+		AssistantEffort:       cfg.AssistantEffort,
+		AssistantDailyLimit:   cfg.AssistantDailyLimit,
+		DocumentChecksEnabled: true,
+		DocumentCheckModel:    cfg.DocumentCheckModel,
+	}, cfg.AnthropicAPIKey != "")
+	if err := aiSettingsService.Load(context.Background()); err != nil {
+		log.Fatalf("loading AI settings: %v", err)
 	}
+	if cfg.AnthropicAPIKey == "" {
+		log.Print("ANTHROPIC_API_KEY not set — AI document checks and the assistant are disabled")
+	}
+	documentCheckService := service.NewDocumentCheckService(applicationDocumentRepo, aiSettingsService, cfg.AnthropicAPIKey, cfg.UploadDir)
+	applicationService.SetDocumentChecks(documentCheckService)
 	triageService := service.NewTriageService(applicationRepo, applicationDocumentRepo, roomService, applicationService)
+	triageService.SetDocumentChecks(documentCheckService)
 	campaignStatsRepo := postgres.NewCampaignStatsRepo(pool)
 	campaignService := service.NewCampaignService(campaignStatsRepo, triageService)
 	assistantService := service.NewAssistantService(postgres.NewAssistantRepo(pool), userRepo, service.NewAssistantTools(service.AssistantToolDeps{
@@ -96,7 +111,7 @@ func main() {
 		CampaignStats:    campaignStatsRepo,
 		Triage:           triageService,
 		Campaign:         campaignService,
-	}), cfg.AnthropicAPIKey, cfg.AssistantModel, cfg.AssistantEffort, cfg.AssistantDailyLimit)
+	}), aiSettingsService, cfg.AnthropicAPIKey)
 	notificationService := service.NewNotificationService(notificationRepo, roomRepo, userRepo, notifierService)
 	protocolService := service.NewProtocolService(protocolRepo, applicationRepo, userRepo, dormitoryRepo, roomRepo, notifierService)
 	contractService := service.NewContractService(contractRepo, applicationRepo, protocolRepo, userRepo, roomService, notifierService, cfg.ContractResponseDeadline, cfg.ContractReminderWindow)
@@ -136,6 +151,7 @@ func main() {
 		Triage:           handler.NewTriageHandler(triageService),
 		Campaign:         handler.NewCampaignHandler(campaignService),
 		Assistant:        handler.NewAssistantHandler(assistantService),
+		AISettings:       handler.NewAISettingsHandler(aiSettingsService),
 	}
 
 	router := apihttp.NewRouter(cfg.JWTSecret, cfg.UploadDir, handlers)

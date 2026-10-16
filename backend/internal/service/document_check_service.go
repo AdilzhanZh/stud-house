@@ -53,24 +53,26 @@ Only report forgery signs you can point to. Poor photo quality is a readability 
 // background (Run) so an upload never waits on the model.
 type DocumentCheckService struct {
 	documents repository.ApplicationDocumentRepository
+	settings  *AISettingsService
 	client    anthropic.Client
-	model     string
 	uploadDir string
-	enabled   bool
 	wake      chan struct{}
 }
 
-func NewDocumentCheckService(documents repository.ApplicationDocumentRepository, apiKey, model, uploadDir string) *DocumentCheckService {
-	s := &DocumentCheckService{documents: documents, model: model, uploadDir: uploadDir, enabled: apiKey != "", wake: make(chan struct{}, 1)}
-	if s.enabled {
+// NewDocumentCheckService: on/off and the model come from settings, read
+// on every check, so an admin's change applies immediately.
+func NewDocumentCheckService(documents repository.ApplicationDocumentRepository, settings *AISettingsService, apiKey, uploadDir string) *DocumentCheckService {
+	s := &DocumentCheckService{documents: documents, settings: settings, uploadDir: uploadDir, wake: make(chan struct{}, 1)}
+	if apiKey != "" {
 		s.client = anthropic.NewClient(option.WithAPIKey(apiKey), option.WithRequestTimeout(documentCheckTimeout))
 	}
 	return s
 }
 
-// Enabled reports whether AI checks are configured (ANTHROPIC_API_KEY set).
+// Enabled reports whether AI checks run right now: an API key is set and
+// an admin hasn't turned them off.
 func (s *DocumentCheckService) Enabled() bool {
-	return s != nil && s.enabled
+	return s != nil && s.settings.DocumentChecksActive()
 }
 
 // Wake asks the background loop (Start) to look at the queue now instead
@@ -88,7 +90,9 @@ func (s *DocumentCheckService) Wake() {
 // Start runs RunOnce at startup, on every tick, and whenever Wake is
 // called, until the returned stop func is called. A no-op when disabled.
 func (s *DocumentCheckService) Start(interval time.Duration) (stop func()) {
-	if !s.Enabled() {
+	// Runs whenever a key is present: checks may be switched on later from
+	// the admin panel, and RunOnce itself does nothing while they're off.
+	if !s.settings.APIKeyPresent() {
 		return func() {}
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -181,7 +185,7 @@ func (s *DocumentCheckService) check(ctx context.Context, doc *domain.PendingDoc
 	)
 	var result domain.DocumentCheckResult
 	msg, err := s.client.Beta.Messages.New(ctx, anthropic.BetaMessageNewParams{
-		Model:     anthropic.Model(s.model),
+		Model:     anthropic.Model(s.settings.Current().DocumentCheckModel),
 		MaxTokens: 16000,
 		System:    []anthropic.BetaTextBlockParam{{Text: documentCheckSystemPrompt}},
 		Messages: []anthropic.BetaMessageParam{

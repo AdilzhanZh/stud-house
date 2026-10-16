@@ -33,6 +33,7 @@ type AssistantToolDeps struct {
 	CampaignStats    repository.CampaignStatsRepository
 	Triage           *TriageService
 	Campaign         *CampaignService
+	StatsQuery       *StatsQueryService
 }
 
 // assistantTools are the tools the assistant may call. Each tool only ever
@@ -128,6 +129,24 @@ var assistantToolList = []assistantTool{
 		description: "Pending move-out (шығу) and room-transfer (ауыстыру) requests from residents, with student names and reasons.",
 		allowed:     forManager,
 		run:         (*assistantTools).openRequests,
+	},
+	{
+		name: "query_statistics",
+		description: `Run one read-only PostgreSQL SELECT over aggregate statistics views, for statistics questions and reports (e.g. for the ministry) that the other tools don't answer. Only these views exist for this query; each row is a group with a count, never an individual student:
+- stats_applications(dormitory_name, stage, submitted_on date, gender 'male'|'female'|null, course smallint, academic_degree 'bachelor'|'master'|'doctorate'|null, has_benefit bool, applications int)
+- stats_application_benefits(dormitory_name, benefit_name_kk, benefit_name_ru, submitted_on date, application_status, applications int) — an applicant with two benefits counts under each
+- stats_application_stages(dormitory_id, dormitory_name, stage, submitted_on date, applications int)
+- stats_residents(dormitory_name, floor, gender, course, academic_degree, has_benefit, residents int) — current residents
+- stats_dormitory_seats(dormitory_id, dormitory_name, total_capacity, room_beds, residents, held, free_beds)
+- stats_contracts(dormitory_name, status 'sent'|'awaiting_manager_decision'|'accepted'|'declined'|'expired', overdue bool, sent_on date, contracts int)
+- stats_resident_requests(kind 'move_out'|'room_transfer', status 'pending'|'approved'|'rejected', created_on date, requests int)
+stage is one of awaiting_review, awaiting_documents, awaiting_commission, awaiting_confirmation, confirmation_overdue, settled, rejected, contract_declined. Aggregate with SUM over the count columns (e.g. SELECT gender, SUM(applications) FROM stats_applications GROUP BY gender). Dates are local (Asia/Qyzylorda). At most 200 rows are returned. If the query fails, the error is returned — fix the SQL and try again.`,
+		properties: map[string]any{
+			"sql": map[string]any{"type": "string", "description": "A single SELECT (or WITH … SELECT) statement over the views above, without a trailing semicolon."},
+		},
+		required: []string{"sql"},
+		allowed:  forManager,
+		run:      (*assistantTools).queryStatistics,
 	},
 	{
 		name:        "list_my_protocol_votes",
@@ -721,6 +740,16 @@ func (t *assistantTools) openRequests(ctx context.Context, _ *domain.User, _ jso
 		out = append(out, it)
 	}
 	return out, nil
+}
+
+func (t *assistantTools) queryStatistics(ctx context.Context, _ *domain.User, input json.RawMessage) (any, error) {
+	var in struct {
+		SQL string `json:"sql"`
+	}
+	if err := json.Unmarshal(input, &in); err != nil {
+		return nil, err
+	}
+	return t.d.StatsQuery.Run(ctx, in.SQL)
 }
 
 // ---- committee tools ----

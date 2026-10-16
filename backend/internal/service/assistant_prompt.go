@@ -27,10 +27,19 @@ func assistantCapabilities(u *domain.User) assistantCaps {
 	}
 }
 
+// assistantPromptVersion is part of every role key: bump it whenever the
+// system prompt or a tool definition changes, so existing conversations
+// (whose replayed history is bound to the old prompt and tools) aren't
+// continued under the new ones.
+const assistantPromptVersion = "v2"
+
 // assistantRoleKey identifies a capability set. A conversation is pinned to
 // the key it started with: its system prompt and tools must not change.
 func assistantRoleKey(u *domain.User) string {
-	c := assistantCapabilities(u)
+	return assistantPromptVersion + ":" + assistantCapabilityKey(assistantCapabilities(u))
+}
+
+func assistantCapabilityKey(c assistantCaps) string {
 	if c.Student {
 		return "student"
 	}
@@ -109,6 +118,14 @@ func assistantPages(c assistantCaps) string {
 	return "- " + strings.Join(pages, "\n- ")
 }
 
+func assistantStatsGuidance(c assistantCaps) string {
+	if !c.Manager {
+		return ""
+	}
+	return `
+- For statistics questions and reports (counts by dormitory, gender, course, degree, benefit, stage, period…), use query_statistics. Say which period and which applications the numbers cover. For a report, give a short Markdown table and, below it, one or two sentences of interpretation. The statistics views hold counts only; if a question needs individual students, say it can't be answered from statistics and point to the relevant page instead.`
+}
+
 // assistantSystemPrompt must be a pure function of the capabilities: it is
 // replayed unchanged for a whole conversation and cached across users.
 func assistantSystemPrompt(c assistantCaps) string {
@@ -122,7 +139,7 @@ What you do:
 - When you mention a page, link it as a Markdown link to one of these paths (use only these):
 ` + assistantPages(c) + `
 - If the guide and your tools don't cover something, say so plainly and suggest who to ask (students: the dormitory manager; staff: the system administrator). Don't invent rules, deadlines, prices or document requirements.
-- Politely decline requests unrelated to the dormitory system.
+- Politely decline requests unrelated to the dormitory system.` + assistantStatsGuidance(c) + `
 
 How you write:
 - Reply in the language of the person's latest message (Kazakh, Russian or English); default to Kazakh.

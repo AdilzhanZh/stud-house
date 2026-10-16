@@ -96,6 +96,8 @@ func main() {
 	triageService := service.NewTriageService(applicationRepo, applicationDocumentRepo, roomService, applicationService)
 	triageService.SetDocumentChecks(documentCheckService)
 	campaignStatsRepo := postgres.NewCampaignStatsRepo(pool)
+	statsQueryService := service.NewStatsQueryService(ctx, pool, cfg.DatabaseURL)
+	defer statsQueryService.Close()
 	campaignService := service.NewCampaignService(campaignStatsRepo, triageService)
 	assistantService := service.NewAssistantService(postgres.NewAssistantRepo(pool), userRepo, service.NewAssistantTools(service.AssistantToolDeps{
 		Users:            userRepo,
@@ -113,6 +115,7 @@ func main() {
 		CampaignStats:    campaignStatsRepo,
 		Triage:           triageService,
 		Campaign:         campaignService,
+		StatsQuery:       statsQueryService,
 	}), aiSettingsService, cfg.AIAPIKey)
 	notificationService := service.NewNotificationService(notificationRepo, roomRepo, userRepo, notifierService)
 	protocolService := service.NewProtocolService(protocolRepo, applicationRepo, userRepo, dormitoryRepo, roomRepo, notifierService)

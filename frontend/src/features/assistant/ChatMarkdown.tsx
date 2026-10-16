@@ -2,12 +2,45 @@ import { Fragment, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
 // A deliberately small Markdown subset for assistant replies: paragraphs,
-// "-"/"1." lists, **bold**, `code` and [links](/path). In-app paths become
+// "-"/"1." lists, | tables |, **bold**, `code` and [links](/path). In-app paths become
 // router links; anything else is shown as plain text (the assistant is only
 // told to link in-app pages, so external URLs are never made clickable).
 export function ChatMarkdown({ text, onNavigate }: { text: string; onNavigate?: () => void }) {
   const blocks: ReactNode[] = []
   let list: { ordered: boolean; items: string[] } | null = null
+  let table: string[][] | null = null
+
+  const flushTable = () => {
+    if (!table) return
+    const [head, ...body] = table
+    blocks.push(
+      <div key={blocks.length} className="overflow-x-auto">
+        <table className="w-full border-collapse text-xs">
+          <thead>
+            <tr>
+              {head.map((cell, i) => (
+                <th key={i} className="border-b border-navy-700 px-2 py-1.5 text-left font-semibold whitespace-nowrap">
+                  {inline(cell, onNavigate)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {body.map((row, r) => (
+              <tr key={r}>
+                {row.map((cell, i) => (
+                  <td key={i} className="border-b border-navy-700/60 px-2 py-1.5 tabular-nums">
+                    {inline(cell, onNavigate)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>,
+    )
+    table = null
+  }
 
   const flush = () => {
     if (!list) return
@@ -24,6 +57,14 @@ export function ChatMarkdown({ text, onNavigate }: { text: string; onNavigate?: 
 
   for (const raw of text.split('\n')) {
     const line = raw.trim()
+    if (line.startsWith('|') && line.endsWith('|') && line.length > 1) {
+      flush()
+      const cells = line.slice(1, -1).split('|').map((c) => c.trim())
+      // The |---|---| separator row only marks the header; skip it.
+      if (!cells.every((c) => /^:?-{2,}:?$/.test(c))) (table ??= []).push(cells)
+      continue
+    }
+    flushTable()
     const bullet = /^[-*•]\s+(.*)$/.exec(line)
     const numbered = /^\d+[.)]\s+(.*)$/.exec(line)
     if (bullet || numbered) {
@@ -43,6 +84,7 @@ export function ChatMarkdown({ text, onNavigate }: { text: string; onNavigate?: 
     )
   }
   flush()
+  flushTable()
   return <div className="flex flex-col gap-2">{blocks}</div>
 }
 

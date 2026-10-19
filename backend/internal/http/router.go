@@ -81,6 +81,8 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 				// AI feature settings (the API key stays in the environment).
 				adminGroup.GET("/ai-settings", h.AISettings.Get)
 				adminGroup.PUT("/ai-settings", h.AISettings.Update)
+				adminGroup.PUT("/ai-settings/api-key", h.AISettings.SetAPIKey)
+				adminGroup.DELETE("/ai-settings/api-key", h.AISettings.ClearAPIKey)
 			}
 
 			// Read-only for any authenticated role.

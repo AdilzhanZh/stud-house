@@ -16,6 +16,16 @@ export interface AISettings {
   // Suggestions only — any model id may be typed in.
   models: string[]
   efforts: string[]
+  // The key in effect, described without revealing it.
+  api_key: {
+    configured: boolean
+    // 'admin': set from this page; 'env': the server environment.
+    source: 'admin' | 'env' | ''
+    provider: 'anthropic' | 'openrouter' | ''
+    set_at: string | null
+    // The server can store a key set here (an encryption secret exists).
+    can_set: boolean
+  }
 }
 
 export type AISettingsUpdate = Pick<
@@ -30,6 +40,17 @@ export type AISettingsUpdate = Pick<
 
 export async function getAISettings(): Promise<AISettings> {
   const { data } = await apiClient.get<{ data: AISettings }>('/admin/ai-settings')
+  return data.data
+}
+
+// The key is checked with its provider, stored encrypted and never sent back.
+export async function setAIAPIKey(key: string): Promise<AISettings> {
+  const { data } = await apiClient.put<{ data: AISettings }>('/admin/ai-settings/api-key', { key })
+  return data.data
+}
+
+export async function clearAIAPIKey(): Promise<AISettings> {
+  const { data } = await apiClient.delete<{ data: AISettings }>('/admin/ai-settings/api-key')
   return data.data
 }
 

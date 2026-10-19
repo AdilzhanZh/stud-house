@@ -10,10 +10,12 @@ import { extractErrorMessage } from '../../../api/client'
 import { getAISettings, updateAISettings, type AISettings, type AISettingsUpdate } from '../../../api/aiSettingsApi'
 import { formatDateTime } from '../../../utils/dateFormat'
 import { adminPageHeading } from '../adminTable'
+import { APIKeyCard } from './APIKeyCard'
 
 // Admin-only: switch the AI features on/off and pick their model (typed
-// freely, with the server's suggestions), effort and limits. Saved settings apply immediately on the server. The API key
-// itself stays in the server environment and is only reported as set/unset.
+// freely, with the server's suggestions), effort and limits, and set the
+// provider API key. Everything saved applies immediately on the server; the
+// key is never shown again once set.
 export function AISettingsPage() {
   const { t } = useTranslation()
   const [settings, setSettings] = useState<AISettings | null>(null)
@@ -63,21 +65,23 @@ export function AISettingsPage() {
     list: 'ai-model-suggestions',
     autoComplete: 'off',
     spellCheck: false,
-    placeholder: t('admin.aiSettings.modelPlaceholder', { example: settings.models[0] ?? 'claude-opus-5-5' }),
+    placeholder: t('admin.aiSettings.modelPlaceholder', { example: settings.models?.[0] ?? 'claude-opus-5-5' }),
   }
 
   return (
     <div className="flex max-w-3xl flex-col gap-4">
       <h1 className={adminPageHeading}>{t('admin.aiSettings.title')}</h1>
 
-      {settings.provider && (
-        <p className="text-sm text-sand-300">
-          {t('admin.aiSettings.provider', { name: openRouter ? 'OpenRouter' : 'Anthropic' })}
-        </p>
-      )}
-      {!settings.api_key_configured && <Alert variant="warning" message={t('admin.aiSettings.noApiKey')} />}
+      <APIKeyCard
+        settings={settings}
+        onChange={(s) => {
+          setSettings(s)
+          setForm(toForm(s))
+          setSaved(false)
+        }}
+      />
       <datalist id="ai-model-suggestions">
-        {settings.models.map((m) => (
+        {(settings.models ?? []).map((m) => (
           <option key={m} value={m}>
             {t(`admin.aiSettings.models.${m}`, { defaultValue: '' })}
           </option>

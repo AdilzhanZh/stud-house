@@ -54,25 +54,17 @@ Only report forgery signs you can point to. Poor photo quality is a readability 
 // TriageService then turns into yellow/red triage reasons. Checks run in the
 // background (Run) so an upload never waits on the model.
 type DocumentCheckService struct {
-	documents  repository.ApplicationDocumentRepository
-	settings   *AISettingsService
-	client     anthropic.Client
-	openRouter *openRouterClient
-	uploadDir  string
-	wake       chan struct{}
+	documents repository.ApplicationDocumentRepository
+	settings  *AISettingsService
+	uploadDir string
+	wake      chan struct{}
 }
 
-// NewDocumentCheckService: on/off and the model come from settings, read
-// on every check, so an admin's change applies immediately.
-func NewDocumentCheckService(documents repository.ApplicationDocumentRepository, settings *AISettingsService, apiKey, uploadDir string) *DocumentCheckService {
-	s := &DocumentCheckService{documents: documents, settings: settings, uploadDir: uploadDir, wake: make(chan struct{}, 1)}
-	switch settings.Provider() {
-	case AIProviderAnthropic:
-		s.client = anthropic.NewClient(option.WithAPIKey(apiKey), option.WithRequestTimeout(documentCheckTimeout))
-	case AIProviderOpenRouter:
-		s.openRouter = newOpenRouterClient(apiKey, documentCheckTimeout)
-	}
-	return s
+// NewDocumentCheckService: on/off, the model, the provider and the API key
+// all come from settings, read on every check, so an admin's change
+// (including a new key) applies immediately.
+func NewDocumentCheckService(documents repository.ApplicationDocumentRepository, settings *AISettingsService, uploadDir string) *DocumentCheckService {
+	return &DocumentCheckService{documents: documents, settings: settings, uploadDir: uploadDir, wake: make(chan struct{}, 1)}
 }
 
 // Enabled reports whether AI checks run right now: an API key is set and
@@ -96,11 +88,8 @@ func (s *DocumentCheckService) Wake() {
 // Start runs RunOnce at startup, on every tick, and whenever Wake is
 // called, until the returned stop func is called. A no-op when disabled.
 func (s *DocumentCheckService) Start(interval time.Duration) (stop func()) {
-	// Runs whenever a key is present: checks may be switched on later from
-	// the admin panel, and RunOnce itself does nothing while they're off.
-	if !s.settings.APIKeyPresent() {
-		return func() {}
-	}
+	// Always runs: a key may be set and checks switched on later from the
+	// admin panel, and RunOnce itself does nothing while they're off.
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		ticker := time.NewTicker(interval)
@@ -188,13 +177,15 @@ func (s *DocumentCheckService) check(ctx context.Context, doc *domain.PendingDoc
 		"Required document this was uploaded as: %q (Russian: %q).\nApplying student's full name: %q.\nToday's date: %s.",
 		doc.ExpectedNameKk, doc.ExpectedNameRu, doc.StudentFullName, time.Now().In(kyzylorda).Format(time.DateOnly),
 	)
-	if s.openRouter != nil {
-		return s.checkOpenRouter(ctx, data, mime, prompt)
+	provider, key := s.settings.Credentials()
+	if provider == AIProviderOpenRouter {
+		return s.checkOpenRouter(ctx, newOpenRouterClient(key, documentCheckTimeout), data, mime, prompt)
 	}
 
+	client := anthropic.NewClient(option.WithAPIKey(key), option.WithRequestTimeout(documentCheckTimeout))
 	block := fileBlock(data, mime)
 	var result domain.DocumentCheckResult
-	msg, err := s.client.Beta.Messages.New(ctx, anthropic.BetaMessageNewParams{
+	msg, err := client.Beta.Messages.New(ctx, anthropic.BetaMessageNewParams{
 		Model:     anthropic.Model(s.settings.Current().DocumentCheckModel),
 		MaxTokens: 16000,
 		System:    []anthropic.BetaTextBlockParam{{Text: documentCheckSystemPrompt}},
@@ -290,7 +281,7 @@ var documentCheckSchema = func() map[string]any {
 // checkOpenRouter is check for OpenRouter. The model must read images; a
 // PDF's text is extracted by OpenRouter's free pdf-text parser, so a
 // scanned PDF without a text layer comes back unreadable.
-func (s *DocumentCheckService) checkOpenRouter(ctx context.Context, data []byte, mime, prompt string) (*domain.DocumentCheckResult, error) {
+func (s *DocumentCheckService) checkOpenRouter(ctx context.Context, openRouter *openRouterClient, data []byte, mime, prompt string) (*domain.DocumentCheckResult, error) {
 	dataURL := "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data)
 	var filePart map[string]any
 	var plugins []map[string]any
@@ -317,7 +308,7 @@ func (s *DocumentCheckService) checkOpenRouter(ctx context.Context, data []byte,
 		}
 		messages = append(messages, raw)
 	}
-	msg, finish, err := s.openRouter.chat(ctx, orRequest{
+	msg, finish, err := openRouter.chat(ctx, orRequest{
 		Model:    s.settings.Current().DocumentCheckModel,
 		Messages: messages,
 		ResponseFormat: map[string]any{

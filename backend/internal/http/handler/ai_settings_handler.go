@@ -38,6 +38,23 @@ type aiSettingsResponse struct {
 	// Models are suggestions only — any model id may be typed in.
 	Models  []string `json:"models"`
 	Efforts []string `json:"efforts"`
+	// APIKey describes the key in effect; the key itself never leaves the
+	// server.
+	APIKey aiKeyStatusResponse `json:"api_key"`
+}
+
+type aiKeyStatusResponse struct {
+	Configured bool       `json:"configured"`
+	Source     string     `json:"source"`
+	Provider   string     `json:"provider"`
+	SetAt      *time.Time `json:"set_at"`
+	// CanSet: the server can store an admin-set key (an encryption secret
+	// is configured).
+	CanSet bool `json:"can_set"`
+}
+
+func (h *AISettingsHandler) keyStatus(st service.AIKeyStatus) aiKeyStatusResponse {
+	return aiKeyStatusResponse{Configured: st.Configured, Source: st.Source, Provider: st.Provider, SetAt: st.SetAt, CanSet: h.settings.CanStoreKeys()}
 }
 
 func (h *AISettingsHandler) respond(c *gin.Context, s domain.AISettings) {
@@ -54,7 +71,38 @@ func (h *AISettingsHandler) respond(c *gin.Context, s domain.AISettings) {
 		UpdatedAt:             s.UpdatedAt,
 		Models:                h.settings.SuggestedModels(c.Request.Context()),
 		Efforts:               service.AIEfforts,
+		APIKey:                h.keyStatus(h.settings.KeyStatus()),
 	})
+}
+
+type setAPIKeyRequest struct {
+	Key string `json:"key" binding:"required"`
+}
+
+// SetAPIKey is admin-only: verifies the key with its provider, stores it
+// encrypted and switches to it immediately. The response never echoes it.
+func (h *AISettingsHandler) SetAPIKey(c *gin.Context) {
+	var req setAPIKeyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.BadRequest("API кілті жарамсыз"))
+		return
+	}
+	actorID, _ := middleware.UserID(c)
+	if _, err := h.settings.SetAPIKey(c.Request.Context(), actorID, req.Key); err != nil {
+		response.Error(c, err)
+		return
+	}
+	h.respond(c, h.settings.Current())
+}
+
+// ClearAPIKey is admin-only: removes the admin-set key (the environment's
+// key, if any, takes over).
+func (h *AISettingsHandler) ClearAPIKey(c *gin.Context) {
+	if _, err := h.settings.ClearAPIKey(c.Request.Context()); err != nil {
+		response.Error(c, err)
+		return
+	}
+	h.respond(c, h.settings.Current())
 }
 
 // Get is admin-only: the AI settings in effect.

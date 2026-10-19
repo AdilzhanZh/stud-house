@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"slices"
+	"strings"
 	"testing"
 
 	"student-house/internal/domain"
+	"student-house/internal/repository"
 )
 
 func TestExtractJSONObject(t *testing.T) {
@@ -51,30 +53,28 @@ func TestOpenRouterMessageText(t *testing.T) {
 }
 
 func TestValidModel(t *testing.T) {
-	or := &AISettingsService{provider: AIProviderOpenRouter}
-	an := &AISettingsService{provider: AIProviderAnthropic}
 	cases := []struct {
-		s     *AISettingsService
-		model string
-		ok    bool
+		provider string
+		model    string
+		ok       bool
 	}{
-		{or, "nvidia/nemotron-3.5-super-vl:free", true},
-		{or, "claude-opus-5-5", false},
-		{or, "google/gemma 4", false},
-		{or, "", false},
-		{an, "claude-sonnet-5-5", true},
-		{an, "anthropic/claude-sonnet-5-5", false},
+		{AIProviderOpenRouter, "nvidia/nemotron-3.5-super-vl:free", true},
+		{AIProviderOpenRouter, "claude-opus-5-5", false},
+		{AIProviderOpenRouter, "google/gemma 4", false},
+		{AIProviderOpenRouter, "", false},
+		{AIProviderAnthropic, "claude-sonnet-5-5", true},
+		{AIProviderAnthropic, "anthropic/claude-sonnet-5-5", false},
 	}
 	for _, c := range cases {
-		if err := c.s.validModel(c.model); (err == nil) != c.ok {
-			t.Errorf("%s validModel(%q) = %v, want ok=%v", c.s.provider, c.model, err, c.ok)
+		if err := validModel(c.provider, c.model); (err == nil) != c.ok {
+			t.Errorf("%s validModel(%q) = %v, want ok=%v", c.provider, c.model, err, c.ok)
 		}
 	}
 }
 
-func TestLoadReplacesOtherProvidersModels(t *testing.T) {
+func TestCurrentReplacesOtherProvidersModels(t *testing.T) {
 	saved := &domain.AISettings{AssistantModel: "claude-opus-5-5", DocumentCheckModel: "nvidia/x:free", AssistantEffort: "low", AssistantDailyLimit: 5}
-	s := NewAISettingsService(fakeAISettingsRepo{saved}, domain.AISettings{}, AIProviderOpenRouter)
+	s := NewAISettingsService(&fakeAISettingsRepo{saved: saved}, domain.AISettings{}, AIProviderOpenRouter, "sk-or-env", "secret")
 	if err := s.Load(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -84,10 +84,79 @@ func TestLoadReplacesOtherProvidersModels(t *testing.T) {
 	}
 }
 
-type fakeAISettingsRepo struct{ saved *domain.AISettings }
+func TestAdminKeyOverridesEnvAndSurvivesReload(t *testing.T) {
+	repo := &fakeAISettingsRepo{}
+	s := NewAISettingsService(repo, domain.AISettings{}, AIProviderAnthropic, "sk-ant-env", "secret")
+	sealed, err := s.sealer.seal("sk-or-admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo.key = &domain.AIAPIKey{Provider: AIProviderOpenRouter, Ciphertext: sealed}
+	if strings.Contains(string(sealed), "sk-or-admin") {
+		t.Fatal("key is stored in plaintext")
+	}
 
-func (r fakeAISettingsRepo) Get(context.Context) (*domain.AISettings, error) {
+	reloaded := NewAISettingsService(repo, domain.AISettings{}, AIProviderAnthropic, "sk-ant-env", "secret")
+	if err := reloaded.Load(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if p, k := reloaded.Credentials(); p != AIProviderOpenRouter || k != "sk-or-admin" {
+		t.Errorf("Credentials() = %s %q, want the admin key", p, k)
+	}
+	if st := reloaded.KeyStatus(); st.Source != "admin" {
+		t.Errorf("KeyStatus().Source = %q", st.Source)
+	}
+
+	// A different secret can't open the stored key: fall back to env.
+	other := NewAISettingsService(repo, domain.AISettings{}, AIProviderAnthropic, "sk-ant-env", "another secret")
+	if err := other.Load(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if p, _ := other.Credentials(); p != AIProviderAnthropic {
+		t.Errorf("with a wrong secret, provider = %s, want env's", p)
+	}
+
+	if _, err := reloaded.ClearAPIKey(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if p, k := reloaded.Credentials(); p != AIProviderAnthropic || k != "sk-ant-env" {
+		t.Errorf("after clearing, Credentials() = %s %q, want env's", p, k)
+	}
+}
+
+func TestKeyProvider(t *testing.T) {
+	for key, want := range map[string]string{"sk-or-v1-abc": AIProviderOpenRouter, "sk-ant-api03-abc": AIProviderAnthropic, "abc": ""} {
+		got, err := keyProvider(key)
+		if got != want || (want == "") != (err != nil) {
+			t.Errorf("keyProvider(%q) = %q, %v", key, got, err)
+		}
+	}
+}
+
+type fakeAISettingsRepo struct {
+	saved *domain.AISettings
+	key   *domain.AIAPIKey
+}
+
+func (r *fakeAISettingsRepo) Get(context.Context) (*domain.AISettings, error) {
+	if r.saved == nil {
+		return nil, repository.ErrNotFound
+	}
 	cp := *r.saved
 	return &cp, nil
 }
-func (r fakeAISettingsRepo) Save(context.Context, *domain.AISettings) error { return nil }
+func (r *fakeAISettingsRepo) Save(context.Context, *domain.AISettings) error { return nil }
+func (r *fakeAISettingsRepo) GetAPIKey(context.Context) (*domain.AIAPIKey, error) {
+	if r.key == nil {
+		return nil, repository.ErrNotFound
+	}
+	return r.key, nil
+}
+func (r *fakeAISettingsRepo) SaveAPIKey(_ context.Context, k *domain.AIAPIKey) error {
+	r.key = k
+	return nil
+}
+func (r *fakeAISettingsRepo) DeleteAPIKey(context.Context) error {
+	r.key = nil
+	return nil
+}

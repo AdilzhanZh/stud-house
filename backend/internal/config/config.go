@@ -82,6 +82,10 @@ type Config struct {
 	AssistantModel      string
 	AssistantEffort     string
 	AssistantDailyLimit int
+	// SettingsEncryptionKey encrypts secrets saved from the admin panel
+	// (the AI API key). Defaults to JWT_SECRET; changing it makes saved
+	// keys unreadable, so they'd have to be set again.
+	SettingsEncryptionKey string
 }
 
 func Load() (*Config, error) {
@@ -104,6 +108,7 @@ func Load() (*Config, error) {
 	cfg.DocumentCheckModel = getEnv("DOCUMENT_CHECK_MODEL", "")
 	cfg.AssistantModel = getEnv("ASSISTANT_MODEL", "")
 	cfg.AssistantEffort = getEnv("ASSISTANT_EFFORT", "low")
+	cfg.SettingsEncryptionKey = getEnv("SETTINGS_ENCRYPTION_KEY", cfg.JWTSecret)
 	assistantLimit, err := strconv.Atoi(getEnv("ASSISTANT_DAILY_LIMIT", "50"))
 	if err != nil {
 		return nil, err

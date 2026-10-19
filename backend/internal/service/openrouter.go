@@ -8,14 +8,25 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"slices"
 	"strings"
 	"sync"
 	"time"
 )
 
+// openRouterBaseURL can be pointed elsewhere (e.g. a local mock in tests)
+// with OPENROUTER_BASE_URL.
+var openRouterBaseURL = envOr("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
+
 const (
-	openRouterBaseURL = "https://openrouter.ai/api/v1"
 	// openRouterModelsTTL: how long the model list shown to admins is cached.
 	openRouterModelsTTL = time.Hour
 )

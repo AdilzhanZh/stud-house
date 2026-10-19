@@ -47,31 +47,29 @@ const (
 // Messages are stored in the provider's own format, so OpenRouter
 // conversations get their own role keys (see roleKey).
 type AssistantService struct {
-	repo       repository.AssistantRepository
-	users      repository.UserRepository
-	tools      *assistantTools
-	settings   *AISettingsService
-	client     anthropic.Client
-	openRouter *openRouterClient
+	repo     repository.AssistantRepository
+	users    repository.UserRepository
+	tools    *assistantTools
+	settings *AISettingsService
 }
 
 // NewAssistantService: model, effort, daily limit and on/off come from
 // settings on every message, so an admin's change applies immediately.
-func NewAssistantService(repo repository.AssistantRepository, users repository.UserRepository, tools *assistantTools, settings *AISettingsService, apiKey string) *AssistantService {
-	s := &AssistantService{repo: repo, users: users, tools: tools, settings: settings}
-	switch settings.Provider() {
-	case AIProviderAnthropic:
-		s.client = anthropic.NewClient(option.WithAPIKey(apiKey), option.WithRequestTimeout(assistantTimeout))
-	case AIProviderOpenRouter:
-		s.openRouter = newOpenRouterClient(apiKey, assistantTimeout)
-	}
-	return s
+//
+// The provider and API key are also read from settings per message (an
+// admin can replace the key at any time), so clients are built per turn.
+func NewAssistantService(repo repository.AssistantRepository, users repository.UserRepository, tools *assistantTools, settings *AISettingsService) *AssistantService {
+	return &AssistantService{repo: repo, users: users, tools: tools, settings: settings}
 }
 
 // roleKey is assistantRoleKey, prefixed for OpenRouter so a conversation
 // stored in one provider's message format is never replayed to the other.
 func (s *AssistantService) roleKey(user *domain.User) string {
-	if s.openRouter != nil {
+	return roleKeyFor(s.settings.Provider(), user)
+}
+
+func roleKeyFor(provider string, user *domain.User) string {
+	if provider == AIProviderOpenRouter {
 		return "openrouter:" + assistantRoleKey(user)
 	}
 	return assistantRoleKey(user)
@@ -161,7 +159,10 @@ func (s *AssistantService) Send(ctx context.Context, userID uuid.UUID, conversat
 		return uuid.Nil, nil, apperror.New(429, "rate_limited", "бүгінгі сұрақтар лимиті таусылды, ертең қайталап көріңіз")
 	}
 
-	roleKey := s.roleKey(user)
+	// One snapshot of provider and key for the whole turn: an admin may
+	// replace the key while it runs.
+	provider, key := s.settings.Credentials()
+	roleKey := roleKeyFor(provider, user)
 	conv, history, err := s.conversationFor(ctx, user, conversationID, roleKey)
 	if err != nil {
 		return uuid.Nil, nil, err
@@ -174,10 +175,11 @@ func (s *AssistantService) Send(ctx context.Context, userID uuid.UUID, conversat
 	var answer string
 	var drafts []formDraft
 	ctx = withFormDrafts(ctx, &drafts)
-	if s.openRouter != nil {
-		answer, err = s.runTurnOpenRouter(ctx, user, roleKey, history, userText, &turn)
+	if provider == AIProviderOpenRouter {
+		answer, err = s.runTurnOpenRouter(ctx, newOpenRouterClient(key, assistantTimeout), user, roleKey, history, userText, &turn)
 	} else {
-		answer, err = s.runTurn(ctx, user, roleKey, history, userText, &turn)
+		client := anthropic.NewClient(option.WithAPIKey(key), option.WithRequestTimeout(assistantTimeout))
+		answer, err = s.runTurn(ctx, client, user, roleKey, history, userText, &turn)
 	}
 	if err != nil {
 		return uuid.Nil, nil, err
@@ -262,7 +264,7 @@ func countUserTurns(msgs []*domain.AssistantMessage) int {
 // answer. Every message it produces is appended to turn; the turn is only
 // persisted by the caller once it completed, so a failure leaves no
 // half-finished tool exchange in the stored history.
-func (s *AssistantService) runTurn(ctx context.Context, user *domain.User, roleKey string, rawHistory []json.RawMessage, userText string, turn *[]turnMessage) (string, error) {
+func (s *AssistantService) runTurn(ctx context.Context, client anthropic.Client, user *domain.User, roleKey string, rawHistory []json.RawMessage, userText string, turn *[]turnMessage) (string, error) {
 	history := make([]anthropic.BetaMessageParam, 0, len(rawHistory))
 	for _, m := range rawHistory {
 		history = append(history, param.Override[anthropic.BetaMessageParam](m))
@@ -287,7 +289,7 @@ func (s *AssistantService) runTurn(ctx context.Context, user *domain.User, roleK
 
 	for round := 0; round < assistantMaxToolRounds; round++ {
 		params.Messages = append(append([]anthropic.BetaMessageParam{}, history...), turnParams(*turn)...)
-		resp, err := s.client.Beta.Messages.New(ctx, params)
+		resp, err := client.Beta.Messages.New(ctx, params)
 		if err != nil {
 			log.Printf("assistant (%s): API call failed: %v", roleKey, err)
 			return "", apperror.New(502, "assistant_failed", "ЖИ көмекші жауап бере алмады, қайталап көріңіз")
@@ -331,7 +333,7 @@ func turnParams(turn []turnMessage) []anthropic.BetaMessageParam {
 
 // runTurnOpenRouter is runTurn for OpenRouter's chat completions API. The
 // system prompt is sent as the first message on every call (not stored).
-func (s *AssistantService) runTurnOpenRouter(ctx context.Context, user *domain.User, roleKey string, history []json.RawMessage, userText string, turn *[]turnMessage) (string, error) {
+func (s *AssistantService) runTurnOpenRouter(ctx context.Context, openRouter *openRouterClient, user *domain.User, roleKey string, history []json.RawMessage, userText string, turn *[]turnMessage) (string, error) {
 	caps := assistantCapabilities(user)
 	cfg := s.settings.Current()
 	system, err := json.Marshal(orMessage{Role: "system", Content: assistantSystemPrompt(caps)})
@@ -354,7 +356,7 @@ func (s *AssistantService) runTurnOpenRouter(ctx context.Context, user *domain.U
 			}
 			req.Messages = append(req.Messages, raw)
 		}
-		msg, _, err := s.openRouter.chat(ctx, req)
+		msg, _, err := openRouter.chat(ctx, req)
 		if err != nil {
 			log.Printf("assistant (%s, %s): API call failed: %v", roleKey, cfg.AssistantModel, err)
 			if isOpenRouterRateLimit(err) {

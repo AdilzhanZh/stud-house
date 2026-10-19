@@ -18,3 +18,11 @@ type AISettings struct {
 	UpdatedBy *uuid.UUID
 	UpdatedAt *time.Time
 }
+
+// AIAPIKey is an admin-set provider API key as stored: encrypted.
+type AIAPIKey struct {
+	Provider   string
+	Ciphertext []byte
+	SetBy      *uuid.UUID
+	SetAt      time.Time
+}

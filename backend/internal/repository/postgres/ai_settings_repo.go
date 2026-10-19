@@ -50,3 +50,27 @@ func (r *AISettingsRepo) Save(ctx context.Context, s *domain.AISettings) error {
 		s.AssistantEnabled, s.AssistantModel, s.AssistantEffort, s.AssistantDailyLimit,
 		s.DocumentChecksEnabled, s.DocumentCheckModel, s.UpdatedBy).Scan(&s.UpdatedAt)
 }
+
+func (r *AISettingsRepo) GetAPIKey(ctx context.Context) (*domain.AIAPIKey, error) {
+	k := &domain.AIAPIKey{}
+	err := r.db.QueryRow(ctx, `SELECT provider, ciphertext, set_by, set_at FROM ai_api_key`).
+		Scan(&k.Provider, &k.Ciphertext, &k.SetBy, &k.SetAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, repository.ErrNotFound
+	}
+	return k, err
+}
+
+func (r *AISettingsRepo) SaveAPIKey(ctx context.Context, k *domain.AIAPIKey) error {
+	return r.db.QueryRow(ctx, `
+		INSERT INTO ai_api_key (provider, ciphertext, set_by, set_at) VALUES ($1, $2, $3, now())
+		ON CONFLICT (singleton) DO UPDATE SET
+			provider = EXCLUDED.provider, ciphertext = EXCLUDED.ciphertext,
+			set_by = EXCLUDED.set_by, set_at = now()
+		RETURNING set_at`, k.Provider, k.Ciphertext, k.SetBy).Scan(&k.SetAt)
+}
+
+func (r *AISettingsRepo) DeleteAPIKey(ctx context.Context) error {
+	_, err := r.db.Exec(ctx, `DELETE FROM ai_api_key`)
+	return err
+}

@@ -547,6 +547,23 @@ var staticTranslations = map[string]translation{
 		"Дневной лимит должен быть от 1 до 1000",
 		"The daily limit must be between 1 and 1000",
 	},
+	"API кілті жарамсыз": {"Недопустимый API-ключ", "Invalid API key"},
+	"кілт танылмады: OpenRouter кілті «sk-or-», Anthropic кілті «sk-ant-» деп басталады": {
+		"Ключ не распознан: ключ OpenRouter начинается с «sk-or-», ключ Anthropic — с «sk-ant-»",
+		"Unrecognised key: OpenRouter keys start with \"sk-or-\", Anthropic keys with \"sk-ant-\"",
+	},
+	"кілт жарамсыз: провайдер оны қабылдамады": {
+		"Ключ недействителен: провайдер его не принял",
+		"The key is invalid: the provider rejected it",
+	},
+	"кілтті тексеру мүмкін болмады (провайдерге қосылу қатесі), кейінірек қайталап көріңіз": {
+		"Не удалось проверить ключ (ошибка подключения к провайдеру), попробуйте позже",
+		"Couldn't verify the key (connection to the provider failed), try again later",
+	},
+	"серверде шифрлау кілті (SETTINGS_ENCRYPTION_KEY немесе JWT_SECRET) жоқ, API кілтін сақтау мүмкін емес": {
+		"На сервере нет ключа шифрования (SETTINGS_ENCRYPTION_KEY или JWT_SECRET), сохранить API-ключ нельзя",
+		"The server has no encryption secret (SETTINGS_ENCRYPTION_KEY or JWT_SECRET), so the API key can't be stored",
+	},
 	"өтініштер таңдалмаған": {"Заявки не выбраны", "No applications selected"},
 	"өтініштің тексеру нәтижесі өзгерді, оны жеке қараңыз": {
 		"Результат проверки заявки изменился, рассмотрите её отдельно",

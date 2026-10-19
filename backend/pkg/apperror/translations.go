@@ -556,10 +556,6 @@ var staticTranslations = map[string]translation{
 		"Ключ недействителен: провайдер его не принял",
 		"The key is invalid: the provider rejected it",
 	},
-	"кілтті тексеру мүмкін болмады (провайдерге қосылу қатесі), кейінірек қайталап көріңіз": {
-		"Не удалось проверить ключ (ошибка подключения к провайдеру), попробуйте позже",
-		"Couldn't verify the key (connection to the provider failed), try again later",
-	},
 	"серверде шифрлау кілті (SETTINGS_ENCRYPTION_KEY немесе JWT_SECRET) жоқ, API кілтін сақтау мүмкін емес": {
 		"На сервере нет ключа шифрования (SETTINGS_ENCRYPTION_KEY или JWT_SECRET), сохранить API-ключ нельзя",
 		"The server has no encryption secret (SETTINGS_ENCRYPTION_KEY or JWT_SECRET), so the API key can't be stored",
@@ -586,6 +582,17 @@ type dynamicPattern struct {
 }
 
 var dynamicPatterns = []dynamicPattern{
+	{
+		// The reason is mostly Kazakh text or a raw network error; only
+		// the fixed prefix is translated.
+		re: regexp.MustCompile(`^кілтті тексеру мүмкін болмады: (.+)$`),
+		translate: func(lang string, g []string) string {
+			if lang == "ru" {
+				return "Не удалось проверить ключ: " + g[0]
+			}
+			return "Couldn't verify the key: " + g[0]
+		},
+	},
 	{
 		re: regexp.MustCompile(`^курс 1 мен (\d+) аралығында болуы керек$`),
 		translate: func(lang string, g []string) string {

@@ -213,10 +213,10 @@ function SectionHeader(props: {
           aria-checked={props.checked}
           aria-label={props.title}
           onClick={() => props.onToggle(!props.checked)}
-          className={`relative h-6 w-11 rounded-full transition-colors ${props.checked ? 'bg-turquoise-500' : 'bg-navy-700'}`}
+          className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border border-navy-600 transition-colors ${props.checked ? 'border-turquoise-500 bg-turquoise-500' : 'bg-navy-700'}`}
         >
           <span
-            className={`absolute top-0.5 h-5 w-5 rounded-full bg-sand-100 transition-transform ${props.checked ? 'translate-x-5' : 'translate-x-0.5'}`}
+            className={`pointer-events-none absolute left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${props.checked ? 'translate-x-5' : 'translate-x-0'}`}
           />
         </button>
       </label>

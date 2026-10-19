@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Check } from 'lucide-react'
 import { Card } from '../../../components/Card'
@@ -47,6 +48,27 @@ export function NotificationBroadcastPage() {
     listDormitories().then(setDormitories).catch(() => {})
     listUsers('student').then(setStudents).catch(() => {})
   }, [])
+
+  // A draft prepared by the AI assistant arrives as URL parameters
+  // (?audience=…&dormitory_id=…&student_id=…&title=…&body=…): prefill the
+  // form, which the manager still reviews and sends. student_id is turned
+  // into the IIN field once the student list has loaded.
+  const [searchParams] = useSearchParams()
+  const draftTitle = searchParams.get('title')
+  useEffect(() => {
+    if (draftTitle === null) return
+    const draftAudience = searchParams.get('audience')
+    if (draftAudience === 'all' || draftAudience === 'dormitory' || draftAudience === 'student') setAudience(draftAudience)
+    setDormitoryId(searchParams.get('dormitory_id') ?? '')
+    setTitle(draftTitle)
+    setBody(searchParams.get('body') ?? '')
+    setJustSent(null)
+  }, [draftTitle, searchParams])
+  useEffect(() => {
+    const studentId = searchParams.get('student_id')
+    const student = studentId ? students.find((s) => s.id === studentId) : undefined
+    if (student?.iin) setStudentIin(student.iin)
+  }, [searchParams, students])
 
   const trimmedIin = studentIin.trim()
   const matchedStudent = trimmedIin ? (students.find((s) => s.iin === trimmedIin) ?? null) : null
@@ -100,6 +122,7 @@ export function NotificationBroadcastPage() {
       ) : (
         <Card className="flex flex-col gap-3.5">
           <p className="text-[15px] font-bold text-sand-100">{t('admin.notifications.sendBroadcast')}</p>
+          {draftTitle !== null && <Alert variant="warning" message={t('assistant.draftPrefilled')} />}
           {error && <Alert variant="error" message={error} />}
 
           <div>

@@ -12,6 +12,7 @@ import { ApplicationJourneyStepper } from '../../components/ApplicationJourneySt
 import { extractErrorMessage } from '../../api/client'
 import { addApplicationDocument, deleteApplication, getApplication, resubmitApplication } from '../../api/applicationApi'
 import { getDormitory } from '../../api/dormitoryApi'
+import { uploadFile } from '../../api/uploadApi'
 import { getRoom } from '../../api/roomApi'
 import { getStudentProfile } from '../../api/profileApi'
 import { formatDateTime } from '../../utils/dateFormat'
@@ -19,7 +20,7 @@ import { bilingualField } from '../../utils/bilingualField'
 import { useApplicationJourneys } from './useApplicationJourneys'
 import { RoomPicker } from './RoomPicker'
 import { useAuth } from '../auth/useAuth'
-import type { ApplicationDetail } from '../../types/applications'
+import type { ApplicationDetail, MissingDocument } from '../../types/applications'
 import type { Room } from '../../types/rooms'
 import type { Gender } from '../../types'
 
@@ -49,6 +50,10 @@ export function ApplicationDetailPage() {
   const [pickedRoomId, setPickedRoomId] = useState('')
   const [roomError, setRoomError] = useState<string | null>(null)
   const [roomSubmitting, setRoomSubmitting] = useState(false)
+
+  const [uploadingMissingKey, setUploadingMissingKey] = useState<string | null>(null)
+  const [missingError, setMissingError] = useState<string | null>(null)
+  const [resubmitting, setResubmitting] = useState(false)
 
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -97,6 +102,45 @@ export function ApplicationDetailPage() {
       setDocError(extractErrorMessage(err, t('appDetail.addDocError')))
     } finally {
       setDocSubmitting(false)
+    }
+  }
+
+  function missingKey(doc: MissingDocument): string {
+    return doc.benefit_required_document_id ?? doc.dormitory_required_document_id ?? ''
+  }
+
+  // Uploads against the exact required-document slot (not a free-form
+  // name), which is what clears it from the manager-side triage check.
+  async function handleUploadMissing(doc: MissingDocument, file: File) {
+    if (!id) return
+    setMissingError(null)
+    setUploadingMissingKey(missingKey(doc))
+    try {
+      const url = await uploadFile(file)
+      await addApplicationDocument(id, {
+        benefit_required_document_id: doc.benefit_required_document_id ?? undefined,
+        dormitory_required_document_id: doc.dormitory_required_document_id ?? undefined,
+        file_url: url,
+      })
+      load()
+    } catch (err) {
+      setMissingError(extractErrorMessage(err, t('appDetail.addDocError')))
+    } finally {
+      setUploadingMissingKey(null)
+    }
+  }
+
+  async function handleResubmit() {
+    if (!id) return
+    setMissingError(null)
+    setResubmitting(true)
+    try {
+      await resubmitApplication(id, { notes: notes.trim() || null })
+      load()
+    } catch (err) {
+      setMissingError(extractErrorMessage(err, t('appDetail.saveFailed')))
+    } finally {
+      setResubmitting(false)
     }
   }
 
@@ -281,6 +325,55 @@ export function ApplicationDetailPage() {
               <AlertCircle className="h-5 w-5 shrink-0 text-amber-400" />
               <p className="text-sm font-semibold text-amber-400">{t('appDetail.needsCorrectionHint')}</p>
             </div>
+          )}
+
+          {canEdit && (
+            <Card>
+              <p className="text-[15px] font-bold text-sand-100">{t('appDetail.missingDocsTitle')}</p>
+              {missingError && <Alert variant="error" message={missingError} />}
+              {application.missing_documents.length === 0 ? (
+                <>
+                  <p className="mt-1 text-sm text-sand-300">{t('appDetail.noMissingDocs')}</p>
+                  <Button className="mt-3.5" isLoading={resubmitting} onClick={handleResubmit}>
+                    {t('appDetail.resubmitButton')}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p className="mt-1 text-sm text-sand-300">{t('appDetail.missingDocsHint')}</p>
+                  <div className="mt-3 flex flex-col gap-2.5">
+                    {application.missing_documents.map((doc) => (
+                      <div key={missingKey(doc)} className="flex items-center gap-2.5">
+                        <span className="flex h-7.5 w-7.5 shrink-0 items-center justify-center rounded-full bg-amber-500/15">
+                          <AlertCircle className="h-3.5 w-3.5 text-amber-400" strokeWidth={2.5} />
+                        </span>
+                        <span className="flex flex-1 flex-col text-sm text-sand-100">
+                          {bilingualField(doc.name_kk, doc.name_ru, i18n.language)}
+                          {doc.reason !== 'missing_document' && (
+                            <span className="text-xs text-amber-400">
+                              {t(`appDetail.fixReasons.${doc.reason}`, { detail: doc.detail ?? '' })}
+                            </span>
+                          )}
+                        </span>
+                        <label className="cursor-pointer text-sm font-semibold text-sand-100 hover:text-turquoise-400">
+                          {uploadingMissingKey === missingKey(doc) ? t('appDetail.uploading') : t('appDetail.uploadButton')}
+                          <input
+                            type="file"
+                            className="hidden"
+                            disabled={uploadingMissingKey !== null}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              e.target.value = ''
+                              if (file) handleUploadMissing(doc, file)
+                            }}
+                          />
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </Card>
           )}
 
           {canEdit && (

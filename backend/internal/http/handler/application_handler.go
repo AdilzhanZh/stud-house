@@ -15,10 +15,11 @@ import (
 
 type ApplicationHandler struct {
 	applications *service.ApplicationService
+	triage       *service.TriageService
 }
 
-func NewApplicationHandler(applications *service.ApplicationService) *ApplicationHandler {
-	return &ApplicationHandler{applications: applications}
+func NewApplicationHandler(applications *service.ApplicationService, triage *service.TriageService) *ApplicationHandler {
+	return &ApplicationHandler{applications: applications, triage: triage}
 }
 
 type createApplicationRequest struct {
@@ -184,6 +185,11 @@ func (h *ApplicationHandler) GetDetail(c *gin.Context) {
 		response.Error(c, err)
 		return
 	}
+	missing, err := h.triage.StudentFixes(c.Request.Context(), id)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
 	history, err := h.applications.ListHistory(c.Request.Context(), id)
 	if err != nil {
 		response.Error(c, err)
@@ -191,8 +197,10 @@ func (h *ApplicationHandler) GetDetail(c *gin.Context) {
 	}
 	response.OK(c, applicationDetailResponse{
 		applicationResponse: applicationDTO(app),
-		Documents:           applicationDocumentsDTO(documents),
-		History:             applicationStatusHistoriesDTO(history),
+		// AI check findings (incl. forgery suspicions) are for managers only.
+		Documents:        applicationDocumentsDTO(documents, middleware.CanManage(c)),
+		MissingDocuments: missingDocumentsDTO(missing),
+		History:          applicationStatusHistoriesDTO(history),
 	})
 }
 

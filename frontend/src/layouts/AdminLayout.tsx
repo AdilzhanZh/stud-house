@@ -2,6 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowLeftRight,
+  Bot,
   Building2,
   ClipboardList,
   DoorOpen,
@@ -16,6 +17,7 @@ import {
   Users,
 } from 'lucide-react'
 import { useAuth } from '../features/auth/useAuth'
+import { AssistantWidget } from '../features/assistant/AssistantWidget'
 import { canManage } from '../constants/roles'
 import { Avatar } from '../components/Avatar'
 import { ThemeToggle } from '../components/ThemeToggle'
@@ -174,6 +176,12 @@ export function AdminLayout() {
                 </NavLink>
               </>
             )}
+            {user?.role === 'admin' && (
+              <NavLink to="/admin/ai-settings" className={navLinkClass}>
+                <Bot className="h-4.5 w-4.5 shrink-0" />
+                {t('admin.layout.aiSettings')}
+              </NavLink>
+            )}
           </nav>
         </div>
 
@@ -197,6 +205,8 @@ export function AdminLayout() {
       <main className="min-w-0 flex-1 p-6 md:p-8">
         <Outlet />
       </main>
+
+      <AssistantWidget />
     </div>
   )
 }

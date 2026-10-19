@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Bell, Building2, ClipboardList, Home as HomeIcon, User } from 'lucide-react'
+import { AssistantWidget } from '../features/assistant/AssistantWidget'
 import { useAuth } from '../features/auth/useAuth'
 import { BrandMark } from '../components/BrandMark'
 import { Avatar } from '../components/Avatar'
@@ -107,6 +108,8 @@ export function DashboardLayout() {
       <main className="mx-auto max-w-6xl px-4 py-4 md:px-10 md:py-8">
         <Outlet />
       </main>
+
+      <AssistantWidget className="bottom-24 md:bottom-6" />
 
       <nav className="fixed inset-x-0 bottom-0 z-10 flex border-t border-navy-700 bg-navy-900 px-2 pt-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden">
         {mobileTabs.map(({ section, label, to, icon: Icon }) => {

@@ -11,8 +11,12 @@ import (
 // and/or dormitories via BenefitRequiredDocument/DormitoryRequiredDocument,
 // instead of every benefit/dormitory re-typing the same document name.
 type RequiredDocument struct {
-	ID        uuid.UUID
-	NameKk    string
-	NameRu    string
-	CreatedAt time.Time
+	ID     uuid.UUID
+	NameKk string
+	NameRu string
+	// ValidityDays is how long the document stays valid after its issue
+	// date; nil means it never expires. Checked against the AI-extracted
+	// issue date (see DocumentCheckResult).
+	ValidityDays *int
+	CreatedAt    time.Time
 }

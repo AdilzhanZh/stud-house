@@ -6,14 +6,21 @@ import { Alert } from '../../../components/Alert'
 import { StatusBadge } from '../../../components/StatusBadge'
 import { Select } from '../../../components/Select'
 import { Button } from '../../../components/Button'
+import { ConfirmDialog } from '../../../components/ConfirmDialog'
 import { DownloadIconButton } from '../../../components/DownloadIconButton'
 import { extractErrorMessage } from '../../../api/client'
-import { listApplications } from '../../../api/applicationAdminApi'
+import {
+  approveGreenApplications,
+  listApplicationTriage,
+  listApplications,
+  requestApplicationCorrections,
+} from '../../../api/applicationAdminApi'
 import { listDormitories } from '../../../api/dormitoryApi'
 import { listUsers } from '../../../api/adminUserApi'
 import { listBenefits, listStudentBenefits } from '../../../api/benefitApi'
 import { downloadPetitionPdf } from '../../../utils/petitionPdf'
 import { formatDate } from '../../../utils/dateFormat'
+import { bilingualField } from '../../../utils/bilingualField'
 import { markApplicationsSeenNow } from './applicationsSeen'
 import { BulkDownloadDialog } from './BulkDownloadDialog'
 import {
@@ -23,13 +30,30 @@ import {
   adminTableWrapClass,
   adminTheadClass,
 } from '../adminTable'
-import type { Application, ApplicationStatus } from '../../../types/applications'
+import type {
+  Application,
+  ApplicationStatus,
+  ApplicationTriage,
+  BulkResult,
+  TriageColor,
+  TriageReason,
+} from '../../../types/applications'
 import type { User } from '../../../types'
 
 const STATUSES: ApplicationStatus[] = ['pending', 'needs_correction', 'approved', 'rejected']
 
+const TRIAGE_COLORS: TriageColor[] = ['green', 'yellow', 'red']
+
+const triageChipClasses: Record<TriageColor, string> = {
+  green: 'bg-mint-500/10 text-mint-400',
+  yellow: 'bg-amber-500/10 text-amber-400',
+  red: 'bg-clay-500/10 text-clay-400',
+}
+
+type BulkAction = 'approve' | 'correct'
+
 export function ApplicationQueuePage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const STATUS_LABELS: Record<ApplicationStatus | 'all', string> = {
     all: t('admin.applications.statusAll'),
@@ -52,6 +76,13 @@ export function ApplicationQueuePage() {
   const [error, setError] = useState<string | null>(null)
   const [downloadError, setDownloadError] = useState<string | null>(null)
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false)
+  const [triageById, setTriageById] = useState<Record<string, ApplicationTriage>>({})
+  const [triageFilter, setTriageFilter] = useState<TriageColor | 'all'>('all')
+  const [pendingBulkAction, setPendingBulkAction] = useState<BulkAction | null>(null)
+  const [bulkRunning, setBulkRunning] = useState(false)
+  const [bulkResults, setBulkResults] = useState<{ action: BulkAction; results: BulkResult[] } | null>(null)
+  const [bulkError, setBulkError] = useState<string | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -60,6 +91,7 @@ export function ApplicationQueuePage() {
       listUsers('student'),
       listDormitories(),
       listBenefits(),
+      listApplicationTriage(),
     ])
       .then(async (results) => {
         if (cancelled) return
@@ -67,8 +99,10 @@ export function ApplicationQueuePage() {
         const students = results[STATUSES.length] as Awaited<ReturnType<typeof listUsers>>
         const dormitories = results[STATUSES.length + 1] as Awaited<ReturnType<typeof listDormitories>>
         const benefits = results[STATUSES.length + 2] as Awaited<ReturnType<typeof listBenefits>>
+        const triage = results[STATUSES.length + 3] as ApplicationTriage[]
 
         setApplications(apps)
+        setTriageById(Object.fromEntries(triage.map((tr) => [tr.application_id, tr])))
         setNamesById(Object.fromEntries(students.map((s) => [s.id, s.full_name])))
         setStudentsById(Object.fromEntries(students.map((s) => [s.id, s])))
         setDormitoryNamesById(Object.fromEntries(dormitories.map((d) => [d.id, d.name])))
@@ -97,7 +131,7 @@ export function ApplicationQueuePage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [reloadKey])
 
   const counts = useMemo(() => {
     const c: Record<ApplicationStatus | 'all', number> = {
@@ -115,10 +149,29 @@ export function ApplicationQueuePage() {
     return c
   }, [applications])
 
+  // Triage only exists for pending applications, so its filter and bulk
+  // actions only apply while the "new" status tab is selected.
+  const showTriage = activeFilter === 'pending'
+
+  const triageCounts = useMemo(() => {
+    const c: Record<TriageColor | 'all', number> = { all: 0, green: 0, yellow: 0, red: 0 }
+    applications?.forEach((a) => {
+      const tr = triageById[a.id]
+      if (a.status !== 'pending' || !tr) return
+      if (dormitoryFilter && a.dormitory_id !== dormitoryFilter) return
+      c.all += 1
+      c[tr.color] += 1
+    })
+    return c
+  }, [applications, triageById, dormitoryFilter])
+
   const visibleApplications = useMemo(() => {
     if (!applications) return null
     let filtered = activeFilter === 'all' ? applications : applications.filter((a) => a.status === activeFilter)
     if (dormitoryFilter) filtered = filtered.filter((app) => app.dormitory_id === dormitoryFilter)
+    if (showTriage && triageFilter !== 'all') {
+      filtered = filtered.filter((app) => triageById[app.id]?.color === triageFilter)
+    }
     const dir = sortDirection === 'asc' ? 1 : -1
     return [...filtered].sort((a, b) => {
       if (sortField === 'priority') {
@@ -128,7 +181,46 @@ export function ApplicationQueuePage() {
       }
       return (new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) * dir
     })
-  }, [applications, activeFilter, dormitoryFilter, priorityByStudent, sortField, sortDirection])
+  }, [applications, activeFilter, dormitoryFilter, showTriage, triageFilter, triageById, priorityByStudent, sortField, sortDirection])
+
+  // Bulk actions cover every pending application of the matching color
+  // (respecting the dormitory filter), not just the ones the color filter
+  // currently shows.
+  function bulkTargets(color: TriageColor): Application[] {
+    return (applications ?? []).filter(
+      (a) =>
+        a.status === 'pending' &&
+        triageById[a.id]?.color === color &&
+        (!dormitoryFilter || a.dormitory_id === dormitoryFilter),
+    )
+  }
+
+  async function runBulkAction() {
+    if (!pendingBulkAction) return
+    const action = pendingBulkAction
+    const ids = bulkTargets(action === 'approve' ? 'green' : 'yellow').map((a) => a.id)
+    setBulkRunning(true)
+    setBulkError(null)
+    setBulkResults(null)
+    try {
+      const results =
+        action === 'approve' ? await approveGreenApplications(ids) : await requestApplicationCorrections(ids)
+      setBulkResults({ action, results })
+      setReloadKey((k) => k + 1)
+    } catch (err) {
+      setBulkError(extractErrorMessage(err, t('admin.applications.triage.bulkFailed')))
+    } finally {
+      setBulkRunning(false)
+      setPendingBulkAction(null)
+    }
+  }
+
+  function reasonText(reason: TriageReason): string {
+    return t(`admin.applications.triage.reasons.${reason.code}`, {
+      doc: bilingualField(reason.document_name_kk ?? '', reason.document_name_ru ?? '', i18n.language),
+      detail: reason.detail ?? '',
+    })
+  }
 
   function toggleSort(field: 'priority' | 'date') {
     if (sortField === field) {
@@ -195,6 +287,63 @@ export function ApplicationQueuePage() {
         ))}
       </div>
 
+      {showTriage && applications && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-navy-700 bg-navy-900 px-4 py-3">
+          <div className="flex flex-wrap gap-2">
+            {(['all', ...TRIAGE_COLORS] as const).map((color) => (
+              <button
+                key={color}
+                onClick={() => setTriageFilter(color)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold whitespace-nowrap ${
+                  triageFilter === color
+                    ? 'border-turquoise-500 bg-turquoise-500/10 text-turquoise-400'
+                    : 'border-navy-700 bg-navy-950 text-sand-300 hover:text-sand-100'
+                }`}
+              >
+                {t(`admin.applications.triage.${color}`)} ({triageCounts[color]})
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              disabled={triageCounts.yellow === 0}
+              onClick={() => setPendingBulkAction('correct')}
+            >
+              {t('admin.applications.triage.requestCorrectionsButton', { count: triageCounts.yellow })}
+            </Button>
+            <Button disabled={triageCounts.green === 0} onClick={() => setPendingBulkAction('approve')}>
+              {t('admin.applications.triage.approveGreenButton', { count: triageCounts.green })}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {bulkError && <Alert variant="error" message={bulkError} />}
+      {bulkResults && (
+        <Alert
+          variant={bulkResults.results.every((r) => r.ok) ? 'success' : 'warning'}
+          message={[
+            t(
+              bulkResults.action === 'approve'
+                ? 'admin.applications.triage.approvedSummary'
+                : 'admin.applications.triage.correctionsSummary',
+              {
+                done: bulkResults.results.filter((r) => r.ok).length,
+                skipped: bulkResults.results.filter((r) => !r.ok).length,
+              },
+            ),
+            ...bulkResults.results
+              .filter((r) => !r.ok)
+              .map((r) => {
+                const app = applications?.find((a) => a.id === r.application_id)
+                const name = app ? namesById[app.student_id] ?? app.student_id : r.application_id
+                return `${name}: ${r.error ?? ''}`
+              }),
+          ].join('\n')}
+        />
+      )}
+
       {error && <Alert variant="error" message={error} />}
       {downloadError && <Alert variant="error" message={downloadError} />}
       {!error && !applications && <p className="text-sm text-sand-300">{t('admin.common.loading')}</p>}
@@ -237,6 +386,7 @@ export function ApplicationQueuePage() {
                     {sortIndicator('date')}
                   </th>
                   <th className={adminCellClass}>{t('admin.applications.status')}</th>
+                  {showTriage && <th className={adminCellClass}>{t('admin.applications.triage.column')}</th>}
                   <th className={adminCellClass} />
                 </tr>
               </thead>
@@ -262,6 +412,29 @@ export function ApplicationQueuePage() {
                     <td className={adminCellClass}>
                       <StatusBadge status={app.status} />
                     </td>
+                    {showTriage && (
+                      <td className={adminCellClass}>
+                        {triageById[app.id] && (
+                          <div className="flex flex-col items-start gap-1">
+                            <span
+                              className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                triageChipClasses[triageById[app.id].color]
+                              }`}
+                            >
+                              {t(`admin.applications.triage.${triageById[app.id].color}`)}
+                            </span>
+                            {triageById[app.id].checking && (
+                              <span className="text-xs text-turquoise-400">{t('admin.applications.triage.checking')}</span>
+                            )}
+                            {triageById[app.id].reasons.map((reason, i) => (
+                              <span key={i} className="text-xs text-sand-300">
+                                {reasonText(reason)}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                    )}
                     <td className={adminCellClass} onClick={(e) => e.stopPropagation()}>
                       {app.status === 'approved' && <DownloadIconButton onClick={() => handleDownload(app)} />}
                     </td>
@@ -269,7 +442,7 @@ export function ApplicationQueuePage() {
                 ))}
                 {visibleApplications?.length === 0 && (
                   <tr>
-                    <td className={`${adminCellClass} text-sand-300`} colSpan={6}>
+                    <td className={`${adminCellClass} text-sand-300`} colSpan={showTriage ? 7 : 6}>
                       {t('admin.applications.empty')}
                     </td>
                   </tr>
@@ -279,6 +452,24 @@ export function ApplicationQueuePage() {
           </Card>
         </>
       )}
+
+      <ConfirmDialog
+        open={pendingBulkAction !== null}
+        title={t(
+          pendingBulkAction === 'approve'
+            ? 'admin.applications.triage.approveGreenTitle'
+            : 'admin.applications.triage.requestCorrectionsTitle',
+        )}
+        message={t(
+          pendingBulkAction === 'approve'
+            ? 'admin.applications.triage.approveGreenConfirm'
+            : 'admin.applications.triage.requestCorrectionsConfirm',
+          { count: pendingBulkAction === 'approve' ? triageCounts.green : triageCounts.yellow },
+        )}
+        isLoading={bulkRunning}
+        onConfirm={runBulkAction}
+        onCancel={() => setPendingBulkAction(null)}
+      />
 
       {applications && (
         <BulkDownloadDialog

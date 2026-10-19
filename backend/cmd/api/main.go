@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"student-house/internal/config"
+	"student-house/internal/domain"
 	apihttp "student-house/internal/http"
 	"student-house/internal/http/handler"
 	"student-house/internal/repository/postgres"
@@ -72,6 +73,50 @@ func main() {
 	benefitService := service.NewBenefitService(benefitRepo, userRepo, studentBenefitRepo)
 	documentService := service.NewDocumentService(requiredDocumentRepo)
 	applicationService := service.NewApplicationService(applicationRepo, applicationDocumentRepo, dormitoryRepo, roomRepo, roomService, userRepo, notifierService)
+	// Env values are only defaults; an admin can change them (and switch
+	// the features on/off) from the admin panel without a restart.
+	aiSettingsService := service.NewAISettingsService(postgres.NewAISettingsRepo(pool), domain.AISettings{
+		AssistantEnabled:      true,
+		AssistantModel:        cfg.AssistantModel,
+		AssistantEffort:       cfg.AssistantEffort,
+		AssistantDailyLimit:   cfg.AssistantDailyLimit,
+		DocumentChecksEnabled: true,
+		DocumentCheckModel:    cfg.DocumentCheckModel,
+	}, cfg.AIProvider, cfg.AIAPIKey, cfg.SettingsEncryptionKey)
+	if err := aiSettingsService.Load(context.Background()); err != nil {
+		log.Fatalf("loading AI settings: %v", err)
+	}
+	if st := aiSettingsService.KeyStatus(); st.Configured {
+		log.Printf("AI provider: %s (key from %s)", st.Provider, st.Source)
+	} else {
+		log.Print("no AI API key set (admin panel or OPENROUTER_API_KEY / ANTHROPIC_API_KEY) — AI document checks and the assistant are off")
+	}
+	documentCheckService := service.NewDocumentCheckService(applicationDocumentRepo, aiSettingsService, cfg.UploadDir)
+	applicationService.SetDocumentChecks(documentCheckService)
+	triageService := service.NewTriageService(applicationRepo, applicationDocumentRepo, roomService, applicationService)
+	triageService.SetDocumentChecks(documentCheckService)
+	campaignStatsRepo := postgres.NewCampaignStatsRepo(pool)
+	statsQueryService := service.NewStatsQueryService(ctx, pool, cfg.DatabaseURL)
+	defer statsQueryService.Close()
+	campaignService := service.NewCampaignService(campaignStatsRepo, triageService)
+	assistantService := service.NewAssistantService(postgres.NewAssistantRepo(pool), userRepo, service.NewAssistantTools(service.AssistantToolDeps{
+		Users:            userRepo,
+		Profiles:         studentProfileRepo,
+		Applications:     applicationRepo,
+		Dormitories:      dormitoryRepo,
+		Rooms:            roomRepo,
+		Benefits:         benefitRepo,
+		StudentBenefits:  studentBenefitRepo,
+		Contracts:        contractRepo,
+		Notifications:    notificationRepo,
+		ExitRequests:     exitRequestRepo,
+		TransferRequests: transferRequestRepo,
+		Protocols:        protocolRepo,
+		CampaignStats:    campaignStatsRepo,
+		Triage:           triageService,
+		Campaign:         campaignService,
+		StatsQuery:       statsQueryService,
+	}), aiSettingsService)
 	notificationService := service.NewNotificationService(notificationRepo, roomRepo, userRepo, notifierService)
 	protocolService := service.NewProtocolService(protocolRepo, applicationRepo, userRepo, dormitoryRepo, roomRepo, notifierService)
 	contractService := service.NewContractService(contractRepo, applicationRepo, protocolRepo, userRepo, roomService, notifierService, cfg.ContractResponseDeadline, cfg.ContractReminderWindow)
@@ -95,7 +140,7 @@ func main() {
 		Room:             handler.NewRoomHandler(roomService),
 		Benefit:          handler.NewBenefitHandler(benefitService),
 		Document:         handler.NewDocumentHandler(documentService),
-		Application:      handler.NewApplicationHandler(applicationService),
+		Application:      handler.NewApplicationHandler(applicationService, triageService),
 		Notification:     handler.NewNotificationHandler(notificationService),
 		Protocol:         handler.NewProtocolHandler(protocolService, applicationService),
 		ProtocolTemplate: handler.NewProtocolTemplateHandler(protocolTemplateService),
@@ -108,6 +153,10 @@ func main() {
 		ContractTemplate: handler.NewContractTemplateHandler(contractTemplateService),
 		Retention:        handler.NewRetentionHandler(retentionService),
 		AcademicYear:     handler.NewAcademicYearHandler(academicYearService),
+		Triage:           handler.NewTriageHandler(triageService),
+		Campaign:         handler.NewCampaignHandler(campaignService),
+		Assistant:        handler.NewAssistantHandler(assistantService),
+		AISettings:       handler.NewAISettingsHandler(aiSettingsService),
 	}
 
 	router := apihttp.NewRouter(cfg.JWTSecret, cfg.UploadDir, handlers)
@@ -120,6 +169,9 @@ func main() {
 
 	stopAcademicYearChecker := startAcademicYearChecker(academicYearService, cfg.AcademicYearCheckInterval)
 	defer stopAcademicYearChecker()
+
+	stopDocumentChecks := documentCheckService.Start(time.Minute)
+	defer stopDocumentChecks()
 
 	log.Printf("listening on :%s", cfg.ServerPort)
 	if err := router.Run(":" + cfg.ServerPort); err != nil {

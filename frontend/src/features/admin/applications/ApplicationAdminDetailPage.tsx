@@ -23,6 +23,7 @@ import { computeJourneyStep } from '../../applications/statusHelpers'
 import { formatDateTime } from '../../../utils/dateFormat'
 import { bilingualField } from '../../../utils/bilingualField'
 import { RoomRestrictionsDialog } from '../rooms/RoomRestrictionsDialog'
+import { DocumentCheckSummary } from './DocumentCheckSummary'
 import type { ApplicationDetail } from '../../../types/applications'
 import type { Dormitory } from '../../../types/dormitories'
 import type { Benefit } from '../../../types/benefits'
@@ -407,18 +408,21 @@ export function ApplicationAdminDetailPage() {
             )}
             <div className="flex flex-col gap-2.5">
               {application.documents.map((doc) => (
-                <div key={doc.id} className="flex items-center gap-2.5">
+                <div key={doc.id} className="flex items-start gap-2.5">
                   <span className="flex h-7.5 w-7.5 shrink-0 items-center justify-center rounded-full bg-mint-500/15">
                     <Check className="h-3.5 w-3.5 text-mint-400" strokeWidth={2.5} />
                   </span>
-                  <a
-                    href={doc.file_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex-1 text-sm text-sand-100 hover:text-turquoise-400"
-                  >
-                    {bilingualField(doc.display_name_kk, doc.display_name_ru, i18n.language)}
-                  </a>
+                  <div className="flex flex-1 flex-col gap-1 pt-1">
+                    <a
+                      href={doc.file_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm text-sand-100 hover:text-turquoise-400"
+                    >
+                      {bilingualField(doc.display_name_kk, doc.display_name_ru, i18n.language)}
+                    </a>
+                    {doc.ai_check && <DocumentCheckSummary check={doc.ai_check} />}
+                  </div>
                 </div>
               ))}
             </div>

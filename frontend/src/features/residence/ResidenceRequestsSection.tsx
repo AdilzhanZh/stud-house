@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Card } from '../../components/Card'
 import { Select } from '../../components/Select'
@@ -50,6 +51,20 @@ export function ResidenceRequestsSection() {
 
   useEffect(load, [t])
 
+  // A draft prepared by the AI assistant arrives as URL parameters
+  // (?draft=move_out|room_transfer&reason=…&dormitory_id=…): prefill the
+  // matching form, which the student still reviews and submits.
+  const [searchParams] = useSearchParams()
+  const draft = searchParams.get('draft')
+  useEffect(() => {
+    const reason = searchParams.get('reason') ?? ''
+    if (draft === 'move_out') setExitReason(reason)
+    if (draft === 'room_transfer') {
+      setTransferReason(reason)
+      setTransferDormitoryId(searchParams.get('dormitory_id') ?? '')
+    }
+  }, [draft, searchParams])
+
   async function handleExitConfirm() {
     setExitError(null)
     setExitSubmitting(true)
@@ -91,6 +106,9 @@ export function ResidenceRequestsSection() {
 
   return (
     <div className="flex flex-col gap-3.5">
+      {(draft === 'move_out' || draft === 'room_transfer') && (
+        <Alert variant="warning" message={t('assistant.draftPrefilled')} />
+      )}
       {latestExit && (
         <Alert
           variant={latestExit.status === 'rejected' ? 'error' : 'success'}

@@ -493,6 +493,82 @@ var staticTranslations = map[string]translation{
 	"өз аккаунтыңызды жоя алмайсыз":    {"Вы не можете удалить свой аккаунт", "You cannot delete your own account"},
 	"өтініш идентификаторы дұрыс емес": {"Неверный идентификатор заявки", "Invalid application identifier"},
 	"өтініш табылмады":                 {"Заявка не найдена", "Application not found"},
+	"жарамдылық мерзімі оң сан болуы керек": {
+		"Срок действия должен быть положительным числом",
+		"The validity period must be a positive number",
+	},
+	"құжаттарды ЖИ тексеруі әлі аяқталмаған": {
+		"ИИ-проверка документов ещё не завершена",
+		"The AI document check has not finished yet",
+	},
+	"файл жүйеде сақталмаған (сыртқы сілтеме)": {
+		"Файл не хранится в системе (внешняя ссылка)",
+		"The file is not stored in the system (external link)",
+	},
+	"файл табылмады":      {"Файл не найден", "File not found"},
+	"PDF файлы тым үлкен": {"PDF-файл слишком большой", "The PDF file is too large"},
+	"сурет файлы тым үлкен (5 МБ-тан аспауы керек)": {
+		"Файл изображения слишком большой (не более 5 МБ)",
+		"The image file is too large (5 MB max)",
+	},
+	"файл пішімі қолдау көрсетілмейді (тек PDF, JPG, PNG, WEBP, GIF)": {
+		"Формат файла не поддерживается (только PDF, JPG, PNG, WEBP, GIF)",
+		"Unsupported file format (PDF, JPG, PNG, WEBP, GIF only)",
+	},
+	"ЖИ көмекші қазір қолжетімсіз": {"ИИ-помощник сейчас недоступен", "The AI assistant is currently unavailable"},
+	"хабарлама бос":                {"Сообщение пустое", "The message is empty"},
+	"бүгінгі сұрақтар лимиті таусылды, ертең қайталап көріңіз": {
+		"Лимит вопросов на сегодня исчерпан, попробуйте завтра",
+		"You've reached today's question limit, try again tomorrow",
+	},
+	"алдыңғы хабарламаға жауап әлі дайындалып жатыр": {
+		"Ответ на предыдущее сообщение ещё готовится",
+		"The reply to your previous message is still being prepared",
+	},
+	"чат тым ұзақ болды, жаңа чат бастаңыз": {
+		"Чат стал слишком длинным, начните новый",
+		"This chat has grown too long, start a new one",
+	},
+	"ЖИ көмекші жауап бере алмады, қайталап көріңіз": {
+		"ИИ-помощник не смог ответить, попробуйте ещё раз",
+		"The AI assistant could not reply, please try again",
+	},
+	"бұл сұраққа ЖИ көмекші жауап бере алмайды": {
+		"ИИ-помощник не может ответить на этот вопрос",
+		"The AI assistant can't answer this question",
+	},
+	"ЖИ көмекші жауап бере алмады, сұрақты нақтырақ қойып көріңіз": {
+		"ИИ-помощник не смог ответить, попробуйте сформулировать вопрос точнее",
+		"The AI assistant could not reply, try asking more specifically",
+	},
+	"модель жарамсыз":         {"Недопустимая модель", "Invalid model"},
+	"effort деңгейі жарамсыз": {"Недопустимый уровень effort", "Invalid effort level"},
+	"күндік лимит 1 мен 1000 аралығында болуы керек": {
+		"Дневной лимит должен быть от 1 до 1000",
+		"The daily limit must be between 1 and 1000",
+	},
+	"API кілті жарамсыз": {"Недопустимый API-ключ", "Invalid API key"},
+	"кілт танылмады: OpenRouter кілті «sk-or-», Anthropic кілті «sk-ant-» деп басталады": {
+		"Ключ не распознан: ключ OpenRouter начинается с «sk-or-», ключ Anthropic — с «sk-ant-»",
+		"Unrecognised key: OpenRouter keys start with \"sk-or-\", Anthropic keys with \"sk-ant-\"",
+	},
+	"кілт жарамсыз: провайдер оны қабылдамады": {
+		"Ключ недействителен: провайдер его не принял",
+		"The key is invalid: the provider rejected it",
+	},
+	"кілтті тексеру мүмкін болмады (провайдерге қосылу қатесі), кейінірек қайталап көріңіз": {
+		"Не удалось проверить ключ (ошибка подключения к провайдеру), попробуйте позже",
+		"Couldn't verify the key (connection to the provider failed), try again later",
+	},
+	"серверде шифрлау кілті (SETTINGS_ENCRYPTION_KEY немесе JWT_SECRET) жоқ, API кілтін сақтау мүмкін емес": {
+		"На сервере нет ключа шифрования (SETTINGS_ENCRYPTION_KEY или JWT_SECRET), сохранить API-ключ нельзя",
+		"The server has no encryption secret (SETTINGS_ENCRYPTION_KEY or JWT_SECRET), so the API key can't be stored",
+	},
+	"өтініштер таңдалмаған": {"Заявки не выбраны", "No applications selected"},
+	"өтініштің тексеру нәтижесі өзгерді, оны жеке қараңыз": {
+		"Результат проверки заявки изменился, рассмотрите её отдельно",
+		"The application's check result has changed, review it individually",
+	},
 	"өтініш шешім қабылдауды күтіп тұрған жоқ": {
 		"Заявка не ожидает решения",
 		"The application is not awaiting a decision",

@@ -106,6 +106,9 @@ type RoomRepository interface {
 type RequiredDocumentRepository interface {
 	Create(ctx context.Context, d *domain.RequiredDocument) error
 	List(ctx context.Context) ([]*domain.RequiredDocument, error)
+	// SetValidityDays sets (or, with nil, clears) how long the document
+	// stays valid after issue.
+	SetValidityDays(ctx context.Context, id uuid.UUID, validityDays *int) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 

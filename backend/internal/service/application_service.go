@@ -29,6 +29,13 @@ type ApplicationService struct {
 	rooms        *RoomService
 	users        repository.UserRepository
 	notifier     *notifier.Notifier
+	checks       *DocumentCheckService
+}
+
+// SetDocumentChecks queues every required-document upload for an AI check
+// (see DocumentCheckService) when checks is enabled.
+func (s *ApplicationService) SetDocumentChecks(checks *DocumentCheckService) {
+	s.checks = checks
 }
 
 func NewApplicationService(
@@ -239,12 +246,22 @@ func (s *ApplicationService) AddDocument(ctx context.Context, actorStudentID, ap
 		DormitoryRequiredDocumentID: dormitoryRequiredDocumentID,
 		DocumentName:                documentName,
 		FileURL:                     fileURL,
+		CheckStatus:                 domain.DocumentCheckSkipped,
+	}
+	// Only uploads against a required-document slot are checked: those are
+	// the ones with an expected type to compare against.
+	queueCheck := s.checks.Enabled() && documentName == nil
+	if queueCheck {
+		doc.CheckStatus = domain.DocumentCheckPending
 	}
 	if err := s.documents.Add(ctx, doc); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return nil, apperror.BadRequest("көрсетілген құжат жарамсыз")
 		}
 		return nil, err
+	}
+	if queueCheck {
+		s.checks.Wake()
 	}
 	return doc, nil
 }

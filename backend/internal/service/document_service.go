@@ -22,9 +22,12 @@ func NewDocumentService(documents repository.RequiredDocumentRepository) *Docume
 	return &DocumentService{documents: documents}
 }
 
-func (s *DocumentService) Create(ctx context.Context, nameKk, nameRu string) (*domain.RequiredDocument, error) {
+func (s *DocumentService) Create(ctx context.Context, nameKk, nameRu string, validityDays *int) (*domain.RequiredDocument, error) {
 	if nameKk == "" && nameRu == "" {
 		return nil, apperror.BadRequest("құжат атауы міндетті")
+	}
+	if validityDays != nil && *validityDays <= 0 {
+		return nil, apperror.BadRequest("жарамдылық мерзімі оң сан болуы керек")
 	}
 	// A name typed in only one language is shown as-is regardless of the
 	// site's current locale, instead of falling back to an empty string.
@@ -34,7 +37,7 @@ func (s *DocumentService) Create(ctx context.Context, nameKk, nameRu string) (*d
 	if nameRu == "" {
 		nameRu = nameKk
 	}
-	d := &domain.RequiredDocument{NameKk: nameKk, NameRu: nameRu}
+	d := &domain.RequiredDocument{NameKk: nameKk, NameRu: nameRu, ValidityDays: validityDays}
 	if err := s.documents.Create(ctx, d); err != nil {
 		return nil, err
 	}
@@ -43,6 +46,22 @@ func (s *DocumentService) Create(ctx context.Context, nameKk, nameRu string) (*d
 
 func (s *DocumentService) List(ctx context.Context) ([]*domain.RequiredDocument, error) {
 	return s.documents.List(ctx)
+}
+
+// SetValidityDays changes how long a required document stays valid after
+// issue (nil = never expires). Already-uploaded documents are re-judged
+// against it the next time their application is triaged.
+func (s *DocumentService) SetValidityDays(ctx context.Context, id uuid.UUID, validityDays *int) error {
+	if validityDays != nil && *validityDays <= 0 {
+		return apperror.BadRequest("жарамдылық мерзімі оң сан болуы керек")
+	}
+	if err := s.documents.SetValidityDays(ctx, id, validityDays); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return apperror.NotFound("құжат табылмады")
+		}
+		return err
+	}
+	return nil
 }
 
 func (s *DocumentService) Delete(ctx context.Context, id uuid.UUID) error {

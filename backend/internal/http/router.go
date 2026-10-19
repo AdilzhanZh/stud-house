@@ -28,6 +28,10 @@ type Handlers struct {
 	Upload           *handler.UploadHandler
 	Retention        *handler.RetentionHandler
 	AcademicYear     *handler.AcademicYearHandler
+	Triage           *handler.TriageHandler
+	Campaign         *handler.CampaignHandler
+	Assistant        *handler.AssistantHandler
+	AISettings       *handler.AISettingsHandler
 }
 
 func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
@@ -73,6 +77,12 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 
 				adminGroup.POST("/retention/purge", h.Retention.Purge)
 				adminGroup.POST("/academic-year/rollover", h.AcademicYear.Rollover)
+
+				// AI feature settings (the API key stays in the environment).
+				adminGroup.GET("/ai-settings", h.AISettings.Get)
+				adminGroup.PUT("/ai-settings", h.AISettings.Update)
+				adminGroup.PUT("/ai-settings/api-key", h.AISettings.SetAPIKey)
+				adminGroup.DELETE("/ai-settings/api-key", h.AISettings.ClearAPIKey)
 			}
 
 			// Read-only for any authenticated role.
@@ -101,6 +111,11 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 			// Any authenticated user: their own password/email.
 			protected.PATCH("/users/me/password", h.User.ChangeOwnPassword)
 			protected.PATCH("/users/me/email", h.User.ChangeOwnEmail)
+
+			// Any authenticated user: the in-app AI assistant. It only looks up
+			// what the caller may see (see service.AssistantService).
+			protected.GET("/assistant/conversation", h.Assistant.Current)
+			protected.POST("/assistant/messages", h.Assistant.Send)
 
 			// Any authenticated user: send a bug report/suggestion to the admins.
 			protected.POST("/feedback", h.Feedback.Send)
@@ -207,6 +222,7 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 
 				mgmt.POST("/documents", h.Document.Create)
 				mgmt.GET("/documents", h.Document.List)
+				mgmt.PATCH("/documents/:id/validity", h.Document.SetValidity)
 				mgmt.DELETE("/documents/:id", h.Document.Delete)
 
 				mgmt.POST("/students/:id/benefits", h.Benefit.AssignBenefit)
@@ -220,6 +236,15 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 				mgmt.GET("/applications", h.Application.List)
 				mgmt.PATCH("/applications/:id/decision", h.Application.Decide)
 				mgmt.PATCH("/applications/:id/cancel-approved", h.Application.CancelApproved)
+
+				// Green/yellow/red sorting of pending applications, and the
+				// bulk actions it exists for (see service.TriageService).
+				mgmt.GET("/application-triage", h.Triage.List)
+				mgmt.POST("/application-triage/approve-green", h.Triage.ApproveGreen)
+				mgmt.POST("/application-triage/request-corrections", h.Triage.RequestCorrections)
+
+				// Aggregate intake-campaign progress for the dashboard.
+				mgmt.GET("/campaign-stats", h.Campaign.Get)
 
 				mgmt.GET("/petition-template", h.PetitionTemplate.Get)
 				mgmt.PUT("/petition-template", h.PetitionTemplate.Update)

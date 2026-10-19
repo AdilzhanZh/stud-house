@@ -97,6 +97,14 @@ type applicationDocumentResponse struct {
 	DisplayNameRu               string     `json:"display_name_ru"`
 	FileURL                     string     `json:"file_url"`
 	UploadedAt                  time.Time  `json:"uploaded_at"`
+	// AICheck is only filled in for managers.
+	AICheck *documentCheckResponse `json:"ai_check,omitempty"`
+}
+
+type documentCheckResponse struct {
+	Status string                      `json:"status"`
+	Result *domain.DocumentCheckResult `json:"result"`
+	Error  *string                     `json:"error"`
 }
 
 func applicationDocumentDTO(d *domain.ApplicationDocument) applicationDocumentResponse {
@@ -113,10 +121,14 @@ func applicationDocumentDTO(d *domain.ApplicationDocument) applicationDocumentRe
 	}
 }
 
-func applicationDocumentsDTO(list []*domain.ApplicationDocument) []applicationDocumentResponse {
+func applicationDocumentsDTO(list []*domain.ApplicationDocument, withChecks bool) []applicationDocumentResponse {
 	out := make([]applicationDocumentResponse, 0, len(list))
 	for _, d := range list {
-		out = append(out, applicationDocumentDTO(d))
+		r := applicationDocumentDTO(d)
+		if withChecks && d.CheckStatus != domain.DocumentCheckSkipped {
+			r.AICheck = &documentCheckResponse{Status: string(d.CheckStatus), Result: d.CheckResult, Error: d.CheckError}
+		}
+		out = append(out, r)
 	}
 	return out
 }
@@ -125,8 +137,33 @@ func applicationDocumentsDTO(list []*domain.ApplicationDocument) []applicationDo
 // status history, for the manager's single-application view.
 type applicationDetailResponse struct {
 	applicationResponse
-	Documents []applicationDocumentResponse      `json:"documents"`
-	History   []applicationStatusHistoryResponse `json:"history"`
+	Documents        []applicationDocumentResponse      `json:"documents"`
+	MissingDocuments []missingDocumentResponse          `json:"missing_documents"`
+	History          []applicationStatusHistoryResponse `json:"history"`
+}
+
+type missingDocumentResponse struct {
+	BenefitRequiredDocumentID   *uuid.UUID `json:"benefit_required_document_id"`
+	DormitoryRequiredDocumentID *uuid.UUID `json:"dormitory_required_document_id"`
+	NameKk                      string     `json:"name_kk"`
+	NameRu                      string     `json:"name_ru"`
+	Reason                      string     `json:"reason"`
+	Detail                      string     `json:"detail,omitempty"`
+}
+
+func missingDocumentsDTO(list []*domain.MissingRequiredDocument) []missingDocumentResponse {
+	out := make([]missingDocumentResponse, 0, len(list))
+	for _, m := range list {
+		out = append(out, missingDocumentResponse{
+			BenefitRequiredDocumentID:   m.BenefitRequiredDocumentID,
+			DormitoryRequiredDocumentID: m.DormitoryRequiredDocumentID,
+			NameKk:                      m.NameKk,
+			NameRu:                      m.NameRu,
+			Reason:                      string(m.Reason),
+			Detail:                      m.Detail,
+		})
+	}
+	return out
 }
 
 type notificationResponse struct {

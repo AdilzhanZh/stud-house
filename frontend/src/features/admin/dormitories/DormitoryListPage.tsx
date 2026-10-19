@@ -11,17 +11,13 @@ import { deleteDormitory, getDormitoryCapacity, listDormitories, listDormitoryIm
 import { adminPageHeading, adminChipButtonClass } from '../adminTable'
 import { canManage } from '../../../constants/roles'
 import { useAuth } from '../../auth/useAuth'
+import { DormitoryCover } from '../../dormitories/DormitoryCover'
 import type { Dormitory } from '../../../types/dormitories'
 
 interface Row extends Dormitory {
   imageUrl: string | null
   allocated: number
   roomsCreated: number
-}
-
-const placeholderStyle = {
-  backgroundImage:
-    'repeating-linear-gradient(45deg, var(--color-navy-800) 0 8px, var(--color-navy-950) 8px 16px)',
 }
 
 export function DormitoryListPage() {
@@ -91,18 +87,17 @@ export function DormitoryListPage() {
       {deleteError && <Alert variant="error" message={deleteError} />}
       {!error && !rows && <p className="text-sm text-sand-300">{t('admin.common.loading')}</p>}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
         {rows?.map((d) => {
           const pct = d.total_capacity > 0 ? Math.min(100, Math.round((d.allocated / d.total_capacity) * 100)) : 0
           return (
             <Card key={d.id} onClick={() => navigate(`/admin/dormitories/${d.id}`)} className="!p-4">
-              {d.imageUrl ? (
-                <img src={d.imageUrl} alt={d.name} className="h-27.5 w-full rounded-2xl object-cover" />
-              ) : (
-                <div className="flex h-27.5 w-full items-center justify-center rounded-2xl" style={placeholderStyle}>
-                  <span className="font-mono text-[10px] text-sand-400">{t('admin.dormitories.photoPlaceholder')}</span>
-                </div>
-              )}
+              <DormitoryCover
+                src={d.imageUrl}
+                alt={d.name}
+                placeholder={t('admin.dormitories.photoPlaceholder')}
+                className="aspect-[16/10] rounded-2xl"
+              />
               <div className="mt-3 flex items-center gap-2">
                 <p className="text-base font-bold text-sand-100">{d.name}</p>
                 {d.closed_for_applications && (

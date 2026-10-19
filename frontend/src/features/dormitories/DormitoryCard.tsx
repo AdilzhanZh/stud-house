@@ -1,12 +1,8 @@
 import { useTranslation } from 'react-i18next'
 import { Card } from '../../components/Card'
 import { dormTypeLabel, formatTenge } from '../../utils/dormitoryLabels'
+import { DormitoryCover } from './DormitoryCover'
 import type { DormitoryCardData } from './useDormitoriesWithMeta'
-
-const placeholderStyle = {
-  backgroundImage:
-    'repeating-linear-gradient(45deg, var(--color-navy-800) 0 8px, var(--color-navy-950) 8px 16px)',
-}
 
 function VacancyChip({ vacancy }: { vacancy: number }) {
   const { t } = useTranslation()
@@ -45,13 +41,7 @@ export function DormitoryCard({ dormitory: d, onClick, variant = 'grid' }: Dormi
   if (variant === 'compact') {
     return (
       <Card onClick={onClick} className={`!p-3 ${noVacancy ? 'opacity-55' : ''}`}>
-        {d.imageUrl ? (
-          <img src={d.imageUrl} alt={d.name} className="h-23 w-full rounded-xl object-cover" />
-        ) : (
-          <div className="flex h-23 w-full items-center justify-center rounded-xl" style={placeholderStyle}>
-            <span className="font-mono text-[10px] text-sand-400">{t('dorm.photoPlaceholder')}</span>
-          </div>
-        )}
+        <DormitoryCover src={d.imageUrl} alt={d.name} placeholder={t('dorm.photoPlaceholder')} className="aspect-[16/9] rounded-xl" />
         <div className="mt-2.5 flex items-center justify-between gap-2">
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-sand-100">{d.name}</p>
@@ -68,13 +58,7 @@ export function DormitoryCard({ dormitory: d, onClick, variant = 'grid' }: Dormi
 
   return (
     <Card onClick={onClick} className={`!p-3.5 ${noVacancy ? 'opacity-55' : ''}`}>
-      {d.imageUrl ? (
-        <img src={d.imageUrl} alt={d.name} className="h-30 w-full rounded-2xl object-cover" />
-      ) : (
-        <div className="flex h-30 w-full items-center justify-center rounded-2xl" style={placeholderStyle}>
-          <span className="font-mono text-[10px] text-sand-400">{t('dorm.photoPlaceholder')}</span>
-        </div>
-      )}
+      <DormitoryCover src={d.imageUrl} alt={d.name} placeholder={t('dorm.photoPlaceholder')} className="aspect-[16/10] rounded-2xl" />
       <div className="mt-3 flex items-center justify-between gap-2">
         <p className="text-base font-semibold text-sand-100">{d.name}</p>
         <VacancyChip vacancy={d.vacancy} />

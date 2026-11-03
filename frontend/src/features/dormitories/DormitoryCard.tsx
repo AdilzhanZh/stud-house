@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { Card } from '../../components/Card'
 import { dormTypeLabel, formatTenge } from '../../utils/dormitoryLabels'
 import { DormitoryCover } from './DormitoryCover'
+import { DormitoryMapButton } from './DormitoryMapViewer'
 import type { DormitoryCardData } from './useDormitoriesWithMeta'
 
 function VacancyChip({ vacancy }: { vacancy: number }) {
@@ -43,10 +44,11 @@ export function DormitoryCard({ dormitory: d, onClick, variant = 'grid' }: Dormi
       <Card onClick={onClick} className={`!p-3 ${noVacancy ? 'opacity-55' : ''}`}>
         <DormitoryCover src={d.imageUrl} alt={d.name} placeholder={t('dorm.photoPlaceholder')} className="aspect-[16/9] rounded-xl" />
         <div className="mt-2.5 flex items-center justify-between gap-2">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-sand-100">{d.name}</p>
             <p className="truncate text-xs text-sand-300">{d.address}</p>
           </div>
+          <DormitoryMapButton dormitory={d} />
           <span className="shrink-0 text-sm font-bold text-sand-100">
             {formatTenge(d.monthly_payment_bachelor)}
             <span className="text-xs font-normal text-sand-300">{t('dorm.perMonth')}</span>
@@ -63,11 +65,14 @@ export function DormitoryCard({ dormitory: d, onClick, variant = 'grid' }: Dormi
         <p className="text-base font-semibold text-sand-100">{d.name}</p>
         <VacancyChip vacancy={d.vacancy} />
       </div>
-      <p className="mt-0.5 text-sm text-sand-300">
-        {d.address}
-        {d.dorm_type && ` · ${dormTypeLabel(d.dorm_type, t)}`}
-        {d.floor_count != null && ` · ${t('dorm.floorsCount', { count: d.floor_count })}`}
-      </p>
+      <div className="mt-0.5 flex items-start justify-between gap-2">
+        <p className="min-w-0 text-sm text-sand-300">
+          {d.address}
+          {d.dorm_type && ` · ${dormTypeLabel(d.dorm_type, t)}`}
+          {d.floor_count != null && ` · ${t('dorm.floorsCount', { count: d.floor_count })}`}
+        </p>
+        <DormitoryMapButton dormitory={d} />
+      </div>
       {!noVacancy && (
         <p className="mt-2.5 text-base font-bold text-sand-100">
           {formatTenge(d.monthly_payment_bachelor)} <span className="text-xs font-normal text-sand-300">{t('dorm.perMonthLong')}</span>

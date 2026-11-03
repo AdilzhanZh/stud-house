@@ -43,6 +43,8 @@ type dormitoryRequest struct {
 	CommissionedYear        *string               `json:"commissioned_year"`
 	OwnershipForm           *string               `json:"ownership_form"`
 	ClosedForApplications   bool                  `json:"closed_for_applications"`
+	Latitude                *float64              `json:"latitude"`
+	Longitude               *float64              `json:"longitude"`
 }
 
 func (req dormitoryRequest) toInput() (service.DormitoryInput, error) {
@@ -72,6 +74,8 @@ func (req dormitoryRequest) toInput() (service.DormitoryInput, error) {
 		CommissionedYear:        commissionedYear,
 		OwnershipForm:           req.OwnershipForm,
 		ClosedForApplications:   req.ClosedForApplications,
+		Latitude:                req.Latitude,
+		Longitude:               req.Longitude,
 	}, nil
 }
 

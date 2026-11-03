@@ -12,6 +12,7 @@ import { adminPageHeading, adminChipButtonClass } from '../adminTable'
 import { canManage } from '../../../constants/roles'
 import { useAuth } from '../../auth/useAuth'
 import { DormitoryCover } from '../../dormitories/DormitoryCover'
+import { DormitoryMapButton } from '../../dormitories/DormitoryMapViewer'
 import type { Dormitory } from '../../../types/dormitories'
 
 interface Row extends Dormitory {
@@ -106,7 +107,10 @@ export function DormitoryListPage() {
                   </span>
                 )}
               </div>
-              <p className="mt-0.5 text-sm text-sand-300">{d.address}</p>
+              <div className="mt-0.5 flex items-start justify-between gap-2">
+                <p className="min-w-0 text-sm text-sand-300">{d.address}</p>
+                <DormitoryMapButton dormitory={d} />
+              </div>
               <div className="mt-3 flex items-baseline justify-between text-xs text-sand-300">
                 <span>{t('admin.dormitories.occupancy')}</span>
                 <span className="font-semibold">

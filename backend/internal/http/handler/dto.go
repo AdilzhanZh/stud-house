@@ -93,6 +93,8 @@ type dormitoryResponse struct {
 	CommissionedYear        *time.Time            `json:"commissioned_year"`
 	OwnershipForm           *string               `json:"ownership_form"`
 	ClosedForApplications   bool                  `json:"closed_for_applications"`
+	Latitude                *float64              `json:"latitude"`
+	Longitude               *float64              `json:"longitude"`
 	CreatedBy               uuid.UUID             `json:"created_by"`
 	CreatedAt               time.Time             `json:"created_at"`
 	UpdatedAt               time.Time             `json:"updated_at"`
@@ -118,6 +120,8 @@ func dormitoryDTO(d *domain.Dormitory) dormitoryResponse {
 		CommissionedYear:        d.CommissionedYear,
 		OwnershipForm:           d.OwnershipForm,
 		ClosedForApplications:   d.ClosedForApplications,
+		Latitude:                d.Latitude,
+		Longitude:               d.Longitude,
 		CreatedBy:               d.CreatedBy,
 		CreatedAt:               d.CreatedAt,
 		UpdatedAt:               d.UpdatedAt,

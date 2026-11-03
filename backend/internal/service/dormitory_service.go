@@ -41,6 +41,8 @@ type DormitoryInput struct {
 	CommissionedYear        *time.Time
 	OwnershipForm           *string
 	ClosedForApplications   bool
+	Latitude                *float64
+	Longitude               *float64
 }
 
 func validateDormitoryInput(in DormitoryInput) error {
@@ -59,6 +61,12 @@ func validateDormitoryInput(in DormitoryInput) error {
 	}
 	if in.TotalRoomsTarget == nil {
 		return apperror.BadRequest("жалпы бөлме санын енгізу міндетті")
+	}
+	if (in.Latitude == nil) != (in.Longitude == nil) {
+		return apperror.BadRequest("картадағы нүктенің ендігі мен бойлығы бірге берілуі керек")
+	}
+	if in.Latitude != nil && (*in.Latitude < -90 || *in.Latitude > 90 || *in.Longitude < -180 || *in.Longitude > 180) {
+		return apperror.BadRequest("картадағы нүктенің координаттары жарамсыз")
 	}
 	return nil
 }
@@ -82,6 +90,8 @@ func dormitoryFromInput(in DormitoryInput) *domain.Dormitory {
 		CommissionedYear:        in.CommissionedYear,
 		OwnershipForm:           in.OwnershipForm,
 		ClosedForApplications:   in.ClosedForApplications,
+		Latitude:                in.Latitude,
+		Longitude:               in.Longitude,
 	}
 }
 

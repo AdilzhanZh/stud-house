@@ -23,6 +23,8 @@ import {
 import { listRequiredDocuments } from '../../../api/documentApi'
 import { uploadFile } from '../../../api/uploadApi'
 import { bilingualField } from '../../../utils/bilingualField'
+import { dormitoryPosition, type LatLng } from '../../dormitories/DormitoryMap'
+import { DormitoryLocationPicker } from './DormitoryLocationPicker'
 import type { DormitoryImage, DormitoryRequiredDocument, DormitoryType } from '../../../types/dormitories'
 import type { RequiredDocument } from '../../../types/documents'
 
@@ -49,6 +51,7 @@ export function DormitoryFormPage() {
   const [commissionedYear, setCommissionedYear] = useState('')
   const [ownershipForm, setOwnershipForm] = useState('')
   const [closedForApplications, setClosedForApplications] = useState(false)
+  const [location, setLocation] = useState<LatLng | null>(null)
 
   const [loadError, setLoadError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -95,6 +98,7 @@ export function DormitoryFormPage() {
         setCommissionedYear(d.commissioned_year?.slice(0, 10) ?? '')
         setOwnershipForm(d.ownership_form ?? '')
         setClosedForApplications(d.closed_for_applications)
+        setLocation(dormitoryPosition(d))
       })
       .catch((err) => setLoadError(extractErrorMessage(err, t('admin.common.loadError'))))
     loadImages(id)
@@ -123,6 +127,8 @@ export function DormitoryFormPage() {
       commissioned_year: commissionedYear || null,
       ownership_form: ownershipForm.trim() || null,
       closed_for_applications: closedForApplications,
+      latitude: location?.lat ?? null,
+      longitude: location?.lng ?? null,
     }
     try {
       if (isEdit && id) {
@@ -338,6 +344,8 @@ export function DormitoryFormPage() {
           </label>
         </form>
       </Card>
+
+      <DormitoryLocationPicker address={address} position={location} onChange={setLocation} />
 
       {isEdit && id && (
         <Card title={t('admin.dormitories.images')}>

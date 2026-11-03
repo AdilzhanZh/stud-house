@@ -12,9 +12,11 @@ import { FloorCorridorMap } from '../../../components/FloorCorridorMap'
 import { extractErrorMessage } from '../../../api/client'
 import { getDormitory, getDormitoryCapacity } from '../../../api/dormitoryApi'
 import { deleteRoom, listRoomResidents, listRoomsByDormitory } from '../../../api/roomApi'
-import { adminCellClass, adminPageHeading, adminRowClass, adminTableWrapClass, adminTheadClass } from '../adminTable'
+import { adminCellClass, adminChipButtonClass, adminPageHeading, adminRowClass, adminTableWrapClass, adminTheadClass } from '../adminTable'
 import { canManage } from '../../../constants/roles'
 import { useAuth } from '../../auth/useAuth'
+import { dormitoryPosition } from '../../dormitories/DormitoryMap'
+import { DormitoryMiniMap } from '../../dormitories/DormitoryMapViewer'
 import type { Dormitory, DormitoryCapacity } from '../../../types/dormitories'
 import type { Room } from '../../../types/rooms'
 
@@ -133,6 +135,14 @@ export function DormitoryDetailPage() {
 
       <Card>
         <p className="text-sm text-sand-300">{dormitory.address}</p>
+        <div className="mt-3">
+          <DormitoryMiniMap dormitory={dormitory} />
+          {!dormitoryPosition(dormitory) && isManager && (
+            <button className={adminChipButtonClass} onClick={() => navigate(`/admin/dormitories/${id}/edit`)}>
+              {t('admin.dormitories.locationPin')}
+            </button>
+          )}
+        </div>
         <div className="mt-4">
           <div className="mb-1 flex justify-between text-sm text-sand-300">
             <span>{t('admin.dormitories.bedsProgress')}</span>

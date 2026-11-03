@@ -10,6 +10,7 @@ import { getDormitory, getDormitoryCapacity, listDormitoryImages } from '../../a
 import { dormTypeLabel, formatTenge } from '../../utils/dormitoryLabels'
 import type { Dormitory, DormitoryCapacity, DormitoryImage } from '../../types/dormitories'
 import { DormitoryImageSlideshow } from './DormitoryImageSlideshow'
+import { DormitoryMiniMap } from './DormitoryMapViewer'
 
 function formatYear(value: string | null): string {
   return value ? value.slice(0, 4) : '—'
@@ -71,6 +72,8 @@ export function DormitoryInfoPage() {
           {vacancy > 0 ? t('dorm.vacancyCount', { count: vacancy }) : t('dorm.noVacancy')}
         </span>
       </div>
+
+      <DormitoryMiniMap dormitory={dormitory} />
 
       <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
         <Card className="!p-3.5">

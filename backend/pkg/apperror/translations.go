@@ -46,9 +46,11 @@ var staticTranslations = map[string]translation{
 		"ИИН должен состоять из 12 цифр",
 		"IIN must be a 12-digit number",
 	},
-	"авторизация қажет":             {"Требуется авторизация", "Authorization required"},
-	"атауы және мекенжайы міндетті": {"Название и адрес обязательны", "Name and address are required"},
-	"атауы міндетті":                {"Название обязательно", "Name is required"},
+	"авторизация қажет":                                         {"Требуется авторизация", "Authorization required"},
+	"атауы және мекенжайы міндетті":                             {"Название и адрес обязательны", "Name and address are required"},
+	"картадағы нүктенің ендігі мен бойлығы бірге берілуі керек": {"Широта и долгота точки на карте должны указываться вместе", "The map point's latitude and longitude must be given together"},
+	"картадағы нүктенің координаттары жарамсыз":                 {"Недопустимые координаты точки на карте", "The map point's coordinates are invalid"},
+	"атауы міндетті":                                            {"Название обязательно", "Name is required"},
 	"аты-жөні, email және құпия сөз міндетті": {
 		"ФИО, email и пароль обязательны",
 		"Full name, email and password are required",
@@ -556,10 +558,6 @@ var staticTranslations = map[string]translation{
 		"Ключ недействителен: провайдер его не принял",
 		"The key is invalid: the provider rejected it",
 	},
-	"кілтті тексеру мүмкін болмады (провайдерге қосылу қатесі), кейінірек қайталап көріңіз": {
-		"Не удалось проверить ключ (ошибка подключения к провайдеру), попробуйте позже",
-		"Couldn't verify the key (connection to the provider failed), try again later",
-	},
 	"серверде шифрлау кілті (SETTINGS_ENCRYPTION_KEY немесе JWT_SECRET) жоқ, API кілтін сақтау мүмкін емес": {
 		"На сервере нет ключа шифрования (SETTINGS_ENCRYPTION_KEY или JWT_SECRET), сохранить API-ключ нельзя",
 		"The server has no encryption secret (SETTINGS_ENCRYPTION_KEY or JWT_SECRET), so the API key can't be stored",
@@ -586,6 +584,17 @@ type dynamicPattern struct {
 }
 
 var dynamicPatterns = []dynamicPattern{
+	{
+		// The reason is mostly Kazakh text or a raw network error; only
+		// the fixed prefix is translated.
+		re: regexp.MustCompile(`^кілтті тексеру мүмкін болмады: (.+)$`),
+		translate: func(lang string, g []string) string {
+			if lang == "ru" {
+				return "Не удалось проверить ключ: " + g[0]
+			}
+			return "Couldn't verify the key: " + g[0]
+		},
+	},
 	{
 		re: regexp.MustCompile(`^курс 1 мен (\d+) аралығында болуы керек$`),
 		translate: func(lang string, g []string) string {

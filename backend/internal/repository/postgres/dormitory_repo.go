@@ -27,6 +27,7 @@ const dormitoryColumns = `
 	monthly_payment_bachelor, monthly_payment_master, monthly_payment_doctorate,
 	yearly_payment_bachelor, yearly_payment_master, yearly_payment_doctorate,
 	built_year, commissioned_year, ownership_form, closed_for_applications,
+	latitude, longitude,
 	created_by, created_at, updated_at`
 
 // dormTypeToText/textToDormType convert domain.DormitoryType (a named string
@@ -58,6 +59,7 @@ func scanDormitory(row pgx.Row) (*domain.Dormitory, error) {
 		&d.MonthlyPaymentBachelor, &d.MonthlyPaymentMaster, &d.MonthlyPaymentDoctorate,
 		&d.YearlyPaymentBachelor, &d.YearlyPaymentMaster, &d.YearlyPaymentDoctorate,
 		&d.BuiltYear, &d.CommissionedYear, &d.OwnershipForm, &d.ClosedForApplications,
+		&d.Latitude, &d.Longitude,
 		&d.CreatedBy, &d.CreatedAt, &d.UpdatedAt,
 	)
 	if err != nil {
@@ -74,16 +76,18 @@ func (r *DormitoryRepo) Create(ctx context.Context, d *domain.Dormitory) error {
 			total_capacity,
 			monthly_payment_bachelor, monthly_payment_master, monthly_payment_doctorate,
 			yearly_payment_bachelor, yearly_payment_master, yearly_payment_doctorate,
-			built_year, commissioned_year, ownership_form, closed_for_applications, created_by
+			built_year, commissioned_year, ownership_form, closed_for_applications,
+			latitude, longitude, created_by
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
 		RETURNING id, created_at, updated_at`
 	return r.db.QueryRow(ctx, q,
 		d.Name, d.Address, d.Phone, dormTypeToText(d.Type), d.FloorCount, d.TotalRoomsTarget,
 		d.TotalCapacity,
 		d.MonthlyPaymentBachelor, d.MonthlyPaymentMaster, d.MonthlyPaymentDoctorate,
 		d.YearlyPaymentBachelor, d.YearlyPaymentMaster, d.YearlyPaymentDoctorate,
-		d.BuiltYear, d.CommissionedYear, d.OwnershipForm, d.ClosedForApplications, d.CreatedBy,
+		d.BuiltYear, d.CommissionedYear, d.OwnershipForm, d.ClosedForApplications,
+		d.Latitude, d.Longitude, d.CreatedBy,
 	).Scan(&d.ID, &d.CreatedAt, &d.UpdatedAt)
 }
 
@@ -136,6 +140,7 @@ func (r *DormitoryRepo) Update(ctx context.Context, d *domain.Dormitory) error {
 			yearly_payment_bachelor = $12, yearly_payment_master = $13, yearly_payment_doctorate = $14,
 			built_year = $15, commissioned_year = $16,
 			ownership_form = $17, closed_for_applications = $18,
+			latitude = $19, longitude = $20,
 			updated_at = now()
 		WHERE id = $1
 		RETURNING updated_at`
@@ -145,6 +150,7 @@ func (r *DormitoryRepo) Update(ctx context.Context, d *domain.Dormitory) error {
 		d.MonthlyPaymentBachelor, d.MonthlyPaymentMaster, d.MonthlyPaymentDoctorate,
 		d.YearlyPaymentBachelor, d.YearlyPaymentMaster, d.YearlyPaymentDoctorate,
 		d.BuiltYear, d.CommissionedYear, d.OwnershipForm, d.ClosedForApplications,
+		d.Latitude, d.Longitude,
 	).Scan(&d.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

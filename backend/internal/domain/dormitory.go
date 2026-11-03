@@ -38,9 +38,13 @@ type Dormitory struct {
 	// browse/apply list and blocks new applications to it, without
 	// affecting existing residents, applications, or admin management.
 	ClosedForApplications bool
-	CreatedBy             uuid.UUID
-	CreatedAt             time.Time
-	UpdatedAt             time.Time
+	// Latitude/Longitude are the point pinned on the map; both nil until an
+	// admin or manager pins it.
+	Latitude  *float64
+	Longitude *float64
+	CreatedBy uuid.UUID
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 // DormitoryCapacity reports how many students are actually placed in a

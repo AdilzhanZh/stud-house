@@ -49,6 +49,8 @@ export interface DormitoryPayload {
   commissioned_year: string | null
   ownership_form: string | null
   closed_for_applications: boolean
+  latitude: number | null
+  longitude: number | null
 }
 
 export async function createDormitory(payload: DormitoryPayload): Promise<Dormitory> {

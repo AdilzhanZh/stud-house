@@ -2,10 +2,15 @@ package service
 
 import (
 	"context"
+	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
+	"net"
 	"net/http"
+	"os"
 	"slices"
 	"strings"
 	"sync"
@@ -305,12 +310,52 @@ func (s *AISettingsService) ClearAPIKey(ctx context.Context) (AIKeyStatus, error
 
 const apiKeyVerifyTimeout = 15 * time.Second
 
+// keyCheckFailed reports that a key couldn't be verified — not that it's
+// wrong — with a short reason so the admin can tell a blocked network from
+// a provider outage. Reasons never contain the key.
+func keyCheckFailed(provider, reason string) error {
+	if len(reason) > 300 {
+		reason = reason[:300] + "…"
+	}
+	log.Printf("verifying %s API key: %s", provider, reason)
+	return apperror.New(http.StatusBadGateway, "key_check_failed", "кілтті тексеру мүмкін болмады: "+reason)
+}
+
+// networkReason describes why a request to the provider failed.
+func networkReason(err error) string {
+	var dnsErr *net.DNSError
+	var certErr *tls.CertificateVerificationError
+	switch {
+	case errors.As(err, &dnsErr):
+		return fmt.Sprintf("серверден %s адресі табылмады (DNS) — сервердің интернетке шығуын тексеріңіз", dnsErr.Name)
+	case errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err):
+		return "провайдер уақытында жауап бермеді (timeout) — сервердің интернетке шығуын немесе firewall-ды тексеріңіз"
+	case errors.As(err, &certErr):
+		return "TLS сертификат қатесі — серверде ca-certificates жоқ немесе трафикті прокси ұстап тұр"
+	}
+	return err.Error()
+}
+
+// providerReason describes an unexpected HTTP answer, with the provider's
+// own error message when it sent one.
+func providerReason(status int, body []byte) string {
+	reason := fmt.Sprintf("провайдер HTTP %d қайтарды", status)
+	var parsed struct {
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(body, &parsed) == nil && parsed.Error.Message != "" {
+		reason += ": " + parsed.Error.Message
+	}
+	return reason
+}
+
 // verifyAPIKey makes one cheap authenticated call to the provider so a
 // mistyped or revoked key is rejected when it's set, not on first use.
 func verifyAPIKey(ctx context.Context, provider, key string) error {
 	ctx, cancel := context.WithTimeout(ctx, apiKeyVerifyTimeout)
 	defer cancel()
-	var status int
 	switch provider {
 	case AIProviderAnthropic:
 		client := anthropic.NewClient(option.WithAPIKey(key), option.WithMaxRetries(0))
@@ -320,10 +365,12 @@ func verifyAPIKey(ctx context.Context, provider, key string) error {
 		case err == nil:
 			return nil
 		case errors.As(err, &apiErr):
-			status = apiErr.StatusCode
+			if apiErr.StatusCode == http.StatusUnauthorized || apiErr.StatusCode == http.StatusForbidden {
+				return apperror.BadRequest("кілт жарамсыз: провайдер оны қабылдамады")
+			}
+			return keyCheckFailed(provider, providerReason(apiErr.StatusCode, []byte(apiErr.RawJSON())))
 		default:
-			log.Printf("verifying Anthropic API key: %v", err)
-			return apperror.New(http.StatusBadGateway, "key_check_failed", "кілтті тексеру мүмкін болмады (провайдерге қосылу қатесі), кейінірек қайталап көріңіз")
+			return keyCheckFailed(provider, networkReason(err))
 		}
 	case AIProviderOpenRouter:
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, openRouterBaseURL+"/key", nil)
@@ -333,20 +380,17 @@ func verifyAPIKey(ctx context.Context, provider, key string) error {
 		req.Header.Set("Authorization", "Bearer "+key)
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			log.Printf("verifying OpenRouter API key: %v", err)
-			return apperror.New(http.StatusBadGateway, "key_check_failed", "кілтті тексеру мүмкін болмады (провайдерге қосылу қатесі), кейінірек қайталап көріңіз")
+			return keyCheckFailed(provider, networkReason(err))
 		}
-		resp.Body.Close()
-		status = resp.StatusCode
-		if status == http.StatusOK {
+		defer resp.Body.Close()
+		switch resp.StatusCode {
+		case http.StatusOK:
 			return nil
+		case http.StatusUnauthorized, http.StatusForbidden:
+			return apperror.BadRequest("кілт жарамсыз: провайдер оны қабылдамады")
 		}
-	default:
-		return fmt.Errorf("unknown provider %q", provider)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return keyCheckFailed(provider, providerReason(resp.StatusCode, body))
 	}
-	if status == http.StatusUnauthorized || status == http.StatusForbidden {
-		return apperror.BadRequest("кілт жарамсыз: провайдер оны қабылдамады")
-	}
-	log.Printf("verifying %s API key: unexpected status %d", provider, status)
-	return apperror.New(http.StatusBadGateway, "key_check_failed", "кілтті тексеру мүмкін болмады (провайдерге қосылу қатесі), кейінірек қайталап көріңіз")
+	return fmt.Errorf("unknown provider %q", provider)
 }

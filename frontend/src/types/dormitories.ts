@@ -19,6 +19,8 @@ export interface Dormitory {
   commissioned_year: string | null
   ownership_form: string | null
   closed_for_applications: boolean
+  latitude: number | null
+  longitude: number | null
   created_by: string
   created_at: string
   updated_at: string

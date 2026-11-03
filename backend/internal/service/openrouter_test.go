@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"slices"
 	"strings"
 	"testing"
@@ -159,4 +161,38 @@ func (r *fakeAISettingsRepo) SaveAPIKey(_ context.Context, k *domain.AIAPIKey) e
 func (r *fakeAISettingsRepo) DeleteAPIKey(context.Context) error {
 	r.key = nil
 	return nil
+}
+
+func TestVerifyAPIKeyReasons(t *testing.T) {
+	saved := openRouterBaseURL
+	defer func() { openRouterBaseURL = saved }()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Header.Get("Authorization") {
+		case "Bearer sk-or-good":
+			w.WriteHeader(http.StatusOK)
+		case "Bearer sk-or-bad":
+			w.WriteHeader(http.StatusUnauthorized)
+		default:
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(`{"error":{"message":"upstream is down"}}`))
+		}
+	}))
+	defer srv.Close()
+	openRouterBaseURL = srv.URL
+
+	if err := verifyAPIKey(t.Context(), AIProviderOpenRouter, "sk-or-good"); err != nil {
+		t.Errorf("good key: %v", err)
+	}
+	if err := verifyAPIKey(t.Context(), AIProviderOpenRouter, "sk-or-bad"); err == nil || !strings.Contains(err.Error(), "жарамсыз") {
+		t.Errorf("bad key: %v", err)
+	}
+	if err := verifyAPIKey(t.Context(), AIProviderOpenRouter, "sk-or-other"); err == nil || !strings.Contains(err.Error(), "HTTP 503 қайтарды: upstream is down") {
+		t.Errorf("provider outage: %v", err)
+	}
+
+	openRouterBaseURL = "http://no-such-host.invalid"
+	if err := verifyAPIKey(t.Context(), AIProviderOpenRouter, "sk-or-good"); err == nil || !strings.Contains(err.Error(), "DNS") {
+		t.Errorf("unreachable host: %v", err)
+	}
 }

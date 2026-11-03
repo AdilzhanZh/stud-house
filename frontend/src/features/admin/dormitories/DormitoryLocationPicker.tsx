@@ -1,17 +1,28 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { MapPin, Search } from 'lucide-react'
+import { ExternalLink, MapPin, Search } from 'lucide-react'
 import { Alert } from '../../../components/Alert'
 import { Button } from '../../../components/Button'
 import { Card } from '../../../components/Card'
 import { Input } from '../../../components/Input'
 import { geocodeAddress, type GeocodeResult } from '../../../api/geocodeApi'
+import { parseMapLocation } from '../../../utils/parseMapLocation'
 import { DormitoryMap, type LatLng } from '../../dormitories/DormitoryMap'
 
 interface DormitoryLocationPickerProps {
   address: string
   position: LatLng | null
   onChange: (position: LatLng | null) => void
+}
+
+// The city is part of the 2GIS path: without it, 2GIS searches whichever city
+// it last guessed for this visitor, which isn't reliably Kyzylorda.
+function externalMapSearches(query: string) {
+  const q = encodeURIComponent(query)
+  return [
+    { name: 'Google Maps', url: `https://www.google.com/maps/search/?api=1&query=${q}` },
+    { name: '2GIS', url: `https://2gis.kz/kyzylorda/search/${q}` },
+  ]
 }
 
 // Lives outside the main dormitory <form> (its search box has a form of its
@@ -23,6 +34,8 @@ export function DormitoryLocationPicker({ address, position, onChange }: Dormito
   const [results, setResults] = useState<GeocodeResult[] | null>(null)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [isSearching, setIsSearching] = useState(false)
+  const [pasted, setPasted] = useState('')
+  const [pasteError, setPasteError] = useState<string | null>(null)
 
   // Start the search from the dormitory's address until the user types their own.
   useEffect(() => {
@@ -43,6 +56,17 @@ export function DormitoryLocationPicker({ address, position, onChange }: Dormito
       setSearchError(t('admin.dormitories.locationSearchFailed'))
     } finally {
       setIsSearching(false)
+    }
+  }
+
+  function handlePaste(e: React.FormEvent) {
+    e.preventDefault()
+    const parsed = parseMapLocation(pasted)
+    if (parsed.kind === 'ok') {
+      onChange(parsed.position)
+      setPasted('')
+    } else {
+      setPasteError(t(parsed.kind === 'short_link' ? 'admin.dormitories.locationPasteShortLink' : 'admin.dormitories.locationPasteInvalid'))
     }
   }
 
@@ -69,6 +93,41 @@ export function DormitoryLocationPicker({ address, position, onChange }: Dormito
 
       {searchError && <Alert variant="error" message={searchError} />}
       {results?.length === 0 && <p className="mb-3 text-sm text-sand-300">{t('admin.dormitories.locationNoResults')}</p>}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <span className="w-full text-xs text-sand-300 sm:mr-auto sm:w-auto">{t('admin.dormitories.locationFindIn')}</span>
+        {externalMapSearches(query.trim()).map(({ name, url }) => (
+          <a
+            key={name}
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-turquoise-500/10 px-3.5 py-2 text-sm font-semibold text-turquoise-400 transition-colors hover:bg-turquoise-500/20 sm:flex-none"
+          >
+            {name} <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+        ))}
+      </div>
+
+      <form className="mb-1 flex items-end gap-2" onSubmit={handlePaste}>
+        <div className="min-w-0 flex-1">
+          <Input
+            label={t('admin.dormitories.locationPaste')}
+            name="location_paste"
+            placeholder="44.848800, 65.509300"
+            value={pasted}
+            onChange={(e) => {
+              setPasted(e.target.value)
+              setPasteError(null)
+            }}
+            error={pasteError ?? undefined}
+          />
+        </div>
+        <Button type="submit" variant="secondary" disabled={!pasted.trim()} className={pasteError ? 'mb-5' : ''}>
+          {t('admin.dormitories.locationApply')}
+        </Button>
+      </form>
+      <p className="mb-3 text-xs text-sand-400">{t('admin.dormitories.locationPasteHint')}</p>
+
       {results && results.length > 1 && (
         <ul className="mb-3 flex flex-col gap-1">
           {results.map((r) => (

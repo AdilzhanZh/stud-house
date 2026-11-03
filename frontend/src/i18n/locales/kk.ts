@@ -220,6 +220,7 @@ export const kk = {
     viewInFull: 'Үлкейтіп көру',
     showOnMap: 'Картадан көру',
     openFullMap: 'Картаны ашу',
+    openInApp: 'Басқа қолданбада ашу:',
     closeFullView: 'Жабу',
     imageCounter: '{{current}} / {{total}}',
     prevImage: 'Алдыңғы сурет',

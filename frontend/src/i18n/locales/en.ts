@@ -222,6 +222,7 @@ export const en: typeof kk = {
     viewInFull: 'View in full',
     showOnMap: 'Show on map',
     openFullMap: 'Open map',
+    openInApp: 'Open in another app:',
     closeFullView: 'Close',
     imageCounter: '{{current}} / {{total}}',
     prevImage: 'Previous photo',

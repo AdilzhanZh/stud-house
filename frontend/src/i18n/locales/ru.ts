@@ -223,6 +223,7 @@ export const ru: typeof kk = {
     viewInFull: 'Смотреть полностью',
     showOnMap: 'Показать на карте',
     openFullMap: 'Открыть карту',
+    openInApp: 'Открыть в другом приложении:',
     closeFullView: 'Закрыть',
     imageCounter: '{{current}} / {{total}}',
     prevImage: 'Предыдущее фото',

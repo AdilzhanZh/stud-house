@@ -1,11 +1,20 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { Map as MapIcon, MapPin, Maximize2, X } from 'lucide-react'
+import { ExternalLink, Map as MapIcon, MapPin, Maximize2, X } from 'lucide-react'
 import type { Dormitory } from '../../types/dormitories'
 import { DormitoryMap, dormitoryPosition, type LatLng } from './DormitoryMap'
 
 type MapDormitory = Pick<Dormitory, 'name' | 'address' | 'latitude' | 'longitude'>
+
+// Plain https links: on a phone with the app installed the OS can hand them to
+// it, otherwise they open the service's website. Note 2GIS takes lng,lat.
+function externalMaps({ lat, lng }: LatLng) {
+  return [
+    { name: 'Google Maps', url: `https://www.google.com/maps/search/?api=1&query=${lat},${lng}` },
+    { name: '2GIS', url: `https://2gis.kz/geo/${lng},${lat}` },
+  ]
+}
 
 interface DormitoryMapDialogProps {
   dormitory: MapDormitory
@@ -61,6 +70,20 @@ function DormitoryMapDialog({ dormitory, position, onClose }: DormitoryMapDialog
           </button>
         </div>
         <DormitoryMap position={position} mode="view" className="min-h-0 flex-1" />
+        <div className="flex flex-wrap items-center gap-2 px-4 py-3">
+          <span className="w-full text-xs text-sand-300 sm:mr-auto sm:w-auto">{t('dorm.openInApp')}</span>
+          {externalMaps(position).map(({ name, url }) => (
+            <a
+              key={name}
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-turquoise-500/10 px-3.5 py-2 sm:flex-none text-sm font-semibold text-turquoise-400 transition-colors hover:bg-turquoise-500/20"
+            >
+              {name} <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          ))}
+        </div>
       </div>
     </div>,
     document.body,

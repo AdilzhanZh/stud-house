@@ -188,7 +188,7 @@ stage is one of awaiting_review, awaiting_documents, awaiting_commission, awaiti
 	},
 	{
 		name:        "list_my_protocol_votes",
-		description: "Commission protocols still open for voting that this commission member belongs to, with how many applications each covers and whether they have voted yet.",
+		description: "Commission protocols still open for voting that this commission member belongs to, with how many applications and current residents each covers and whether they have voted yet.",
 		allowed:     forCommittee,
 		run:         (*assistantTools).myProtocolVotes,
 	},
@@ -993,6 +993,7 @@ func (t *assistantTools) myProtocolVotes(ctx context.Context, user *domain.User,
 		Number       int       `json:"number"`
 		CreatedOn    string    `json:"created_on"`
 		Applications int       `json:"applications"`
+		Residents    int       `json:"residents"`
 		MyVote       *string   `json:"my_vote"`
 	}
 	pending := domain.ProtocolPending
@@ -1019,7 +1020,11 @@ func (t *assistantTools) myProtocolVotes(ctx context.Context, user *domain.User,
 		if err != nil {
 			return nil, err
 		}
-		it := item{ProtocolID: p.ID, Number: p.Number, CreatedOn: dateOnly(p.CreatedAt), Applications: len(ids)}
+		residents, err := t.d.Protocols.ListResidents(ctx, p.ID)
+		if err != nil {
+			return nil, err
+		}
+		it := item{ProtocolID: p.ID, Number: p.Number, CreatedOn: dateOnly(p.CreatedAt), Applications: len(ids), Residents: len(residents)}
 		if vote.Decision != nil {
 			s := string(*vote.Decision)
 			it.MyVote = &s

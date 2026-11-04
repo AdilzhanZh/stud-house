@@ -42,21 +42,18 @@ export function applicationStatusToJourneyStep(status: ApplicationStatus): Journ
 // The accurate version of the step above: an 'approved' application could
 // really be sitting at any of three further stages — manager-approved and
 // not yet sent to committee, sent and awaiting a unanimous committee vote,
-// or committee-approved and awaiting a contract — which Application.status
-// alone can't tell apart (see ProtocolService.GetByApplicationID). A
-// contract only ever exists once a protocol is approved
-// (ContractService.OnProtocolApproved), so checking it first is safe and
-// keeps the contract/settled steps reachable without extra branching.
+// or committee-approved and about to be placed — which Application.status
+// alone can't tell apart (see ProtocolService.GetByApplicationID). A contract
+// exists from submission and is already accepted, so it says nothing about
+// these stages. Only an application older than the wizard's contract step can
+// still be waiting on a contract response ('contract').
 // Callers that already have the application's protocol and contract
 // (Home, My Applications, both Application Detail pages) should use this
-// instead so the progress bar reads the same everywhere. Accepting a
-// contract settles the application immediately (no separate payment-
-// confirmation step), so 'settled' is reached as soon as the contract is
-// accepted — but an application's status stays 'settled' forever even
-// after the student later moves out (approving an exit request only
-// touches room_residents, not applications), so hasActiveResidence lets
-// callers fall back to the same "left the forward path" treatment as
-// rejected once the student no longer actually lives there.
+// instead so the progress bar reads the same everywhere. An application's
+// status stays 'settled' forever even after the student later moves out
+// (approving an exit request only touches room_residents, not applications),
+// so hasActiveResidence lets callers fall back to the same "left the forward
+// path" treatment as rejected once the student no longer actually lives there.
 export function computeJourneyStep(
   status: ApplicationStatus,
   protocol: { status: ProtocolStatus } | null,
@@ -67,10 +64,7 @@ export function computeJourneyStep(
   if (status === 'settled') return hasActiveResidence ? 'settled' : null
   if (status !== 'approved') return applicationStatusToJourneyStep(status)
 
-  if (contract) {
-    if (contract.status !== 'accepted') return 'contract'
-    return hasActiveResidence ? 'settled' : null
-  }
+  if (contract && contract.status !== 'accepted') return 'contract'
   if (!protocol) return 'accepted'
   return protocol.status === 'approved' ? 'fully_approved' : 'committee_review'
 }
@@ -81,12 +75,13 @@ const STEP_ORDER: JourneyStep[] = [
   'accepted',
   'committee_review',
   'fully_approved',
-  'contract',
   'settled',
 ]
 
+// 'contract' is only reachable by an application older than the wizard's
+// contract step, and shares its position with 'fully_approved'.
 export function journeyStepIndex(step: JourneyStep): number {
-  return STEP_ORDER.indexOf(step)
+  return STEP_ORDER.indexOf(step === 'contract' ? 'fully_approved' : step)
 }
 
 export function journeyStepCaption(step: JourneyStep, t: TFunction): string {

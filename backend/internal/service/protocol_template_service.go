@@ -81,7 +81,7 @@ func (s *ProtocolTemplateService) Get(ctx context.Context) (*domain.ProtocolTemp
 
 // Update is manager/admin-only (enforced by the route group). It always
 // overwrites the single system-wide template.
-func (s *ProtocolTemplateService) Update(ctx context.Context, actorID uuid.UUID, pages []string) (*domain.ProtocolTemplate, error) {
+func (s *ProtocolTemplateService) Update(ctx context.Context, actorID uuid.UUID, pages []string, twoPagesPerSheet bool) (*domain.ProtocolTemplate, error) {
 	if len(pages) == 0 {
 		return nil, apperror.BadRequest("үлгіде кемінде бір бет болуы керек")
 	}
@@ -90,7 +90,7 @@ func (s *ProtocolTemplateService) Update(ctx context.Context, actorID uuid.UUID,
 			return nil, apperror.BadRequest("үлгінің беттері бос болмауы керек")
 		}
 	}
-	t := &domain.ProtocolTemplate{Pages: pages, UpdatedBy: actorID}
+	t := &domain.ProtocolTemplate{Pages: pages, TwoPagesPerSheet: twoPagesPerSheet, UpdatedBy: actorID}
 	if err := s.templates.Upsert(ctx, t); err != nil {
 		return nil, err
 	}

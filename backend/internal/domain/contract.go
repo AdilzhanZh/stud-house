@@ -31,9 +31,11 @@ const (
 	ContractExpired                 ContractStatus = "expired"
 )
 
-// Contract is auto-created (one per application) once that application's
-// protocol is approved by committee. The student must accept/decline before
-// ResponseDeadline.
+// Contract is one per application, created as accepted the moment the student
+// agrees to it while applying (Application.ContractAgreedAt), so 'accepted' on
+// its own doesn't mean the student is settled. Only an application older than
+// that step gets its contract once its protocol is approved, and the student
+// must then accept/decline before ResponseDeadline.
 type Contract struct {
 	ID               uuid.UUID
 	ApplicationID    uuid.UUID

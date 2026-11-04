@@ -36,10 +36,13 @@ func (l ContractLanguage) Valid() bool {
 // which seeds it with the approved wording the first time it's requested,
 // before any manager has customized it.
 type ContractTemplate struct {
-	Language  ContractLanguage
-	Pages     []string
-	UpdatedBy uuid.UUID
-	UpdatedAt time.Time
+	Language ContractLanguage
+	Pages    []string
+	// TwoPagesPerSheet makes this template's PDFs print two pages side by side
+	// on a landscape A4 sheet.
+	TwoPagesPerSheet bool
+	UpdatedBy        uuid.UUID
+	UpdatedAt        time.Time
 }
 
 // ContractVariable is one of the fixed set of tokens a manager can insert

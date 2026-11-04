@@ -25,9 +25,9 @@ func NewPetitionTemplateRepo(db *pgxpool.Pool) *PetitionTemplateRepo {
 }
 
 func (r *PetitionTemplateRepo) Get(ctx context.Context) (*domain.PetitionTemplate, error) {
-	const q = `SELECT id, pages, updated_by, updated_at FROM petition_template WHERE id = $1`
+	const q = `SELECT id, pages, two_pages_per_sheet, updated_by, updated_at FROM petition_template WHERE id = $1`
 	t := &domain.PetitionTemplate{}
-	err := r.db.QueryRow(ctx, q, petitionTemplateID).Scan(&t.ID, &t.Pages, &t.UpdatedBy, &t.UpdatedAt)
+	err := r.db.QueryRow(ctx, q, petitionTemplateID).Scan(&t.ID, &t.Pages, &t.TwoPagesPerSheet, &t.UpdatedBy, &t.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, repository.ErrNotFound
@@ -39,10 +39,10 @@ func (r *PetitionTemplateRepo) Get(ctx context.Context) (*domain.PetitionTemplat
 
 func (r *PetitionTemplateRepo) Upsert(ctx context.Context, t *domain.PetitionTemplate) error {
 	const q = `
-		INSERT INTO petition_template (id, pages, updated_by, updated_at)
-		VALUES ($1, $2, $3, now())
-		ON CONFLICT (id) DO UPDATE SET pages = $2, updated_by = $3, updated_at = now()
+		INSERT INTO petition_template (id, pages, two_pages_per_sheet, updated_by, updated_at)
+		VALUES ($1, $2, $3, $4, now())
+		ON CONFLICT (id) DO UPDATE SET pages = $2, two_pages_per_sheet = $3, updated_by = $4, updated_at = now()
 		RETURNING updated_at`
 	t.ID = petitionTemplateID
-	return r.db.QueryRow(ctx, q, petitionTemplateID, t.Pages, t.UpdatedBy).Scan(&t.UpdatedAt)
+	return r.db.QueryRow(ctx, q, petitionTemplateID, t.Pages, t.TwoPagesPerSheet, t.UpdatedBy).Scan(&t.UpdatedAt)
 }

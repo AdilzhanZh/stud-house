@@ -1,4 +1,5 @@
 import { renderHtmlPagesToPdf } from './pdf'
+import type { FilledDocument } from './pdf'
 import { getContractTemplate } from '../api/contractTemplateApi'
 import { formatDate } from './dateFormat'
 import type { ContractLanguage } from '../api/contractTemplateApi'
@@ -39,9 +40,8 @@ export function fillContractTemplate(pages: string[], values: Required<ContractF
   })
 }
 
-async function loadFilledContractPages(values: ContractFieldValues, language: ContractLanguage): Promise<string[]> {
-  const template = await getContractTemplate(language)
-  return fillContractTemplate(template.pages, {
+function fillWithDefaults(pages: string[], values: ContractFieldValues): string[] {
+  return fillContractTemplate(pages, {
     ...values,
     date: values.date ?? formatDate(new Date()),
   })
@@ -51,11 +51,12 @@ async function loadFilledContractPages(values: ContractFieldValues, language: Co
 // detail page — the filled pages are shared between on-screen rendering
 // (TemplatePages) and PDF export. A contract always exists in both
 // languages, so callers pass whichever one the viewer currently wants.
-export async function getFilledContractPages(
+export async function getFilledContractDocument(
   values: ContractFieldValues,
   language: ContractLanguage,
-): Promise<string[]> {
-  return loadFilledContractPages(values, language)
+): Promise<FilledDocument> {
+  const template = await getContractTemplate(language)
+  return { pages: fillWithDefaults(template.pages, values), twoPagesPerSheet: template.two_pages_per_sheet }
 }
 
 export async function downloadContractPdf(
@@ -63,7 +64,9 @@ export async function downloadContractPdf(
   filename: string,
   language: ContractLanguage,
 ): Promise<void> {
-  const pages = await loadFilledContractPages(values, language)
-  const doc = await renderHtmlPagesToPdf(pages)
+  const template = await getContractTemplate(language)
+  const doc = await renderHtmlPagesToPdf(fillWithDefaults(template.pages, values), {
+    twoPagesPerSheet: template.two_pages_per_sheet,
+  })
   doc.save(filename)
 }

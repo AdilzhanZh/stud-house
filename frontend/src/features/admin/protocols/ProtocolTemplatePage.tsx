@@ -5,6 +5,7 @@ import { ChevronLeft } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
 import { TemplateEditor } from '../../../components/TemplateEditor'
+import { TwoPagesPerSheetToggle } from '../../../components/TwoPagesPerSheetToggle'
 import { extractErrorMessage } from '../../../api/client'
 import { getProtocolTemplate, updateProtocolTemplate } from '../../../api/protocolTemplateApi'
 import { formatDateTime } from '../../../utils/dateFormat'
@@ -19,6 +20,7 @@ export function ProtocolTemplatePage() {
 
   const [pages, setPages] = useState<string[] | null>(null)
   const [variables, setVariables] = useState<ProtocolVariable[]>([])
+  const [twoPagesPerSheet, setTwoPagesPerSheet] = useState(false)
   const [updatedAt, setUpdatedAt] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -30,6 +32,7 @@ export function ProtocolTemplatePage() {
     getProtocolTemplate()
       .then((tpl) => {
         setPages(tpl.pages)
+        setTwoPagesPerSheet(tpl.two_pages_per_sheet)
         setVariables(tpl.variables ?? [])
         setUpdatedAt(tpl.updated_at)
       })
@@ -43,7 +46,7 @@ export function ProtocolTemplatePage() {
     setSaveSuccess(false)
     setIsSaving(true)
     try {
-      const result = await updateProtocolTemplate(editorRef.current.getPages())
+      const result = await updateProtocolTemplate(editorRef.current.getPages(), twoPagesPerSheet)
       setUpdatedAt(result.updated_at)
       setSaveSuccess(true)
     } catch (err) {
@@ -96,6 +99,8 @@ export function ProtocolTemplatePage() {
               pageLabel: (current, total) => t('admin.protocolTemplate.pageLabel', { current, total }),
             }}
           />
+
+          <TwoPagesPerSheetToggle checked={twoPagesPerSheet} onChange={setTwoPagesPerSheet} />
 
           <div className="flex items-center justify-between">
             <p className="text-xs text-sand-400">

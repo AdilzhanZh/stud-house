@@ -5,6 +5,7 @@ import { ChevronLeft } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
 import { TemplateEditor } from '../../../components/TemplateEditor'
+import { TwoPagesPerSheetToggle } from '../../../components/TwoPagesPerSheetToggle'
 import { extractErrorMessage } from '../../../api/client'
 import { getContractTemplate, updateContractTemplate } from '../../../api/contractTemplateApi'
 import { formatDateTime } from '../../../utils/dateFormat'
@@ -22,6 +23,7 @@ export function ContractTemplatePage() {
   const [language, setLanguage] = useState<ContractLanguage>('kk')
   const [pages, setPages] = useState<string[] | null>(null)
   const [variables, setVariables] = useState<ContractVariable[]>([])
+  const [twoPagesPerSheet, setTwoPagesPerSheet] = useState(false)
   const [updatedAt, setUpdatedAt] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -37,6 +39,7 @@ export function ContractTemplatePage() {
     getContractTemplate(language)
       .then((tpl) => {
         setPages(tpl.pages)
+        setTwoPagesPerSheet(tpl.two_pages_per_sheet)
         setVariables(tpl.variables ?? [])
         setUpdatedAt(tpl.updated_at)
       })
@@ -50,7 +53,7 @@ export function ContractTemplatePage() {
     setSaveSuccess(false)
     setIsSaving(true)
     try {
-      const result = await updateContractTemplate(language, editorRef.current.getPages())
+      const result = await updateContractTemplate(language, editorRef.current.getPages(), twoPagesPerSheet)
       setUpdatedAt(result.updated_at)
       setSaveSuccess(true)
     } catch (err) {
@@ -120,6 +123,8 @@ export function ContractTemplatePage() {
               pageLabel: (current, total) => t('admin.contractTemplate.pageLabel', { current, total }),
             }}
           />
+
+          <TwoPagesPerSheetToggle checked={twoPagesPerSheet} onChange={setTwoPagesPerSheet} />
 
           <div className="flex items-center justify-between">
             <p className="text-xs text-sand-400">

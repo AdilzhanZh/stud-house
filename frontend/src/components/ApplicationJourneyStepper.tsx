@@ -10,13 +10,15 @@ export type JourneyStep =
   | 'contract'
   | 'settled'
 
+// 'contract' isn't a step of its own: students agree while applying. Only an
+// application older than that can still be waiting on one, and it shows at
+// 'fully_approved' (see computeJourneyStep).
 const STEP_KEYS: JourneyStep[] = [
   'submitted',
   'under_review',
   'accepted',
   'committee_review',
   'fully_approved',
-  'contract',
   'settled',
 ]
 
@@ -57,7 +59,7 @@ export function ApplicationJourneyStepper({
   className = '',
 }: ApplicationJourneyStepperProps) {
   const { t } = useTranslation()
-  const currentIndex = STEP_KEYS.indexOf(currentStep)
+  const currentIndex = STEP_KEYS.indexOf(currentStep === 'contract' ? 'fully_approved' : currentStep)
 
   if (orientation === 'vertical') {
     return (

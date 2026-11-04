@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -65,7 +66,10 @@ func statusPtr(s domain.ApplicationStatus) *domain.ApplicationStatus { return &s
 // of some room (an active room_residents row) — settled students must go
 // through a move-out flow, not a new intake application, which is out of
 // scope for this phase.
-func (s *ApplicationService) Create(ctx context.Context, studentID, dormitoryID uuid.UUID, preferredRoomType, notes *string, preferredRoomID *uuid.UUID, studyGroup, hometown, parentContact string) (*domain.Application, error) {
+func (s *ApplicationService) Create(ctx context.Context, studentID, dormitoryID uuid.UUID, preferredRoomType, notes *string, preferredRoomID *uuid.UUID, studyGroup, hometown, parentContact string, contractAgreed bool) (*domain.Application, error) {
+	if !contractAgreed {
+		return nil, apperror.BadRequest("өтініш жіберу үшін келісімшартпен келісу міндетті")
+	}
 	if studyGroup == "" || hometown == "" || parentContact == "" {
 		return nil, apperror.BadRequest("оқу тобы, келген жеріңіз және ата-ана/жақынның байланыс нөмірі міндетті")
 	}
@@ -131,6 +135,7 @@ func (s *ApplicationService) Create(ctx context.Context, studentID, dormitoryID 
 		}
 	}
 
+	agreedAt := time.Now()
 	app := &domain.Application{
 		StudentID:         studentID,
 		DormitoryID:       dormitoryID,
@@ -141,6 +146,7 @@ func (s *ApplicationService) Create(ctx context.Context, studentID, dormitoryID 
 		StudyGroup:        studyGroup,
 		Hometown:          hometown,
 		ParentContact:     parentContact,
+		ContractAgreedAt:  &agreedAt,
 	}
 	if err := s.applications.Create(ctx, app); err != nil {
 		if errors.Is(err, repository.ErrConflict) {
@@ -333,8 +339,8 @@ func (s *ApplicationService) Resubmit(ctx context.Context, actorStudentID, appli
 // silently ending up unassigned. Only a student who never expressed a room
 // preference is left unassigned for now, to be placed in a room later.
 // Approval only earmarks AssignedRoomID; the seat itself (a room_residents
-// row) is claimed later, once the student accepts the contract that gets
-// sent after the commission also approves — see ContractService.Respond.
+// row) is claimed later, once the commission also approves — see
+// ContractService.OnProtocolApproved.
 func (s *ApplicationService) Decide(ctx context.Context, actorID, applicationID uuid.UUID, action DecisionAction, roomID *uuid.UUID, comment *string) (*domain.Application, error) {
 	var finalStatus domain.ApplicationStatus
 	var studentID uuid.UUID

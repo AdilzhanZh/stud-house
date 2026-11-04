@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import { Bell, Building2, Clock, FileText } from 'lucide-react'
+import { Bell, Building2, Clock } from 'lucide-react'
 import { Card } from '../../components/Card'
 import { StatusBadge } from '../../components/StatusBadge'
 import { SegmentedProgress } from '../../components/SegmentedProgress'
@@ -104,7 +104,7 @@ export function HomePage() {
                 <StatusBadge status={latestApplication.status} />
               </div>
               <p className="mt-2 text-lg font-semibold text-sand-100">{dormitoryName ?? '...'}</p>
-              <SegmentedProgress total={7} filled={journeyStepIndex(journey.step) + 1} className="mt-3" />
+              <SegmentedProgress total={6} filled={journeyStepIndex(journey.step) + 1} className="mt-3" />
               <p className="mt-2 text-sm text-sand-200">{journeyStepCaption(journey.step, t)}</p>
               <p className="mt-3 text-sm font-semibold text-turquoise-400">{nextAction.label}</p>
             </Card>
@@ -132,20 +132,12 @@ export function HomePage() {
               </Card>
             )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <Card onClick={() => navigate('/dormitories')} className="!p-3.5 flex flex-col gap-2.5">
-              <span className="flex h-8.5 w-8.5 items-center justify-center rounded-full bg-navy-800">
-                <Building2 className="h-4 w-4 text-turquoise-400" />
-              </span>
-              <span className="text-sm font-semibold text-sand-100">{t('home.dormsCard')}</span>
-            </Card>
-            <Card onClick={() => navigate('/contracts/my')} className="!p-3.5 flex flex-col gap-2.5">
-              <span className="flex h-8.5 w-8.5 items-center justify-center rounded-full bg-navy-800">
-                <FileText className="h-4 w-4 text-turquoise-400" />
-              </span>
-              <span className="text-sm font-semibold text-sand-100">{t('home.contractCard')}</span>
-            </Card>
-          </div>
+          <Card onClick={() => navigate('/dormitories')} className="!p-3.5 flex flex-col gap-2.5">
+            <span className="flex h-8.5 w-8.5 items-center justify-center rounded-full bg-navy-800">
+              <Building2 className="h-4 w-4 text-turquoise-400" />
+            </span>
+            <span className="text-sm font-semibold text-sand-100">{t('home.dormsCard')}</span>
+          </Card>
         </div>
 
         <div className="flex flex-col gap-2.5">

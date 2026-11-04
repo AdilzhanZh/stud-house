@@ -1,6 +1,5 @@
 import { apiClient } from './client'
-import type { Protocol, ProtocolDetail, ProtocolStatus, VoteDecision } from '../types/protocols'
-import type { Application } from '../types/applications'
+import type { Protocol, ProtocolCandidate, ProtocolDetail, ProtocolStatus, VoteDecision } from '../types/protocols'
 
 export async function listProtocols(status?: ProtocolStatus): Promise<Protocol[]> {
   const { data } = await apiClient.get<{ data: Protocol[] }>('/protocols', {
@@ -23,12 +22,13 @@ export async function getApplicationProtocol(applicationId: string): Promise<Pro
   return data.data
 }
 
-// "Хаттама дайындау" (prepare protocol) — bundles the selected applications
-// (must all be approved and not already in another protocol) and sends the
-// protocol to every current committee member for review.
-export async function createProtocol(applicationIds: string[]): Promise<Protocol> {
+// "Хаттама дайындау" (prepare protocol) — bundles the selected approved
+// applicants and current residents (none already in another protocol) and
+// sends the protocol to every current committee member for review.
+export async function createProtocol(applicationIds: string[], residentStudentIds: string[]): Promise<Protocol> {
   const { data } = await apiClient.post<{ data: Protocol }>('/protocols', {
     application_ids: applicationIds,
+    resident_student_ids: residentStudentIds,
   })
   return data.data
 }
@@ -47,9 +47,9 @@ export async function voteProtocol(id: string, decision: VoteDecision, reason?: 
   return data.data
 }
 
-// Approved applications not yet attached to any protocol — the "prepare
-// protocol" candidate list.
-export async function listEligibleApplications(): Promise<Application[]> {
-  const { data } = await apiClient.get<{ data: Application[] }>('/protocols/eligible-applications')
+// Approved applicants and current residents not yet in any protocol — the
+// "prepare protocol" candidate list.
+export async function listProtocolCandidates(): Promise<ProtocolCandidate[]> {
+  const { data } = await apiClient.get<{ data: ProtocolCandidate[] }>('/protocols/candidates')
   return data.data
 }

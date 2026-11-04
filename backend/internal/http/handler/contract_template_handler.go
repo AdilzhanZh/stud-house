@@ -26,10 +26,11 @@ type contractVariableResponse struct {
 }
 
 type contractTemplateResponse struct {
-	Language  string                     `json:"language"`
-	Pages     []string                   `json:"pages"`
-	UpdatedAt *time.Time                 `json:"updated_at"`
-	Variables []contractVariableResponse `json:"variables,omitempty"`
+	Language         string                     `json:"language"`
+	Pages            []string                   `json:"pages"`
+	TwoPagesPerSheet bool                       `json:"two_pages_per_sheet"`
+	UpdatedAt        *time.Time                 `json:"updated_at"`
+	Variables        []contractVariableResponse `json:"variables,omitempty"`
 }
 
 // requestedLanguage reads ?language=kk|ru, defaulting to kk so an old client
@@ -64,11 +65,12 @@ func (h *ContractTemplateHandler) Get(c *gin.Context) {
 		u := t.UpdatedAt
 		updatedAt = &u
 	}
-	response.OK(c, contractTemplateResponse{Language: string(t.Language), Pages: t.Pages, UpdatedAt: updatedAt, Variables: vars})
+	response.OK(c, contractTemplateResponse{Language: string(t.Language), Pages: t.Pages, TwoPagesPerSheet: t.TwoPagesPerSheet, UpdatedAt: updatedAt, Variables: vars})
 }
 
 type updateContractTemplateRequest struct {
-	Pages []string `json:"pages" binding:"required"`
+	Pages            []string `json:"pages" binding:"required"`
+	TwoPagesPerSheet bool     `json:"two_pages_per_sheet"`
 }
 
 // Update is manager/admin-only: overwrites the given language's template
@@ -81,10 +83,10 @@ func (h *ContractTemplateHandler) Update(c *gin.Context) {
 	}
 	language := domain.ContractLanguage(c.Query("language"))
 	actorID, _ := middleware.UserID(c)
-	t, err := h.templates.Update(c.Request.Context(), actorID, language, req.Pages)
+	t, err := h.templates.Update(c.Request.Context(), actorID, language, req.Pages, req.TwoPagesPerSheet)
 	if err != nil {
 		response.Error(c, err)
 		return
 	}
-	response.OK(c, contractTemplateResponse{Language: string(t.Language), Pages: t.Pages, UpdatedAt: &t.UpdatedAt})
+	response.OK(c, contractTemplateResponse{Language: string(t.Language), Pages: t.Pages, TwoPagesPerSheet: t.TwoPagesPerSheet, UpdatedAt: &t.UpdatedAt})
 }

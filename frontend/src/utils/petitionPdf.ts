@@ -37,7 +37,7 @@ async function renderPetition(values: PetitionFieldValues) {
     ...values,
     date: values.date ?? formatDate(new Date()),
   })
-  return renderHtmlPagesToPdf(filled)
+  return renderHtmlPagesToPdf(filled, { twoPagesPerSheet: template.two_pages_per_sheet })
 }
 
 // Used by the manager's per-application "Download" button (queue page) and
@@ -67,6 +67,6 @@ export async function downloadPetitionsBulkPdf(entriesList: PetitionFieldValues[
       date: values.date ?? formatDate(new Date()),
     }),
   )
-  const doc = await renderHtmlPagesToPdf(allPages)
+  const doc = await renderHtmlPagesToPdf(allPages, { twoPagesPerSheet: template.two_pages_per_sheet })
   doc.save(filename)
 }

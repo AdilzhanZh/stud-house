@@ -8,6 +8,7 @@ import { Alert } from '../../components/Alert'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { ContractStatusBadge } from '../../components/ContractStatusBadge'
 import { TemplatePages } from '../../components/TemplatePages'
+import type { FilledDocument } from '../../utils/pdf'
 import { extractErrorMessage } from '../../api/client'
 import { listMyContracts, respondContract } from '../../api/contractApi'
 import { getApplication } from '../../api/applicationApi'
@@ -15,7 +16,7 @@ import { getDormitory } from '../../api/dormitoryApi'
 import { getRoom } from '../../api/roomApi'
 import { formatTenge } from '../../utils/dormitoryLabels'
 import { formatDate } from '../../utils/dateFormat'
-import { getFilledContractPages, downloadContractPdf } from '../../utils/contractPdf'
+import { getFilledContractDocument, downloadContractPdf } from '../../utils/contractPdf'
 import { formatTimeRemaining } from './deadline'
 import { useIsSettled } from '../residence/useIsSettled'
 import { useAuth } from '../auth/useAuth'
@@ -24,7 +25,7 @@ import type { Contract } from '../../types/contracts'
 import type { Dormitory } from '../../types/dormitories'
 
 type PendingAction = { contractId: string; action: 'accept' | 'decline' } | null
-type PagesByLanguage = Record<ContractLanguage, string[]>
+type PagesByLanguage = Record<ContractLanguage, FilledDocument>
 
 const LANGUAGES: ContractLanguage[] = ['kk', 'ru']
 
@@ -75,7 +76,8 @@ export function ContractsPage() {
             const app = await getApplication(c.application_id).catch(() => null)
             if (!app) return null
             const dormitory = await getDormitory(app.dormitory_id).catch(() => null)
-            const room = app.assigned_room_id ? await getRoom(app.assigned_room_id).catch(() => null) : null
+            const roomId = app.assigned_room_id ?? app.preferred_room_id
+            const room = roomId ? await getRoom(roomId).catch(() => null) : null
             return dormitory ? { contract: c, app, dormitory, room } : null
           }),
         )
@@ -103,8 +105,8 @@ export function ContractsPage() {
               date: formatDate(e.contract.sent_at),
             }
             const [kk, ru] = await Promise.all([
-              getFilledContractPages(values, 'kk').catch(() => null),
-              getFilledContractPages(values, 'ru').catch(() => null),
+              getFilledContractDocument(values, 'kk').catch(() => null),
+              getFilledContractDocument(values, 'ru').catch(() => null),
             ])
             return kk && ru ? ([e.contract.id, { kk, ru }] as const) : null
           }),
@@ -123,7 +125,8 @@ export function ContractsPage() {
     setDownloadingId(contract.id)
     try {
       const app = await getApplication(contract.application_id)
-      const room = app.assigned_room_id ? await getRoom(app.assigned_room_id).catch(() => null) : null
+      const roomId = app.assigned_room_id ?? app.preferred_room_id
+      const room = roomId ? await getRoom(roomId).catch(() => null) : null
       await downloadContractPdf(
         {
           student_full_name: user.full_name,
@@ -231,7 +234,7 @@ export function ContractsPage() {
                         </button>
                       ))}
                     </div>
-                    <TemplatePages pages={pagesByLang[language]} />
+                    <TemplatePages document={pagesByLang[language]} />
                     <Button
                       variant="secondary"
                       className="self-start"

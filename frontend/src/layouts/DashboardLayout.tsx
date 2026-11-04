@@ -26,8 +26,8 @@ function mobileSectionFor(pathname: string): MobileSection {
 }
 
 // Matches the design handoff's navMap: each desktop pill lights up only for
-// its own slice of the flow (wizard vs. my-applications vs. contracts are
-// three distinct pills, not one shared "apps" section).
+// its own slice of the flow (wizard vs. my-applications are distinct pills,
+// not one shared "apps" section).
 function deskNavMatch(pathname: string, to: string): boolean {
   if (to === '/dashboard/home') return pathname.startsWith('/dashboard/home')
   if (to === '/dormitories') return pathname.startsWith('/dormitories')
@@ -38,7 +38,6 @@ function deskNavMatch(pathname: string, to: string): boolean {
       (/^\/applications\/[^/]+$/.test(pathname) && !pathname.startsWith('/applications/new'))
     )
   }
-  if (to === '/contracts/my') return pathname.startsWith('/contracts')
   return false
 }
 
@@ -62,7 +61,6 @@ export function DashboardLayout() {
     { label: t('nav.dorms'), to: '/dormitories' },
     { label: t('nav.applyNew'), to: '/applications/new' },
     { label: t('nav.myApplications'), to: '/applications/my' },
-    { label: t('nav.contract'), to: '/contracts/my' },
   ]
 
   return (

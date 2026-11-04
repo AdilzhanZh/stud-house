@@ -49,8 +49,11 @@ type Application struct {
 	ParentContact  string
 	AssignedRoomID *uuid.UUID
 	HandledBy      *uuid.UUID
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	// ContractAgreedAt is when the student agreed to the contract in the
+	// wizard's final step. Nil only on applications that predate that step.
+	ContractAgreedAt *time.Time
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 // ApplicationStatusHistory is an immutable audit log entry for one status

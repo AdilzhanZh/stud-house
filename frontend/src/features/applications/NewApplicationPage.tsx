@@ -20,8 +20,13 @@ import { listRoomsByDormitory } from '../../api/roomApi'
 import { getStudentProfile } from '../../api/profileApi'
 import { uploadFile } from '../../api/uploadApi'
 import { generatePetitionPdfBlob } from '../../utils/petitionPdf'
+import { downloadContractPdf, getFilledContractPages } from '../../utils/contractPdf'
+import { formatDate } from '../../utils/dateFormat'
 import { formatTenge } from '../../utils/dormitoryLabels'
 import { bilingualField } from '../../utils/bilingualField'
+import { TemplatePages } from '../../components/TemplatePages'
+import { getDormitory } from '../../api/dormitoryApi'
+import { getRoom } from '../../api/roomApi'
 import { RoomPicker } from './RoomPicker'
 import { useDormitoriesWithMeta } from '../dormitories/useDormitoriesWithMeta'
 import { useAuth } from '../auth/useAuth'
@@ -29,9 +34,15 @@ import { useIsSettled } from '../residence/useIsSettled'
 import { ResidenceRequestsSection } from '../residence/ResidenceRequestsSection'
 import { isActiveApplicationStatus } from './statusHelpers'
 import type { TFunction } from 'i18next'
+import type { ContractLanguage } from '../../api/contractTemplateApi'
+import type { ContractFieldValues } from '../../utils/contractPdf'
 import type { DormitoryRequiredDocument } from '../../types/dormitories'
 import type { Benefit, BenefitRequiredDocument } from '../../types/benefits'
 import type { Gender } from '../../types'
+
+type WizardStep = 1 | 2 | 3 | 4
+
+const CONTRACT_LANGUAGES: ContractLanguage[] = ['kk', 'ru']
 
 function DocumentCard({
   name,
@@ -101,7 +112,7 @@ export function NewApplicationPage() {
   const { user } = useAuth()
   const isSettled = useIsSettled()
 
-  const [step, setStep] = useState<1 | 2 | 3>(1)
+  const [step, setStep] = useState<WizardStep>(1)
   const [sent, setSent] = useState(false)
 
   const { dormitories } = useDormitoriesWithMeta()
@@ -125,11 +136,18 @@ export function NewApplicationPage() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [serverError, setServerError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [contractValues, setContractValues] = useState<ContractFieldValues | null>(null)
+  const [contractPages, setContractPages] = useState<Record<ContractLanguage, string[]> | null>(null)
+  const [contractLanguage, setContractLanguage] = useState<ContractLanguage>(i18n.language === 'ru' ? 'ru' : 'kk')
+  const [contractError, setContractError] = useState<string | null>(null)
+  const [isDownloadingContract, setIsDownloadingContract] = useState(false)
+  const [contractAgreed, setContractAgreed] = useState(false)
 
-  const STEP_CAPTIONS: Record<1 | 2 | 3, string> = {
+  const STEP_CAPTIONS: Record<WizardStep, string> = {
     1: t('wizard.stepCaption1'),
     2: t('wizard.stepCaption2'),
     3: t('wizard.stepCaption3'),
+    4: t('wizard.stepCaption4'),
   }
 
   useEffect(() => {
@@ -171,6 +189,49 @@ export function NewApplicationPage() {
       .catch(() => setDormitoryRequiredDocs([]))
   }, [dormitoryId])
 
+  // The contract is filled in with this application's own details, so it's
+  // only loaded on reaching the final step, once all of them are known.
+  useEffect(() => {
+    if (step !== 4 || !user) return
+    let cancelled = false
+    setContractPages(null)
+    setContractError(null)
+
+    async function loadContract(student: NonNullable<typeof user>) {
+      const [dormitory, room] = await Promise.all([getDormitory(dormitoryId), getRoom(roomId)])
+      const values: ContractFieldValues = {
+        student_full_name: student.full_name,
+        student_iin: student.iin ?? '',
+        student_phone: student.phone,
+        study_group: studyGroup.trim(),
+        room_number: room.room_number,
+        dormitory_name: dormitory.name,
+        dormitory_address: dormitory.address,
+        monthly_payment_bachelor: formatTenge(dormitory.monthly_payment_bachelor),
+        monthly_payment_master: formatTenge(dormitory.monthly_payment_master),
+        monthly_payment_doctorate: formatTenge(dormitory.monthly_payment_doctorate),
+        yearly_payment_bachelor: formatTenge(dormitory.yearly_payment_bachelor),
+        yearly_payment_master: formatTenge(dormitory.yearly_payment_master),
+        yearly_payment_doctorate: formatTenge(dormitory.yearly_payment_doctorate),
+        date: formatDate(new Date()),
+      }
+      const [kk, ru] = await Promise.all([
+        getFilledContractPages(values, 'kk'),
+        getFilledContractPages(values, 'ru'),
+      ])
+      if (cancelled) return
+      setContractValues(values)
+      setContractPages({ kk, ru })
+    }
+
+    loadContract(user).catch((err) => {
+      if (!cancelled) setContractError(extractErrorMessage(err, t('wizard.contractLoadError')))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [step, user, dormitoryId, roomId, studyGroup, t])
+
   const chosenDormitory = dormitories?.find((d) => d.id === dormitoryId) ?? null
 
   function toggleBenefit(benefitId: string) {
@@ -210,35 +271,58 @@ export function NewApplicationPage() {
         return
       }
     }
-    setStep((s) => (s < 3 ? ((s + 1) as 1 | 2 | 3) : s))
+    if (step === 3) {
+      const missingDoc = allRequiredDocs.find((doc) => !docFiles[doc.id])
+      if (missingDoc) {
+        setServerError(
+          t('wizard.missingDocError', { doc: bilingualField(missingDoc.document_name_kk, missingDoc.document_name_ru, i18n.language) }),
+        )
+        return
+      }
+      const invalidDoc = allRequiredDocs.find((doc) => docFiles[doc.id]?.type !== 'application/pdf')
+      if (invalidDoc) {
+        setServerError(
+          t('wizard.invalidDocError', { doc: bilingualField(invalidDoc.document_name_kk, invalidDoc.document_name_ru, i18n.language) }),
+        )
+        return
+      }
+      if (!studyGroup.trim() || !hometown.trim() || !parentContact.trim()) {
+        setServerError(t('wizard.missingPetitionFieldsError'))
+        return
+      }
+    }
+    setStep((s) => (s < 4 ? ((s + 1) as WizardStep) : s))
   }
 
   function goBack() {
+    setServerError(null)
     if (step > 1) {
-      setStep((s) => (s - 1) as 1 | 2 | 3)
+      // Going back lets the student change what the contract is filled in
+      // with, so what they agreed to may no longer be what they'd now submit.
+      setContractAgreed(false)
+      setStep((s) => (s - 1) as WizardStep)
     } else {
       navigate('/dashboard/home')
     }
   }
 
+  async function handleDownloadContract() {
+    if (!contractValues) return
+    setContractError(null)
+    setIsDownloadingContract(true)
+    try {
+      await downloadContractPdf(contractValues, `${t('contracts.contractFallback')}-${contractLanguage}.pdf`, contractLanguage)
+    } catch (err) {
+      setContractError(extractErrorMessage(err, t('contracts.downloadFailed')))
+    } finally {
+      setIsDownloadingContract(false)
+    }
+  }
+
   async function handleSubmit() {
     setServerError(null)
-    const missingDoc = allRequiredDocs.find((doc) => !docFiles[doc.id])
-    if (missingDoc) {
-      setServerError(
-        t('wizard.missingDocError', { doc: bilingualField(missingDoc.document_name_kk, missingDoc.document_name_ru, i18n.language) }),
-      )
-      return
-    }
-    const invalidDoc = allRequiredDocs.find((doc) => docFiles[doc.id]?.type !== 'application/pdf')
-    if (invalidDoc) {
-      setServerError(
-        t('wizard.invalidDocError', { doc: bilingualField(invalidDoc.document_name_kk, invalidDoc.document_name_ru, i18n.language) }),
-      )
-      return
-    }
-    if (!studyGroup.trim() || !hometown.trim() || !parentContact.trim()) {
-      setServerError(t('wizard.missingPetitionFieldsError'))
+    if (!contractAgreed) {
+      setServerError(t('wizard.contractNotAgreedError'))
       return
     }
 
@@ -262,6 +346,7 @@ export function NewApplicationPage() {
         study_group: studyGroup.trim(),
         hometown: hometown.trim(),
         parent_contact: parentContact.trim(),
+        contract_agreed: contractAgreed,
       })
       createdApplicationId = application.id
 
@@ -329,7 +414,7 @@ export function NewApplicationPage() {
         </span>
         <p className="text-[22px] font-bold text-sand-100">{t('wizard.sentTitle')}</p>
         <p className="max-w-[300px] text-sm text-sand-300">{t('wizard.sentBody')}</p>
-        <SegmentedProgress total={7} filled={2} className="mt-1.5 w-full max-w-[300px]" />
+        <SegmentedProgress total={6} filled={2} className="mt-1.5 w-full max-w-[300px]" />
         <p className="text-xs text-sand-300">{t('wizard.sentStepCaption')}</p>
         <Button className="mt-2" onClick={() => navigate('/dashboard/home')}>
           {t('wizard.backToHome')}
@@ -368,7 +453,7 @@ export function NewApplicationPage() {
         <span className="text-[19px] font-bold text-sand-100">{t('wizard.title')}</span>
       </div>
 
-      <SegmentedProgress total={3} filled={step} />
+      <SegmentedProgress total={4} filled={step} />
       <p className="text-sm text-sand-300">{STEP_CAPTIONS[step]}</p>
 
       {serverError && <Alert variant="error" message={serverError} />}
@@ -612,9 +697,64 @@ export function NewApplicationPage() {
           </div>
 
           <div className="mt-1">
-            <Button className="w-full" isLoading={isSubmitting} onClick={handleSubmit}>
+            <Button className="w-full" onClick={goNext}>
+              {t('wizard.continueButton')}
+            </Button>
+            <p className="mt-2.5 text-center text-xs text-sand-300">{t('wizard.nextContractHint')}</p>
+          </div>
+        </>
+      )}
+
+      {step === 4 && (
+        <>
+          <p className="text-sm text-sand-200">{t('wizard.contractIntro')}</p>
+          {contractError && <Alert variant="error" message={contractError} />}
+          {!contractPages && !contractError && <p className="text-sm text-sand-300">{t('contracts.loading')}</p>}
+          {contractPages && (
+            <div className="flex flex-col gap-2.5">
+              <div className="flex gap-2">
+                {CONTRACT_LANGUAGES.map((lang) => (
+                  <button
+                    key={lang}
+                    onClick={() => setContractLanguage(lang)}
+                    className={`rounded-full border px-3.5 py-1.5 text-xs font-semibold ${
+                      contractLanguage === lang
+                        ? 'border-turquoise-500 bg-turquoise-500/10 text-turquoise-400'
+                        : 'border-navy-700 bg-navy-900 text-sand-300 hover:text-sand-100'
+                    }`}
+                  >
+                    {t(`contracts.language.${lang}`)}
+                  </button>
+                ))}
+              </div>
+              <TemplatePages pages={contractPages[contractLanguage]} />
+              <Button
+                variant="secondary"
+                className="self-start"
+                isLoading={isDownloadingContract}
+                onClick={handleDownloadContract}
+              >
+                {t('contracts.download')}
+              </Button>
+              <Card className="!p-4">
+                <label className="flex cursor-pointer items-start gap-2.5 text-sm font-semibold text-sand-100">
+                  <input
+                    type="checkbox"
+                    checked={contractAgreed}
+                    onChange={(e) => setContractAgreed(e.target.checked)}
+                    className="mt-0.5 h-4.5 w-4.5 shrink-0 accent-turquoise-500"
+                  />
+                  {t('wizard.contractAgreeLabel')}
+                </label>
+              </Card>
+            </div>
+          )}
+
+          <div className="mt-1">
+            <Button className="w-full" isLoading={isSubmitting} disabled={!contractAgreed} onClick={handleSubmit}>
               {t('wizard.submitButton')}
             </Button>
+            <p className="mt-2.5 text-center text-xs text-sand-300">{t('wizard.contractRequiredHint')}</p>
           </div>
         </>
       )}

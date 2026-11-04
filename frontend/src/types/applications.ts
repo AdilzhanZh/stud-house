@@ -3,7 +3,7 @@
 // — the spec explicitly notes only pending/needs_correction/approved/rejected
 // are ever seen at rest. Included here only so the type covers whatever the
 // API could technically send, not because the UI treats it as a real state.
-// settled is set by the system once the student accepts their contract (see
+// settled is set by the system once the student is placed in their room (see
 // backend internal/domain/contract.go's ApplicationSettled).
 export type ApplicationStatus =
   | 'pending'

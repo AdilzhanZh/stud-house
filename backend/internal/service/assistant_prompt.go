@@ -84,7 +84,6 @@ func assistantPages(c assistantCaps) string {
 			"/dormitories — Жатақханалар (and /dormitories/<id> for one dormitory)",
 			"/applications/new — Өтініш беру",
 			"/applications/my — Менің өтініштерім (and /applications/<id> for one application)",
-			"/contracts/my — Келісімшарт",
 			"/my-residence — Менің орным (room transfer and move-out requests)",
 			"/notifications — Хабарламалар",
 			"/dashboard/profile — Профиль (/dashboard/profile/edit to edit, /dashboard/profile/feedback to report a problem)",

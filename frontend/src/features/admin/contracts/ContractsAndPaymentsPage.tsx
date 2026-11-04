@@ -5,12 +5,12 @@ import { Card } from '../../../components/Card'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
 import { ConfirmDialog } from '../../../components/ConfirmDialog'
-import { ContractStatusBadge } from '../../../components/ContractStatusBadge'
 import { extractErrorMessage } from '../../../api/client'
 import { contractManagerDecision, listContracts } from '../../../api/contractAdminApi'
 import { getApplication } from '../../../api/applicationApi'
 import { listUsers } from '../../../api/adminUserApi'
 import { listDormitories } from '../../../api/dormitoryApi'
+import { formatDateTime } from '../../../utils/dateFormat'
 import { formatTimeElapsed } from '../../contracts/deadline'
 import {
   adminCellClass,
@@ -124,7 +124,7 @@ export function ContractsAndPaymentsPage() {
                 <tr>
                   <th className={adminCellClass}>{t('admin.applications.student')}</th>
                   <th className={adminCellClass}>{t('admin.layout.dormitories')}</th>
-                  <th className={adminCellClass}>{t('admin.applications.status')}</th>
+                  <th className={adminCellClass}>{t('admin.contracts.createdAtColumn')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -136,9 +136,9 @@ export function ContractsAndPaymentsPage() {
                   >
                     <td className={`${adminCellClass} font-semibold text-sand-100`}>{c.studentName}</td>
                     <td className={`${adminCellClass} text-sand-300`}>{c.dormitoryName}</td>
-                    <td className={adminCellClass}>
-                      <ContractStatusBadge status={c.status} />
-                    </td>
+                    {/* sent_at, not created_at: it's when the student agreed, even for
+                        contracts backfilled later (see migration 000087). */}
+                    <td className={`${adminCellClass} text-sand-300`}>{formatDateTime(c.sent_at)}</td>
                   </tr>
                 ))}
                 {contracts.length === 0 && (

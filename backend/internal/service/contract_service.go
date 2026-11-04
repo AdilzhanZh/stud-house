@@ -51,45 +51,86 @@ func NewContractService(
 	}
 }
 
-// OnProtocolApproved is wired as ProtocolService's onApproved hook: it
-// creates one contract per application in the protocol (idempotent — skips
-// any application that already has one) and notifies each student.
+// OnProtocolApproved is wired as ProtocolService's onApproved hook. A student
+// who agreed to the contract while applying is settled straight away, with no
+// further response needed. An application with no recorded agreement predates
+// that wizard step, so it still gets a contract to accept or decline.
 func (s *ContractService) OnProtocolApproved(ctx context.Context, protocolID uuid.UUID) error {
 	appIDs, err := s.protocols.ListApplicationIDs(ctx, protocolID)
 	if err != nil {
 		return err
 	}
 
-	// The protocol template has no attachable file — a contract's "Open PDF"
-	// link starts empty, hidden by the frontend when file_url is empty.
-	var contractFileURL string
-
-	now := time.Now()
 	for _, appID := range appIDs {
-		contract := &domain.Contract{
-			ApplicationID:    appID,
-			FileURL:          contractFileURL,
-			Status:           domain.ContractSent,
-			SentAt:           now,
-			ResponseDeadline: now.Add(s.responseDeadline),
-		}
-		created, err := s.contracts.CreateIfNotExists(ctx, contract)
-		if err != nil {
-			log.Printf("failed to create contract for application %s: %v", appID, err)
-			continue
-		}
-		if !created {
-			continue
-		}
-
 		app, err := s.applications.GetByID(ctx, appID)
 		if err != nil {
-			log.Printf("contract created but failed to load application %s for notification: %v", appID, err)
+			log.Printf("failed to load application %s on protocol approval: %v", appID, err)
 			continue
 		}
-		body := fmt.Sprintf("Сізге келісімшарт жіберілді, %d күн ішінде растаңыз.", int(s.responseDeadline.Hours()/24))
-		_ = s.notifier.Notify(ctx, app.StudentID, domain.NotificationContractSent, "Келісімшарт жіберілді", body, &app.ID)
+		// A manager may have cancelled it after the protocol was created, and
+		// the hook must never place such a student.
+		if app.Status != domain.ApplicationApproved {
+			continue
+		}
+		if app.ContractAgreedAt == nil {
+			s.sendContractForResponse(ctx, app)
+			continue
+		}
+		if err := s.settleAgreedApplication(ctx, app); err != nil {
+			log.Printf("failed to settle application %s on protocol approval: %v", appID, err)
+			body := fmt.Sprintf("Хаттама мақұлданды, бірақ студентті (ID: %s) бөлмеге автоматты түрде орналастыру мүмкін болмады: %v. Өтінішті тексеріңіз.", app.StudentID, err)
+			for _, u := range listManagementStaff(ctx, s.users) {
+				_ = s.notifier.Notify(ctx, u.ID, domain.NotificationContractSent, "Студент орналастырылмады", body, &app.ID)
+			}
+		}
 	}
+	return nil
+}
+
+// sendContractForResponse creates a contract the student must accept or
+// decline before its deadline (idempotent — skips an application that already
+// has one).
+func (s *ContractService) sendContractForResponse(ctx context.Context, app *domain.Application) {
+	now := time.Now()
+	created, err := s.contracts.CreateIfNotExists(ctx, &domain.Contract{
+		ApplicationID:    app.ID,
+		Status:           domain.ContractSent,
+		SentAt:           now,
+		ResponseDeadline: now.Add(s.responseDeadline),
+	})
+	if err != nil {
+		log.Printf("failed to create contract for application %s: %v", app.ID, err)
+		return
+	}
+	if !created {
+		return
+	}
+	body := fmt.Sprintf("Сізге келісімшарт жіберілді, %d күн ішінде растаңыз.", int(s.responseDeadline.Hours()/24))
+	_ = s.notifier.Notify(ctx, app.StudentID, domain.NotificationContractSent, "Келісімшарт жіберілді", body, &app.ID)
+}
+
+// settleAgreedApplication claims the student's seat and settles the
+// application. Its contract already exists, created when the student agreed
+// to it while applying (see ApplicationRepository.Create).
+func (s *ContractService) settleAgreedApplication(ctx context.Context, app *domain.Application) error {
+	contract, err := s.contracts.GetByApplicationID(ctx, app.ID)
+	if err != nil {
+		return err
+	}
+	if app.AssignedRoomID != nil {
+		if _, err := s.rooms.AddResident(ctx, *app.AssignedRoomID, app.StudentID); err != nil {
+			return err
+		}
+	}
+	err = s.contracts.WithLock(ctx, contract.ID, func(ctx context.Context, _ *domain.Contract, tx repository.ContractTx) error {
+		return tx.MarkApplicationSettled(ctx, app.ID, app.StudentID)
+	})
+	if err != nil {
+		return err
+	}
+
+	_ = s.notifier.Notify(ctx, app.StudentID, domain.NotificationContractSent, "Жатақханаға орналастыңыз",
+		"Комиссия өтінішіңізді мақұлдады, сіз жатақханаға орналастыңыз. Төлемді Бас ғимараттың 2-қабатындағы бухгалтериядан төлеңіз.", &app.ID)
 	return nil
 }
 

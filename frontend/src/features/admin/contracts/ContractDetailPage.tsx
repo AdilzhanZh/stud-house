@@ -50,9 +50,12 @@ export function ContractDetailPage() {
         setContract(found)
 
         const app = await getApplication(found.application_id)
+        // Until a manager assigns a room, the contract names the one the
+        // student picked and agreed to.
+        const roomId = app.assigned_room_id ?? app.preferred_room_id
         const [dormitory, room] = await Promise.all([
           getDormitory(app.dormitory_id),
-          app.assigned_room_id ? getRoom(app.assigned_room_id).catch(() => null) : Promise.resolve(null),
+          roomId ? getRoom(roomId).catch(() => null) : Promise.resolve(null),
         ])
         const student = students.find((s) => s.id === app.student_id)
 

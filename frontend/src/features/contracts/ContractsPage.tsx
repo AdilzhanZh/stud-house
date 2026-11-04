@@ -75,7 +75,8 @@ export function ContractsPage() {
             const app = await getApplication(c.application_id).catch(() => null)
             if (!app) return null
             const dormitory = await getDormitory(app.dormitory_id).catch(() => null)
-            const room = app.assigned_room_id ? await getRoom(app.assigned_room_id).catch(() => null) : null
+            const roomId = app.assigned_room_id ?? app.preferred_room_id
+            const room = roomId ? await getRoom(roomId).catch(() => null) : null
             return dormitory ? { contract: c, app, dormitory, room } : null
           }),
         )
@@ -123,7 +124,8 @@ export function ContractsPage() {
     setDownloadingId(contract.id)
     try {
       const app = await getApplication(contract.application_id)
-      const room = app.assigned_room_id ? await getRoom(app.assigned_room_id).catch(() => null) : null
+      const roomId = app.assigned_room_id ?? app.preferred_room_id
+      const room = roomId ? await getRoom(roomId).catch(() => null) : null
       await downloadContractPdf(
         {
           student_full_name: user.full_name,

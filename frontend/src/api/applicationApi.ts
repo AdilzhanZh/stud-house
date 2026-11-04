@@ -8,6 +8,7 @@ export interface CreateApplicationPayload {
   study_group: string
   hometown: string
   parent_contact: string
+  contract_agreed: boolean
 }
 
 export async function createApplication(payload: CreateApplicationPayload): Promise<Application> {

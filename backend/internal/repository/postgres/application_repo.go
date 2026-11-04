@@ -14,7 +14,7 @@ import (
 	"student-house/internal/repository"
 )
 
-const applicationColumns = `id, student_id, dormitory_id, status, preferred_room_type, preferred_room_id, notes, study_group, hometown, parent_contact, assigned_room_id, handled_by, created_at, updated_at`
+const applicationColumns = `id, student_id, dormitory_id, status, preferred_room_type, preferred_room_id, notes, study_group, hometown, parent_contact, assigned_room_id, handled_by, contract_agreed_at, created_at, updated_at`
 
 type ApplicationRepo struct {
 	db *pgxpool.Pool
@@ -24,12 +24,20 @@ func NewApplicationRepo(db *pgxpool.Pool) *ApplicationRepo {
 	return &ApplicationRepo{db: db}
 }
 
+// Create also records the contract the student just agreed to, in one
+// statement so an application can never exist without it.
 func (r *ApplicationRepo) Create(ctx context.Context, a *domain.Application) error {
 	const q = `
-		INSERT INTO applications (student_id, dormitory_id, status, preferred_room_type, preferred_room_id, notes, study_group, hometown, parent_contact)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		RETURNING id, created_at, updated_at`
-	err := r.db.QueryRow(ctx, q, a.StudentID, a.DormitoryID, string(a.Status), a.PreferredRoomType, a.PreferredRoomID, a.Notes, a.StudyGroup, a.Hometown, a.ParentContact).
+		WITH app AS (
+			INSERT INTO applications (student_id, dormitory_id, status, preferred_room_type, preferred_room_id, notes, study_group, hometown, parent_contact, contract_agreed_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+			RETURNING id, created_at, updated_at
+		), contract AS (
+			INSERT INTO contracts (application_id, file_url, status, sent_at, responded_at, response_deadline)
+			SELECT id, '', 'accepted', $10, $10, $10 FROM app
+		)
+		SELECT id, created_at, updated_at FROM app`
+	err := r.db.QueryRow(ctx, q, a.StudentID, a.DormitoryID, string(a.Status), a.PreferredRoomType, a.PreferredRoomID, a.Notes, a.StudyGroup, a.Hometown, a.ParentContact, a.ContractAgreedAt).
 		Scan(&a.ID, &a.CreatedAt, &a.UpdatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -91,8 +99,15 @@ func (r *ApplicationRepo) ListByDormitory(ctx context.Context, dormitoryID uuid.
 	return scanApplicationRows(rows)
 }
 
+// Delete also removes the contract agreed to at submission. Any other contract
+// (e.g. one the student declined) still blocks the delete, as ErrConflict.
 func (r *ApplicationRepo) Delete(ctx context.Context, id uuid.UUID) error {
-	tag, err := r.db.Exec(ctx, `DELETE FROM applications WHERE id = $1`, id)
+	const q = `
+		WITH contract AS (
+			DELETE FROM contracts WHERE application_id = $1 AND status = 'accepted'
+		)
+		DELETE FROM applications WHERE id = $1`
+	tag, err := r.db.Exec(ctx, q, id)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
@@ -228,7 +243,7 @@ func scanApplicationRow(row pgx.Row) (*domain.Application, error) {
 	a := &domain.Application{}
 	var status string
 	var studyGroup, hometown, parentContact *string
-	err := row.Scan(&a.ID, &a.StudentID, &a.DormitoryID, &status, &a.PreferredRoomType, &a.PreferredRoomID, &a.Notes, &studyGroup, &hometown, &parentContact, &a.AssignedRoomID, &a.HandledBy, &a.CreatedAt, &a.UpdatedAt)
+	err := row.Scan(&a.ID, &a.StudentID, &a.DormitoryID, &status, &a.PreferredRoomType, &a.PreferredRoomID, &a.Notes, &studyGroup, &hometown, &parentContact, &a.AssignedRoomID, &a.HandledBy, &a.ContractAgreedAt, &a.CreatedAt, &a.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, repository.ErrNotFound
@@ -253,7 +268,7 @@ func scanApplicationRows(rows pgx.Rows) ([]*domain.Application, error) {
 		a := &domain.Application{}
 		var status string
 		var studyGroup, hometown, parentContact *string
-		if err := rows.Scan(&a.ID, &a.StudentID, &a.DormitoryID, &status, &a.PreferredRoomType, &a.PreferredRoomID, &a.Notes, &studyGroup, &hometown, &parentContact, &a.AssignedRoomID, &a.HandledBy, &a.CreatedAt, &a.UpdatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.StudentID, &a.DormitoryID, &status, &a.PreferredRoomType, &a.PreferredRoomID, &a.Notes, &studyGroup, &hometown, &parentContact, &a.AssignedRoomID, &a.HandledBy, &a.ContractAgreedAt, &a.CreatedAt, &a.UpdatedAt); err != nil {
 			return nil, err
 		}
 		a.Status = domain.ApplicationStatus(status)

@@ -909,6 +909,10 @@ export const en: typeof kk = {
       selectAll: 'Select all',
       createFailed: 'Failed to prepare the protocol',
     },
+    twoPagesPerSheet: {
+      label: 'Two pages per sheet',
+      hint: 'The PDF prints two pages on each landscape A4 sheet, in slightly smaller type. A long document takes fewer sheets.',
+    },
     protocolTemplate: {
       title: 'Manage the sample protocol',
       hint: "Edit the text like in Word (bold, alignment) and place variables where the student list and other data should go.",

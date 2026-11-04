@@ -34,10 +34,13 @@ func (s ProtocolStatus) Valid() bool {
 // fragments — almost always just one page, but a manager can add more
 // through the editor if the wording grows past one sheet.
 type ProtocolTemplate struct {
-	ID        uuid.UUID
-	Pages     []string
-	UpdatedBy uuid.UUID
-	UpdatedAt time.Time
+	ID    uuid.UUID
+	Pages []string
+	// TwoPagesPerSheet makes this template's PDFs print two pages side by side
+	// on a landscape A4 sheet.
+	TwoPagesPerSheet bool
+	UpdatedBy        uuid.UUID
+	UpdatedAt        time.Time
 }
 
 // Protocol is a committee meeting-minutes document ("Хаттама") bundling a

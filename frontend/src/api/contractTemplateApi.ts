@@ -10,6 +10,7 @@ export interface ContractVariable {
 export interface ContractTemplate {
   language: ContractLanguage
   pages: string[]
+  two_pages_per_sheet: boolean
   updated_at: string | null
   variables?: ContractVariable[]
 }
@@ -21,10 +22,14 @@ export async function getContractTemplate(language: ContractLanguage): Promise<C
   return data.data
 }
 
-export async function updateContractTemplate(language: ContractLanguage, pages: string[]): Promise<ContractTemplate> {
+export async function updateContractTemplate(
+  language: ContractLanguage,
+  pages: string[],
+  twoPagesPerSheet: boolean,
+): Promise<ContractTemplate> {
   const { data } = await apiClient.put<{ data: ContractTemplate }>(
     '/contract-template',
-    { pages },
+    { pages, two_pages_per_sheet: twoPagesPerSheet },
     { params: { language } },
   )
   return data.data

@@ -105,7 +105,11 @@ function fillProtocolTemplate(pages: string[], values: Required<ProtocolFieldVal
 // longer requires downloading it first.
 export async function getFilledProtocolPages(values: ProtocolFieldValues): Promise<string[]> {
   const template = await getProtocolTemplate()
-  return fillProtocolTemplate(template.pages, {
+  return fillWithDefaults(template.pages, values)
+}
+
+function fillWithDefaults(pages: string[], values: ProtocolFieldValues): string[] {
+  return fillProtocolTemplate(pages, {
     ...values,
     students: sortProtocolStudents(
       values.students,
@@ -117,7 +121,9 @@ export async function getFilledProtocolPages(values: ProtocolFieldValues): Promi
 }
 
 export async function downloadProtocolPdf(values: ProtocolFieldValues, filename: string): Promise<void> {
-  const filled = await getFilledProtocolPages(values)
-  const doc = await renderHtmlPagesToPdf(filled)
+  const template = await getProtocolTemplate()
+  const doc = await renderHtmlPagesToPdf(fillWithDefaults(template.pages, values), {
+    twoPagesPerSheet: template.two_pages_per_sheet,
+  })
   doc.save(filename)
 }

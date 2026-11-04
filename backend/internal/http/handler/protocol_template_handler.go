@@ -26,9 +26,10 @@ type protocolVariableResponse struct {
 }
 
 type protocolTemplateResponse struct {
-	Pages     []string                   `json:"pages"`
-	UpdatedAt *time.Time                 `json:"updated_at"`
-	Variables []protocolVariableResponse `json:"variables,omitempty"`
+	Pages            []string                   `json:"pages"`
+	TwoPagesPerSheet bool                       `json:"two_pages_per_sheet"`
+	UpdatedAt        *time.Time                 `json:"updated_at"`
+	Variables        []protocolVariableResponse `json:"variables,omitempty"`
 }
 
 // Get is manager/admin-only: loads the single system-wide template plus the
@@ -48,11 +49,12 @@ func (h *ProtocolTemplateHandler) Get(c *gin.Context) {
 		u := t.UpdatedAt
 		updatedAt = &u
 	}
-	response.OK(c, protocolTemplateResponse{Pages: t.Pages, UpdatedAt: updatedAt, Variables: vars})
+	response.OK(c, protocolTemplateResponse{Pages: t.Pages, TwoPagesPerSheet: t.TwoPagesPerSheet, UpdatedAt: updatedAt, Variables: vars})
 }
 
 type updateProtocolTemplateRequest struct {
-	Pages []string `json:"pages" binding:"required"`
+	Pages            []string `json:"pages" binding:"required"`
+	TwoPagesPerSheet bool     `json:"two_pages_per_sheet"`
 }
 
 // Update is manager/admin-only: overwrites the single system-wide template.
@@ -63,10 +65,10 @@ func (h *ProtocolTemplateHandler) Update(c *gin.Context) {
 		return
 	}
 	actorID, _ := middleware.UserID(c)
-	t, err := h.templates.Update(c.Request.Context(), actorID, req.Pages)
+	t, err := h.templates.Update(c.Request.Context(), actorID, req.Pages, req.TwoPagesPerSheet)
 	if err != nil {
 		response.Error(c, err)
 		return
 	}
-	response.OK(c, protocolTemplateResponse{Pages: t.Pages, UpdatedAt: &t.UpdatedAt})
+	response.OK(c, protocolTemplateResponse{Pages: t.Pages, TwoPagesPerSheet: t.TwoPagesPerSheet, UpdatedAt: &t.UpdatedAt})
 }

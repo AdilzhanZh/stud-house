@@ -203,7 +203,7 @@ func (s *ContractTemplateService) Get(ctx context.Context, language domain.Contr
 // Update is manager/admin-only (enforced by the route group). It always
 // overwrites the given language's template — there's no per-template
 // selection or history, per the current spec.
-func (s *ContractTemplateService) Update(ctx context.Context, actorID uuid.UUID, language domain.ContractLanguage, pages []string) (*domain.ContractTemplate, error) {
+func (s *ContractTemplateService) Update(ctx context.Context, actorID uuid.UUID, language domain.ContractLanguage, pages []string, twoPagesPerSheet bool) (*domain.ContractTemplate, error) {
 	if !language.Valid() {
 		return nil, apperror.BadRequest("тіл жарамсыз")
 	}
@@ -215,7 +215,7 @@ func (s *ContractTemplateService) Update(ctx context.Context, actorID uuid.UUID,
 			return nil, apperror.BadRequest("үлгінің беттері бос болмауы керек")
 		}
 	}
-	t := &domain.ContractTemplate{Language: language, Pages: pages, UpdatedBy: actorID}
+	t := &domain.ContractTemplate{Language: language, Pages: pages, TwoPagesPerSheet: twoPagesPerSheet, UpdatedBy: actorID}
 	if err := s.templates.Upsert(ctx, t); err != nil {
 		return nil, err
 	}

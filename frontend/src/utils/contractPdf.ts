@@ -39,9 +39,8 @@ export function fillContractTemplate(pages: string[], values: Required<ContractF
   })
 }
 
-async function loadFilledContractPages(values: ContractFieldValues, language: ContractLanguage): Promise<string[]> {
-  const template = await getContractTemplate(language)
-  return fillContractTemplate(template.pages, {
+function fillWithDefaults(pages: string[], values: ContractFieldValues): string[] {
+  return fillContractTemplate(pages, {
     ...values,
     date: values.date ?? formatDate(new Date()),
   })
@@ -55,7 +54,8 @@ export async function getFilledContractPages(
   values: ContractFieldValues,
   language: ContractLanguage,
 ): Promise<string[]> {
-  return loadFilledContractPages(values, language)
+  const template = await getContractTemplate(language)
+  return fillWithDefaults(template.pages, values)
 }
 
 export async function downloadContractPdf(
@@ -63,7 +63,9 @@ export async function downloadContractPdf(
   filename: string,
   language: ContractLanguage,
 ): Promise<void> {
-  const pages = await loadFilledContractPages(values, language)
-  const doc = await renderHtmlPagesToPdf(pages)
+  const template = await getContractTemplate(language)
+  const doc = await renderHtmlPagesToPdf(fillWithDefaults(template.pages, values), {
+    twoPagesPerSheet: template.two_pages_per_sheet,
+  })
   doc.save(filename)
 }

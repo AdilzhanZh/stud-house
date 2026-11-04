@@ -139,23 +139,31 @@ export function ProtocolCreatePage() {
                 </select>
               </label>
 
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <label className="flex items-center gap-2 text-sm font-medium text-sand-200">
-                  <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} />
-                  {t('admin.protocols.selectAll')}
-                </label>
-                <span className="text-sm text-sand-300">
-                  {t('admin.protocols.selectedCount', { count: selectedKeys.size, max: MAX_PROTOCOL_STUDENTS })}
-                </span>
-              </div>
-              {isAtLimit && (
-                <div className="mb-3">
+              {/* Stays in view while scrolling: the list can run to hundreds of
+                  students, and the submit button shouldn't be at its far end. */}
+              <div className="sticky top-4 z-10 mb-3 flex flex-col gap-3 rounded-2xl bg-navy-800 p-3 ring-1 ring-turquoise-400/30">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <label className="flex items-center gap-2 text-sm font-medium text-sand-200">
+                    <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} />
+                    {t('admin.protocols.selectAll')}
+                  </label>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-sm text-sand-300">
+                      {t('admin.protocols.selectedCount', { count: selectedKeys.size, max: MAX_PROTOCOL_STUDENTS })}
+                    </span>
+                    <Button onClick={handleSubmit} isLoading={isSubmitting} disabled={selectedKeys.size === 0}>
+                      {t('admin.protocols.prepareButton')}
+                    </Button>
+                  </div>
+                </div>
+                {isAtLimit && (
                   <Alert
                     variant="warning"
                     message={t('admin.protocols.selectionLimit', { max: MAX_PROTOCOL_STUDENTS })}
                   />
-                </div>
-              )}
+                )}
+                {submitError && <Alert variant="error" message={submitError} />}
+              </div>
 
               <ul className="flex flex-col gap-2">
                 {visible.map((c) => {
@@ -185,16 +193,6 @@ export function ProtocolCreatePage() {
           )}
         </Card>
       )}
-
-      {submitError && <Alert variant="error" message={submitError} />}
-      <Button
-        onClick={handleSubmit}
-        isLoading={isSubmitting}
-        disabled={!candidates || selectedKeys.size === 0}
-        className="self-start"
-      >
-        {t('admin.protocols.prepareButton')}
-      </Button>
     </div>
   )
 }

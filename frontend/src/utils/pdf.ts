@@ -43,11 +43,13 @@ const TWO_PAGES_PER_SHEET: SheetLayout = {
   gutterPt: TWO_PAGE_GUTTER_PT,
   slotWidthPt: (PAGE_HEIGHT_PT - TWO_PAGE_MARGIN_PT * 2 - TWO_PAGE_GUTTER_PT) / 2,
   slotHeightPt: PAGE_WIDTH_PT - TWO_PAGE_MARGIN_PT * 2,
-  // The sheet's own margins replace the container's padding. This width makes
-  // the templates' 14px text come out at 8pt, against 9pt on a full page, which
-  // fits nearly a full page's text into each half sheet.
+  // The sheet's own margins replace the container's padding, except at the
+  // bottom: html2canvas paints text a few px below where the DOM lays it out and
+  // crops to the container, which would cut through the last line. This width
+  // makes the templates' 14px text come out at 8pt, against 9pt on a full page,
+  // which fits nearly a full page's text into each half sheet.
   containerWidthPx: 684,
-  containerPadding: '0',
+  containerPadding: '0 0 24px',
   lineHeight: '1.4',
 }
 

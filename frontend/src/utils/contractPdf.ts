@@ -1,4 +1,5 @@
 import { renderHtmlPagesToPdf } from './pdf'
+import type { FilledDocument } from './pdf'
 import { getContractTemplate } from '../api/contractTemplateApi'
 import { formatDate } from './dateFormat'
 import type { ContractLanguage } from '../api/contractTemplateApi'
@@ -50,12 +51,12 @@ function fillWithDefaults(pages: string[], values: ContractFieldValues): string[
 // detail page — the filled pages are shared between on-screen rendering
 // (TemplatePages) and PDF export. A contract always exists in both
 // languages, so callers pass whichever one the viewer currently wants.
-export async function getFilledContractPages(
+export async function getFilledContractDocument(
   values: ContractFieldValues,
   language: ContractLanguage,
-): Promise<string[]> {
+): Promise<FilledDocument> {
   const template = await getContractTemplate(language)
-  return fillWithDefaults(template.pages, values)
+  return { pages: fillWithDefaults(template.pages, values), twoPagesPerSheet: template.two_pages_per_sheet }
 }
 
 export async function downloadContractPdf(

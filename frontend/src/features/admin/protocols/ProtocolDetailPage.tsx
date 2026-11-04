@@ -9,11 +9,77 @@ import { ProtocolStatusBadge } from '../../../components/ProtocolStatusBadge'
 import { extractErrorMessage } from '../../../api/client'
 import { TemplatePages } from '../../../components/TemplatePages'
 import { deleteProtocol, getProtocolDetail, voteProtocol } from '../../../api/protocolApi'
-import { downloadProtocolPdf, getFilledProtocolPages, sortProtocolStudents } from '../../../utils/protocolPdf'
+import { downloadProtocolPdf, getFilledProtocolDocument, sortProtocolStudents } from '../../../utils/protocolPdf'
 import { formatDate } from '../../../utils/dateFormat'
 import { useAuth } from '../../auth/useAuth'
 import { canManage } from '../../../constants/roles'
+import type { FilledDocument } from '../../../utils/pdf'
 import type { ProtocolDetail } from '../../../types/protocols'
+
+const STUDENTS_SHOWN_ON_PAGE = 5
+
+function StudentsTable({ students }: { students: ProtocolDetail['students'] }) {
+  const { t } = useTranslation()
+  return (
+    <table className="w-full text-left text-sm">
+      <thead>
+        <tr>
+          <th className="px-2 py-1.5 text-xs font-semibold text-sand-300">{t('admin.applications.student')}</th>
+          <th className="px-2 py-1.5 text-xs font-semibold text-sand-300">{t('admin.layout.dormitories')}</th>
+          <th className="px-2 py-1.5 text-xs font-semibold text-sand-300">{t('admin.protocols.roomColumn')}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {students.map((s) => (
+          <tr key={s.application_id ?? s.student_id}>
+            <td className="px-2 py-1.5 text-sand-100">{s.student_full_name}</td>
+            <td className="px-2 py-1.5 text-sand-100">{s.dormitory_name}</td>
+            <td className="px-2 py-1.5 text-sand-100">{s.room_number ?? '—'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+function StudentsDialog({ students, onClose }: { students: ProtocolDetail['students']; onClose: () => void }) {
+  const { t } = useTranslation()
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-navy-950/70 px-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t('admin.protocols.studentsFullListTitle', { count: students.length })}
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-[20px] bg-navy-900 p-6 shadow-[var(--shadow-card)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="font-heading text-lg text-sand-100">
+          {t('admin.protocols.studentsFullListTitle', { count: students.length })}
+        </h2>
+        <div className="mt-4 min-h-0 flex-1 overflow-auto">
+          <StudentsTable students={students} />
+        </div>
+        <div className="mt-4 flex justify-end">
+          <Button variant="secondary" onClick={onClose}>
+            {t('common.close')}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function ProtocolDetailPage() {
   const { t } = useTranslation()
@@ -24,8 +90,10 @@ export function ProtocolDetailPage() {
   const [protocol, setProtocol] = useState<ProtocolDetail | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
-  const [previewPages, setPreviewPages] = useState<string[] | null>(null)
+  const [previewDocument, setPreviewDocument] = useState<FilledDocument | null>(null)
   const [previewError, setPreviewError] = useState<string | null>(null)
+
+  const [studentsDialogOpen, setStudentsDialogOpen] = useState(false)
 
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -65,9 +133,9 @@ export function ProtocolDetailPage() {
     const values = protocolFieldValues()
     if (!values) return
     let cancelled = false
-    getFilledProtocolPages(values)
-      .then((pages) => {
-        if (!cancelled) setPreviewPages(pages)
+    getFilledProtocolDocument(values)
+      .then((filled) => {
+        if (!cancelled) setPreviewDocument(filled)
       })
       .catch((err) => {
         if (!cancelled) setPreviewError(extractErrorMessage(err, t('admin.protocols.previewFailed')))
@@ -144,6 +212,11 @@ export function ProtocolDetailPage() {
   // committee list and can't manage (delete) protocols.
   const isManager = canManage(user)
   const backPath = isManager ? '/admin/protocols' : '/committee/protocols'
+  const sortedStudents = sortProtocolStudents(
+    protocol.students,
+    (s) => s.dormitory_name,
+    (s) => s.student_full_name,
+  )
 
   return (
     <div className="flex flex-col gap-6">
@@ -174,39 +247,23 @@ export function ProtocolDetailPage() {
 
       <Card title={t('admin.protocols.documentPreview')}>
         {previewError && <Alert variant="error" message={previewError} />}
-        {!previewError && !previewPages && <p className="text-sm text-sand-300">{t('admin.common.loading')}</p>}
+        {!previewError && !previewDocument && <p className="text-sm text-sand-300">{t('admin.common.loading')}</p>}
         {/* Read-only render of the already-sanitized-by-us template content
             (only ever written by the manager's own editor via
             updateProtocolTemplate) with real values substituted in — not
             user-supplied HTML from an untrusted source. */}
-        {previewPages && <TemplatePages pages={previewPages} />}
+        {previewDocument && <TemplatePages document={previewDocument} />}
       </Card>
 
       <Card title={t('admin.protocols.studentsTitle')}>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr>
-                <th className="px-2 py-1.5 text-xs font-semibold text-sand-300">{t('admin.applications.student')}</th>
-                <th className="px-2 py-1.5 text-xs font-semibold text-sand-300">{t('admin.layout.dormitories')}</th>
-                <th className="px-2 py-1.5 text-xs font-semibold text-sand-300">{t('admin.protocols.roomColumn')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortProtocolStudents(
-                protocol.students,
-                (s) => s.dormitory_name,
-                (s) => s.student_full_name,
-              ).map((s) => (
-                <tr key={s.application_id ?? s.student_id}>
-                  <td className="px-2 py-1.5 text-sand-100">{s.student_full_name}</td>
-                  <td className="px-2 py-1.5 text-sand-100">{s.dormitory_name}</td>
-                  <td className="px-2 py-1.5 text-sand-100">{s.room_number ?? '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <StudentsTable students={sortedStudents.slice(0, STUDENTS_SHOWN_ON_PAGE)} />
         </div>
+        {sortedStudents.length > STUDENTS_SHOWN_ON_PAGE && (
+          <Button variant="secondary" className="mt-3" onClick={() => setStudentsDialogOpen(true)}>
+            {t('admin.protocols.studentsFullList')}
+          </Button>
+        )}
       </Card>
 
       <Card title={t('admin.protocols.committeeVotes')}>
@@ -273,6 +330,10 @@ export function ProtocolDetailPage() {
               myVote.decision === 'approved' ? t('admin.protocols.voteApproved') : t('admin.protocols.voteRejected'),
           })}
         />
+      )}
+
+      {studentsDialogOpen && (
+        <StudentsDialog students={sortedStudents} onClose={() => setStudentsDialogOpen(false)} />
       )}
 
       <ConfirmDialog

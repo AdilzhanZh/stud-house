@@ -7,6 +7,7 @@ import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
 import { ContractStatusBadge } from '../../../components/ContractStatusBadge'
 import { TemplatePages } from '../../../components/TemplatePages'
+import type { FilledDocument } from '../../../utils/pdf'
 import { extractErrorMessage } from '../../../api/client'
 import { listContracts } from '../../../api/contractAdminApi'
 import { getApplication } from '../../../api/applicationApi'
@@ -15,7 +16,7 @@ import { getRoom } from '../../../api/roomApi'
 import { listUsers } from '../../../api/adminUserApi'
 import { formatTenge } from '../../../utils/dormitoryLabels'
 import { formatDate } from '../../../utils/dateFormat'
-import { downloadContractPdf, getFilledContractPages } from '../../../utils/contractPdf'
+import { downloadContractPdf, getFilledContractDocument } from '../../../utils/contractPdf'
 import { adminPageHeading } from '../adminTable'
 import type { ContractFieldValues } from '../../../utils/contractPdf'
 import type { ContractLanguage } from '../../../api/contractTemplateApi'
@@ -31,7 +32,7 @@ export function ContractDetailPage() {
   const [contract, setContract] = useState<Contract | null>(null)
   const [studentName, setStudentName] = useState('')
   const [dormitoryName, setDormitoryName] = useState('')
-  const [pagesByLanguage, setPagesByLanguage] = useState<Record<ContractLanguage, string[]> | null>(null)
+  const [pagesByLanguage, setPagesByLanguage] = useState<Record<ContractLanguage, FilledDocument> | null>(null)
   const [language, setLanguage] = useState<ContractLanguage>(i18n.language === 'ru' ? 'ru' : 'kk')
   const [error, setError] = useState<string | null>(null)
   const [downloadError, setDownloadError] = useState<string | null>(null)
@@ -80,8 +81,8 @@ export function ContractDetailPage() {
         }
         setDownloadValues(values)
         const [kk, ru] = await Promise.all([
-          getFilledContractPages(values, 'kk'),
-          getFilledContractPages(values, 'ru'),
+          getFilledContractDocument(values, 'kk'),
+          getFilledContractDocument(values, 'ru'),
         ])
         setPagesByLanguage({ kk, ru })
       })
@@ -145,7 +146,7 @@ export function ContractDetailPage() {
               </button>
             ))}
           </div>
-          <TemplatePages pages={pagesByLanguage[language]} />
+          <TemplatePages document={pagesByLanguage[language]} />
           <Button variant="secondary" className="self-start" isLoading={isDownloading} onClick={handleDownload}>
             {t('contracts.download')}
           </Button>

@@ -3,6 +3,7 @@ import type { kk } from './kk'
 // Typed against kk's shape so a missing/mistyped key here is a compile error.
 export const en: typeof kk = {
   common: {
+    close: 'Close',
     confirm: 'Confirm',
     cancel: 'Cancel',
     delete: 'Delete',
@@ -12,6 +13,14 @@ export const en: typeof kk = {
     enableDayView: 'Enable day view',
     nightView: 'Night view',
     dayView: 'Day view',
+  },
+  documentViewer: {
+    rendering: 'Preparing the document…',
+    renderFailed: 'Could not show the document. You can download it to view it.',
+    sheetOf: 'Page {{current}} of {{total}}',
+    goToSheet: 'Go to page {{page}}',
+    previousSheet: 'Previous page',
+    nextSheet: 'Next page',
   },
   protocolStatus: {
     pending: 'Pending',
@@ -892,6 +901,8 @@ export const en: typeof kk = {
       votePending: 'Not voted yet',
       committeeVotes: 'Committee votes',
       studentsTitle: 'Students',
+      studentsFullList: 'Full list',
+      studentsFullListTitle: 'Students ({{count}})',
       roomColumn: 'Room',
       documentPreview: 'Protocol text',
       previewFailed: 'Failed to load the protocol text',

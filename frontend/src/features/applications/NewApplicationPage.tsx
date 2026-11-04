@@ -20,11 +20,12 @@ import { listRoomsByDormitory } from '../../api/roomApi'
 import { getStudentProfile } from '../../api/profileApi'
 import { uploadFile } from '../../api/uploadApi'
 import { generatePetitionPdfBlob } from '../../utils/petitionPdf'
-import { downloadContractPdf, getFilledContractPages } from '../../utils/contractPdf'
+import { downloadContractPdf, getFilledContractDocument } from '../../utils/contractPdf'
 import { formatDate } from '../../utils/dateFormat'
 import { formatTenge } from '../../utils/dormitoryLabels'
 import { bilingualField } from '../../utils/bilingualField'
 import { TemplatePages } from '../../components/TemplatePages'
+import type { FilledDocument } from '../../utils/pdf'
 import { getDormitory } from '../../api/dormitoryApi'
 import { getRoom } from '../../api/roomApi'
 import { RoomPicker } from './RoomPicker'
@@ -137,7 +138,7 @@ export function NewApplicationPage() {
   const [serverError, setServerError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [contractValues, setContractValues] = useState<ContractFieldValues | null>(null)
-  const [contractPages, setContractPages] = useState<Record<ContractLanguage, string[]> | null>(null)
+  const [contractPages, setContractPages] = useState<Record<ContractLanguage, FilledDocument> | null>(null)
   const [contractLanguage, setContractLanguage] = useState<ContractLanguage>(i18n.language === 'ru' ? 'ru' : 'kk')
   const [contractError, setContractError] = useState<string | null>(null)
   const [isDownloadingContract, setIsDownloadingContract] = useState(false)
@@ -216,8 +217,8 @@ export function NewApplicationPage() {
         date: formatDate(new Date()),
       }
       const [kk, ru] = await Promise.all([
-        getFilledContractPages(values, 'kk'),
-        getFilledContractPages(values, 'ru'),
+        getFilledContractDocument(values, 'kk'),
+        getFilledContractDocument(values, 'ru'),
       ])
       if (cancelled) return
       setContractValues(values)
@@ -727,7 +728,7 @@ export function NewApplicationPage() {
                   </button>
                 ))}
               </div>
-              <TemplatePages pages={contractPages[contractLanguage]} />
+              <TemplatePages document={contractPages[contractLanguage]} />
               <Button
                 variant="secondary"
                 className="self-start"

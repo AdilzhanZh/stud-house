@@ -1,5 +1,6 @@
 export const kk = {
   common: {
+    close: 'Жабу',
     confirm: 'Растау',
     cancel: 'Бас тарту',
     delete: 'Өшіру',
@@ -9,6 +10,14 @@ export const kk = {
     enableDayView: 'Күндізгі көріністі қосу',
     nightView: 'Түнгі көрініс',
     dayView: 'Күндізгі көрініс',
+  },
+  documentViewer: {
+    rendering: 'Құжат дайындалып жатыр…',
+    renderFailed: 'Құжатты көрсету мүмкін болмады. Оны жүктеп алып көруге болады.',
+    sheetOf: '{{total}} беттің {{current}}-беті',
+    goToSheet: '{{page}}-бетке өту',
+    previousSheet: 'Алдыңғы бет',
+    nextSheet: 'Келесі бет',
   },
   protocolStatus: {
     pending: 'Күтуде',
@@ -892,6 +901,8 @@ export const kk = {
       votePending: 'Әлі дауыс берген жоқ',
       committeeVotes: 'Комиссия дауыстары',
       studentsTitle: 'Студенттер',
+      studentsFullList: 'Толық тізім',
+      studentsFullListTitle: 'Студенттер ({{count}})',
       roomColumn: 'Бөлме',
       documentPreview: 'Хаттама мәтіні',
       previewFailed: 'Хаттама мәтінін жүктеу сәтсіз аяқталды',

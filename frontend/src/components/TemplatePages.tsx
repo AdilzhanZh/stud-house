@@ -1,76 +1,154 @@
 import { useEffect, useRef, useState } from 'react'
+import type { KeyboardEvent } from 'react'
+import { useTranslation } from 'react-i18next'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { Alert } from './Alert'
+import { renderHtmlPagesToSheetImages } from '../utils/pdf'
+import type { FilledDocument } from '../utils/pdf'
 
-// Read-only, already-filled-in rendering of a template's pages — the
-// on-screen counterpart to each *Pdf.ts util's PDF export, sharing the same
-// filled HTML. Not editable (unlike TemplateEditor): variable chips have
-// already been swapped for plain text by the caller's fill*Template function
-// before this ever renders, so this component needs no knowledge of the
-// original chip class name — the same fixed styling works for every
-// template (petition, protocol, contract all use identical page typography).
+// Read-only view of a filled-in document, one A4 sheet at a time. The sheets
+// are images of the PDF's own sheets (see renderHtmlPagesToSheetImages), so
+// what's on screen is what downloads: same page breaks, same two-per-sheet.
 interface TemplatePagesProps {
-  pages: string[]
+  document: FilledDocument
 }
 
-// A4-ish page width the template HTML is authored/styled against. Content
-// inside a page keeps this fixed pixel layout (fixed px padding, etc.) —
-// instead of reflowing it for narrow screens, the whole page is scaled down
-// as one unit so it always fits the available width without horizontal
-// scrolling, the same way a document preview shrinks to fit.
-const PAGE_WIDTH = 794
+interface Sheets {
+  urls: string[]
+  widthPt: number
+  heightPt: number
+}
 
-function ScaledPage({ html }: { html: string }) {
-  const outerRef = useRef<HTMLDivElement>(null)
-  const innerRef = useRef<HTMLDivElement>(null)
-  const [scale, setScale] = useState(1)
-  const [height, setHeight] = useState<number | null>(null)
+function SheetCarousel({ sheets }: { sheets: Sheets }) {
+  const { t } = useTranslation()
+  const scrollerRef = useRef<HTMLDivElement>(null)
+  const [active, setActive] = useState(0)
+  const total = sheets.urls.length
 
-  useEffect(() => {
-    const outer = outerRef.current
-    const inner = innerRef.current
-    if (!outer || !inner) return
+  function goTo(index: number) {
+    const scroller = scrollerRef.current
+    if (!scroller) return
+    scroller.scrollTo({ left: index * scroller.clientWidth, behavior: 'smooth' })
+  }
 
-    function recompute() {
-      if (!outer || !inner) return
-      setScale(Math.min(1, outer.clientWidth / PAGE_WIDTH))
-      setHeight(inner.offsetHeight)
+  function handleScroll() {
+    const scroller = scrollerRef.current
+    if (!scroller) return
+    setActive(Math.round(scroller.scrollLeft / scroller.clientWidth))
+  }
+
+  function handleKeyDown(e: KeyboardEvent) {
+    if (e.key === 'ArrowLeft' && active > 0) {
+      e.preventDefault()
+      goTo(active - 1)
     }
-
-    recompute()
-    const observer = new ResizeObserver(recompute)
-    observer.observe(outer)
-    return () => observer.disconnect()
-  }, [html])
+    if (e.key === 'ArrowRight' && active < total - 1) {
+      e.preventDefault()
+      goTo(active + 1)
+    }
+  }
 
   return (
-    <div
-      ref={outerRef}
-      className="w-full max-w-[794px]"
-      style={{ height: height != null ? height * scale : undefined }}
-    >
+    <div className="flex flex-col gap-3">
       <div
-        ref={innerRef}
-        className="template-page min-h-[1050px] w-[794px] origin-top-left bg-white px-[96px] py-[76px] shadow-lg"
-        style={{ transform: `scale(${scale})` }}
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
+        ref={scrollerRef}
+        tabIndex={0}
+        onScroll={handleScroll}
+        onKeyDown={handleKeyDown}
+        className="flex snap-x snap-mandatory overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {sheets.urls.map((url, i) => (
+          <div key={url} className="flex w-full shrink-0 snap-center justify-center">
+            <img
+              src={url}
+              alt={t('documentViewer.sheetOf', { current: i + 1, total })}
+              className="h-auto w-full bg-white"
+              style={{
+                aspectRatio: `${sheets.widthPt} / ${sheets.heightPt}`,
+                // 96 CSS px to the inch, 72 pt: the sheet's actual printed size.
+                maxWidth: `${(sheets.widthPt * 96) / 72}px`,
+              }}
+            />
+          </div>
+        ))}
+      </div>
+
+      {total > 1 && (
+        <div className="sticky bottom-3 flex justify-center">
+          <div className="flex items-center gap-1 rounded-full bg-navy-900 px-1.5 py-1 shadow-[var(--shadow-card)]">
+            <button
+              type="button"
+              onClick={() => goTo(active - 1)}
+              disabled={active === 0}
+              aria-label={t('documentViewer.previousSheet')}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-sand-200 hover:bg-navy-800 disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <div className="flex flex-wrap items-center justify-center">
+              {sheets.urls.map((url, i) => (
+                <button
+                  key={url}
+                  type="button"
+                  onClick={() => goTo(i)}
+                  aria-label={t('documentViewer.goToSheet', { page: i + 1 })}
+                  aria-current={i === active ? 'page' : undefined}
+                  className="flex h-6 w-4 items-center justify-center"
+                >
+                  <span
+                    className={`h-2 w-2 rounded-full transition-colors ${
+                      i === active ? 'bg-turquoise-400' : 'bg-sand-400/40'
+                    }`}
+                  />
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => goTo(active + 1)}
+              disabled={active === total - 1}
+              aria-label={t('documentViewer.nextSheet')}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-sand-200 hover:bg-navy-800 disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-export function TemplatePages({ pages }: TemplatePagesProps) {
+export function TemplatePages({ document }: TemplatePagesProps) {
+  const { t } = useTranslation()
+  const [sheets, setSheets] = useState<Sheets | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    let urls: string[] = []
+    setSheets(null)
+    setFailed(false)
+    renderHtmlPagesToSheetImages(document.pages, { twoPagesPerSheet: document.twoPagesPerSheet })
+      .then(({ images, widthPt, heightPt }) => {
+        if (cancelled) return
+        urls = images.map((image) => URL.createObjectURL(image))
+        setSheets({ urls, widthPt, heightPt })
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true)
+      })
+    return () => {
+      cancelled = true
+      urls.forEach((url) => URL.revokeObjectURL(url))
+    }
+  }, [document])
+
   return (
-    <div className="flex flex-col items-center gap-4 rounded-2xl bg-navy-950/40 p-4">
-      <style>{`
-        .template-page {
-          font-family: 'Times New Roman', Georgia, serif;
-          color: #111827;
-          font-size: 14px;
-          line-height: 1.6;
-        }
-      `}</style>
-      {pages.map((html, i) => (
-        <ScaledPage key={i} html={html} />
-      ))}
+    <div className="rounded-2xl bg-navy-950/40 p-4">
+      {failed && <Alert variant="error" message={t('documentViewer.renderFailed')} />}
+      {!failed && !sheets && <p className="text-sm text-sand-300">{t('documentViewer.rendering')}</p>}
+      {sheets && <SheetCarousel key={sheets.urls[0]} sheets={sheets} />}
     </div>
   )
 }

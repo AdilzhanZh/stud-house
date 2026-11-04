@@ -1,4 +1,5 @@
 import { renderHtmlPagesToPdf } from './pdf'
+import type { FilledDocument } from './pdf'
 import { getProtocolTemplate } from '../api/protocolTemplateApi'
 import { formatDate } from './dateFormat'
 
@@ -12,7 +13,7 @@ export interface ProtocolFieldValues {
   protocolDate?: string
   // The selected students paired with their dormitory for the "Қаулы етілді"
   // resolution list — each renders as "name — dormitory" so it's clear at a
-  // glance who goes where. getFilledProtocolPages sorts them.
+  // glance who goes where. getFilledProtocolDocument sorts them.
   students: ProtocolStudentEntry[]
 }
 
@@ -103,9 +104,9 @@ function fillProtocolTemplate(pages: string[], values: Required<ProtocolFieldVal
 // to build the downloadable PDF and to render an inline read-only "white
 // pages" preview on ProtocolDetailPage, so viewing the full document no
 // longer requires downloading it first.
-export async function getFilledProtocolPages(values: ProtocolFieldValues): Promise<string[]> {
+export async function getFilledProtocolDocument(values: ProtocolFieldValues): Promise<FilledDocument> {
   const template = await getProtocolTemplate()
-  return fillWithDefaults(template.pages, values)
+  return { pages: fillWithDefaults(template.pages, values), twoPagesPerSheet: template.two_pages_per_sheet }
 }
 
 function fillWithDefaults(pages: string[], values: ProtocolFieldValues): string[] {

@@ -3,6 +3,7 @@ import type { kk } from './kk'
 // Typed against kk's shape so a missing/mistyped key here is a compile error.
 export const ru: typeof kk = {
   common: {
+    close: 'Закрыть',
     confirm: 'Подтвердить',
     cancel: 'Отмена',
     delete: 'Удалить',
@@ -12,6 +13,14 @@ export const ru: typeof kk = {
     enableDayView: 'Включить дневной вид',
     nightView: 'Ночной вид',
     dayView: 'Дневной вид',
+  },
+  documentViewer: {
+    rendering: 'Документ готовится…',
+    renderFailed: 'Не удалось показать документ. Его можно скачать и посмотреть.',
+    sheetOf: 'Страница {{current}} из {{total}}',
+    goToSheet: 'Перейти на страницу {{page}}',
+    previousSheet: 'Предыдущая страница',
+    nextSheet: 'Следующая страница',
   },
   protocolStatus: {
     pending: 'В ожидании',
@@ -895,6 +904,8 @@ export const ru: typeof kk = {
       votePending: 'Ещё не голосовал(а)',
       committeeVotes: 'Голоса комиссии',
       studentsTitle: 'Студенты',
+      studentsFullList: 'Полный список',
+      studentsFullListTitle: 'Студенты ({{count}})',
       roomColumn: 'Комната',
       documentPreview: 'Текст хаттама',
       previewFailed: 'Не удалось загрузить текст хаттама',

@@ -82,25 +82,10 @@ func (s *ProtocolService) List(ctx context.Context, status *domain.ProtocolStatu
 	return s.protocols.List(ctx, status)
 }
 
-// EligibleApplications is the manager's "prepare protocol" candidate list:
-// approved applications not yet attached to any protocol.
-func (s *ProtocolService) EligibleApplications(ctx context.Context) ([]*domain.Application, error) {
-	ids, err := s.protocols.EligibleApplicationIDs(ctx)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]*domain.Application, 0, len(ids))
-	for _, id := range ids {
-		app, err := s.applications.GetByID(ctx, id)
-		if err != nil {
-			if errors.Is(err, repository.ErrNotFound) {
-				continue
-			}
-			return nil, err
-		}
-		out = append(out, app)
-	}
-	return out, nil
+// Candidates is the manager's "prepare protocol" list: approved applicants and
+// current residents not yet in any protocol.
+func (s *ProtocolService) Candidates(ctx context.Context) ([]*domain.ProtocolCandidate, error) {
+	return s.protocols.ListCandidates(ctx)
 }
 
 // Delete is only allowed while a protocol is still pending — once approved
@@ -149,20 +134,43 @@ func mapProtocolCreationError(err error) error {
 		return apperror.BadRequest("бір немесе бірнеше өтініш табылмады")
 	case errors.Is(err, repository.ErrApplicationNotApproved):
 		return apperror.BadRequest("барлық өтініштер \"мақұлданды\" мәртебесінде болуы керек")
+	case errors.Is(err, repository.ErrResidentNotEligible):
+		return apperror.BadRequest("бір немесе бірнеше студент хаттамаға қосылатын жатақхана тұрғыны емес немесе бұрын хаттамада болған")
 	case errors.Is(err, repository.ErrConflict):
-		return apperror.Conflict("бір немесе бірнеше өтініш қазірдің өзінде басқа хаттамада бар")
+		return apperror.Conflict("бір немесе бірнеше студент қазірдің өзінде басқа хаттамада бар")
 	default:
 		return err
 	}
 }
 
-// Create bundles applicationIDs (all must be status=approved and not
-// already attached to any protocol) into a new protocol and sends it to
-// every current committee member for review — approval requires every
-// member's vote (see Vote), it is not automatic.
-func (s *ProtocolService) Create(ctx context.Context, actorID uuid.UUID, applicationIDs []uuid.UUID) (*domain.Protocol, error) {
-	if len(applicationIDs) == 0 {
-		return nil, apperror.BadRequest("өтініштер тізімі міндетті")
+func uniqueIDs(ids []uuid.UUID) []uuid.UUID {
+	seen := make(map[uuid.UUID]struct{}, len(ids))
+	out := make([]uuid.UUID, 0, len(ids))
+	for _, id := range ids {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out
+}
+
+// Create bundles approved applications and current residents (none already in
+// any protocol, at most domain.MaxProtocolStudents in total) into a new
+// protocol and sends it to every current committee member for review —
+// approval requires every member's vote (see Vote), it is not automatic.
+// Approval settles the applicants (see ContractService.OnProtocolApproved);
+// residents already live in a room, so it changes nothing for them.
+func (s *ProtocolService) Create(ctx context.Context, actorID uuid.UUID, applicationIDs, residentStudentIDs []uuid.UUID) (*domain.Protocol, error) {
+	applicationIDs = uniqueIDs(applicationIDs)
+	residentStudentIDs = uniqueIDs(residentStudentIDs)
+	total := len(applicationIDs) + len(residentStudentIDs)
+	if total == 0 {
+		return nil, apperror.BadRequest("студенттер тізімі міндетті")
+	}
+	if total > domain.MaxProtocolStudents {
+		return nil, apperror.BadRequest("бір хаттамаға 500-ден артық студент қосуға болмайды")
 	}
 
 	committeeMemberIDs, err := s.activeCommitteeMemberIDs(ctx)
@@ -171,7 +179,7 @@ func (s *ProtocolService) Create(ctx context.Context, actorID uuid.UUID, applica
 	}
 
 	protocol := &domain.Protocol{CreatedBy: actorID, Status: domain.ProtocolPending}
-	if err := s.protocols.CreateWithApplications(ctx, protocol, applicationIDs, committeeMemberIDs); err != nil {
+	if err := s.protocols.CreateWithStudents(ctx, protocol, applicationIDs, residentStudentIDs, committeeMemberIDs); err != nil {
 		return nil, mapProtocolCreationError(err)
 	}
 
@@ -297,6 +305,7 @@ func (s *ProtocolService) runOnApproved(ctx context.Context, protocolID uuid.UUI
 type ProtocolDetail struct {
 	Protocol         *domain.Protocol
 	Applications     []*domain.Application
+	Residents        []*domain.ProtocolResident
 	Students         map[uuid.UUID]*domain.User
 	Dormitories      map[uuid.UUID]*domain.Dormitory
 	Rooms            map[uuid.UUID]*domain.Room
@@ -353,6 +362,11 @@ func (s *ProtocolService) GetDetail(ctx context.Context, protocolID uuid.UUID) (
 		}
 	}
 
+	residents, err := s.protocols.ListResidents(ctx, protocolID)
+	if err != nil {
+		return nil, err
+	}
+
 	votes, err := s.protocols.ListVotes(ctx, protocolID)
 	if err != nil {
 		return nil, err
@@ -371,6 +385,7 @@ func (s *ProtocolService) GetDetail(ctx context.Context, protocolID uuid.UUID) (
 	return &ProtocolDetail{
 		Protocol:         protocol,
 		Applications:     applications,
+		Residents:        residents,
 		Students:         students,
 		Dormitories:      dormitories,
 		Rooms:            rooms,

@@ -571,7 +571,19 @@ var staticTranslations = map[string]translation{
 		"Заявка не ожидает решения",
 		"The application is not awaiting a decision",
 	},
-	"өтініштер тізімі міндетті": {"Список заявок обязателен", "A list of applications is required"},
+	"студенттер тізімі міндетті": {"Список студентов обязателен", "A list of students is required"},
+	"бір хаттамаға 500-ден артық студент қосуға болмайды": {
+		"В один протокол нельзя добавить больше 500 студентов",
+		"A protocol can't include more than 500 students",
+	},
+	"бір немесе бірнеше студент хаттамаға қосылатын жатақхана тұрғыны емес немесе бұрын хаттамада болған": {
+		"Один или несколько студентов не проживают в общежитии или уже были в протоколе",
+		"One or more students don't currently live in a dormitory or have already been in a protocol",
+	},
+	"бір немесе бірнеше студент қазірдің өзінде басқа хаттамада бар": {
+		"Один или несколько студентов уже есть в другом протоколе",
+		"One or more students are already in another protocol",
+	},
 	"өтінішті тек түзету қажет болған кезде ғана өзгертуге болады": {
 		"Заявку можно изменить только когда требуется исправление",
 		"The application can only be edited when a correction is needed",

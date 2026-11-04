@@ -1,81 +1,93 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Card } from '../../../components/Card'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
 import { extractErrorMessage } from '../../../api/client'
-import { createProtocol, listEligibleApplications } from '../../../api/protocolApi'
-import { listDormitories } from '../../../api/dormitoryApi'
-import { listUsers } from '../../../api/adminUserApi'
+import { createProtocol, listProtocolCandidates } from '../../../api/protocolApi'
 import { downloadProtocolPdf } from '../../../utils/protocolPdf'
-import type { Application } from '../../../types/applications'
-import type { User } from '../../../types'
+import { MAX_PROTOCOL_STUDENTS, type ProtocolCandidate } from '../../../types/protocols'
 
-interface Candidate {
-  application: Application
-  student: User | null
-  dormitoryName: string
+// A student can have more than one approved application, so an applicant's
+// row is identified by the application and only a resident's by the student.
+function candidateKey(c: ProtocolCandidate): string {
+  return c.application_id ?? c.student_id
 }
 
 export function ProtocolCreatePage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
 
-  const [candidates, setCandidates] = useState<Candidate[] | null>(null)
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [candidates, setCandidates] = useState<ProtocolCandidate[] | null>(null)
+  const [dormitoryFilter, setDormitoryFilter] = useState('')
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
   const [loadError, setLoadError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
-    Promise.all([listEligibleApplications(), listUsers('student'), listDormitories()])
-      .then(([applications, students, dormitories]) => {
-        const studentsById = new Map(students.map((s) => [s.id, s]))
-        const dormNamesById = new Map(dormitories.map((d) => [d.id, d.name]))
-        setCandidates(
-          applications.map((a) => ({
-            application: a,
-            student: studentsById.get(a.student_id) ?? null,
-            dormitoryName: dormNamesById.get(a.dormitory_id) ?? a.dormitory_id,
-          })),
-        )
-      })
+    listProtocolCandidates()
+      .then(setCandidates)
       .catch((err) => setLoadError(extractErrorMessage(err, t('admin.protocols.loadError'))))
   }, [t])
 
-  function toggleSelected(applicationId: string) {
-    setSelectedIds((prev) => {
+  const dormitoryOptions = useMemo(() => {
+    const options = new Map<string, { name: string; count: number }>()
+    candidates?.forEach((c) => {
+      const option = options.get(c.dormitory_id) ?? { name: c.dormitory_name, count: 0 }
+      option.count += 1
+      options.set(c.dormitory_id, option)
+    })
+    return Array.from(options, ([id, option]) => ({ id, ...option })).sort((a, b) =>
+      a.name.localeCompare(b.name, 'kk'),
+    )
+  }, [candidates])
+
+  const visible = useMemo(
+    () => (candidates ?? []).filter((c) => !dormitoryFilter || c.dormitory_id === dormitoryFilter),
+    [candidates, dormitoryFilter],
+  )
+
+  const isAtLimit = selectedKeys.size >= MAX_PROTOCOL_STUDENTS
+  // "Select all" can only ever take the first MAX_PROTOCOL_STUDENTS rows.
+  const allSelected = selectedKeys.size > 0 && selectedKeys.size === Math.min(visible.length, MAX_PROTOCOL_STUDENTS)
+
+  // The selection is cleared rather than carried over, so a protocol meant for
+  // one dormitory can't silently include students ticked under another filter.
+  function changeDormitoryFilter(dormitoryId: string) {
+    setDormitoryFilter(dormitoryId)
+    setSelectedKeys(new Set())
+  }
+
+  function toggleSelected(key: string) {
+    setSelectedKeys((prev) => {
       const next = new Set(prev)
-      if (next.has(applicationId)) next.delete(applicationId)
-      else next.add(applicationId)
+      if (next.has(key)) next.delete(key)
+      else if (next.size < MAX_PROTOCOL_STUDENTS) next.add(key)
       return next
     })
   }
 
   function toggleSelectAll() {
-    setSelectedIds((prev) =>
-      candidates && prev.size === candidates.length
-        ? new Set()
-        : new Set(candidates?.map((c) => c.application.id)),
-    )
+    setSelectedKeys(allSelected ? new Set() : new Set(visible.slice(0, MAX_PROTOCOL_STUDENTS).map(candidateKey)))
   }
 
   async function handleSubmit() {
-    if (!candidates || selectedIds.size === 0) return
+    if (selectedKeys.size === 0) return
     setSubmitError(null)
     setIsSubmitting(true)
     try {
-      const selected = candidates.filter((c) => selectedIds.has(c.application.id))
-      const protocol = await createProtocol(Array.from(selectedIds))
+      const selected = visible.filter((c) => selectedKeys.has(candidateKey(c)))
+      const protocol = await createProtocol(
+        selected.flatMap((c) => (c.application_id ? [c.application_id] : [])),
+        selected.filter((c) => !c.application_id).map((c) => c.student_id),
+      )
       try {
         await downloadProtocolPdf(
           {
             protocolNumber: protocol.number,
-            students: selected.map((c) => ({
-              name: c.student?.full_name ?? c.application.student_id,
-              dormitoryName: c.dormitoryName,
-            })),
+            students: selected.map((c) => ({ name: c.student_full_name, dormitoryName: c.dormitory_name })),
           },
           `khattama-${protocol.number}.pdf`,
         )
@@ -109,28 +121,65 @@ export function ProtocolCreatePage() {
             <p className="text-sm text-sand-300">{t('admin.protocols.noEligibleApplications')}</p>
           ) : (
             <>
-              <label className="mb-3 flex items-center gap-2 text-sm font-medium text-sand-200">
-                <input
-                  type="checkbox"
-                  checked={selectedIds.size === candidates.length}
-                  onChange={toggleSelectAll}
-                />
-                {t('admin.protocols.selectAll')}
+              <label className="mb-3 flex flex-col gap-1.5 text-sm font-medium text-sand-200">
+                {t('admin.protocols.filterByDormitory')}
+                <select
+                  value={dormitoryFilter}
+                  onChange={(e) => changeDormitoryFilter(e.target.value)}
+                  className="max-w-sm rounded-[14px] border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sm text-sand-100 outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
+                >
+                  <option value="">
+                    {t('admin.protocols.allDormitories')} ({candidates.length})
+                  </option>
+                  {dormitoryOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.name} ({option.count})
+                    </option>
+                  ))}
+                </select>
               </label>
+
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <label className="flex items-center gap-2 text-sm font-medium text-sand-200">
+                  <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} />
+                  {t('admin.protocols.selectAll')}
+                </label>
+                <span className="text-sm text-sand-300">
+                  {t('admin.protocols.selectedCount', { count: selectedKeys.size, max: MAX_PROTOCOL_STUDENTS })}
+                </span>
+              </div>
+              {isAtLimit && (
+                <div className="mb-3">
+                  <Alert
+                    variant="warning"
+                    message={t('admin.protocols.selectionLimit', { max: MAX_PROTOCOL_STUDENTS })}
+                  />
+                </div>
+              )}
+
               <ul className="flex flex-col gap-2">
-                {candidates.map(({ application, student, dormitoryName }) => (
-                  <li key={application.id}>
-                    <label className="flex items-center gap-2 text-sm text-sand-200">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(application.id)}
-                        onChange={() => toggleSelected(application.id)}
-                      />
-                      <span className="font-medium text-sand-100">{student?.full_name ?? application.student_id}</span>
-                      <span className="text-sand-300/70"> — {dormitoryName}</span>
-                    </label>
-                  </li>
-                ))}
+                {visible.map((c) => {
+                  const key = candidateKey(c)
+                  const isSelected = selectedKeys.has(key)
+                  return (
+                    <li key={key}>
+                      <label className="flex items-center gap-2 text-sm text-sand-200">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          disabled={!isSelected && isAtLimit}
+                          onChange={() => toggleSelected(key)}
+                        />
+                        <span className="font-medium text-sand-100">{c.student_full_name}</span>
+                        <span className="text-sand-300/70">
+                          {' '}
+                          — {c.dormitory_name}
+                          {!c.application_id && ` · ${t('admin.protocols.residentLabel')}`}
+                        </span>
+                      </label>
+                    </li>
+                  )
+                })}
               </ul>
             </>
           )}
@@ -141,7 +190,7 @@ export function ProtocolCreatePage() {
       <Button
         onClick={handleSubmit}
         isLoading={isSubmitting}
-        disabled={!candidates || selectedIds.size === 0}
+        disabled={!candidates || selectedKeys.size === 0}
         className="self-start"
       >
         {t('admin.protocols.prepareButton')}

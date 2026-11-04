@@ -41,10 +41,11 @@ type ProtocolTemplate struct {
 }
 
 // Protocol is a committee meeting-minutes document ("Хаттама") bundling a
-// batch of approved applications for placement, sent to every current
-// committee member for a vote. Number is a manager-facing sequential id
-// (Postgres SERIAL) matching the "№___" blank on the paper template — never
-// reused even if a protocol is later deleted.
+// batch of students, sent to every current committee member for a vote: both
+// approved applicants awaiting placement and current residents who have never
+// been in a protocol. Number is a manager-facing sequential id (Postgres
+// SERIAL) matching the "№___" blank on the paper template — never reused even
+// if a protocol is later deleted.
 type Protocol struct {
 	ID        uuid.UUID
 	Number    int
@@ -52,6 +53,33 @@ type Protocol struct {
 	CreatedBy uuid.UUID
 	CreatedAt time.Time
 	UpdatedAt time.Time
+}
+
+// MaxProtocolStudents caps how many students one protocol can list.
+const MaxProtocolStudents = 500
+
+// ProtocolCandidate is one student the manager can add to a new protocol.
+// ApplicationID is set for an approved applicant and nil for a current
+// resident; that decides which of the two lists ProtocolService.Create
+// receives the student in.
+type ProtocolCandidate struct {
+	ApplicationID   *uuid.UUID
+	StudentID       uuid.UUID
+	StudentFullName string
+	DormitoryID     uuid.UUID
+	DormitoryName   string
+	RoomNumber      *string
+}
+
+// ProtocolResident is a current resident's entry in a protocol. DormitoryName
+// and RoomNumber are snapshots taken when the protocol was created.
+type ProtocolResident struct {
+	StudentID     uuid.UUID
+	FullName      string
+	Email         string
+	Phone         string
+	DormitoryName string
+	RoomNumber    string
 }
 
 // NotificationProtocolReview is a notification_type enum value (added by a

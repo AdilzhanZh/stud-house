@@ -37,14 +37,40 @@ func protocolsDTO(list []*domain.Protocol) []protocolResponse {
 	return out
 }
 
+type protocolCandidateResponse struct {
+	ApplicationID   *uuid.UUID `json:"application_id"`
+	StudentID       uuid.UUID  `json:"student_id"`
+	StudentFullName string     `json:"student_full_name"`
+	DormitoryID     uuid.UUID  `json:"dormitory_id"`
+	DormitoryName   string     `json:"dormitory_name"`
+	RoomNumber      *string    `json:"room_number"`
+}
+
+func protocolCandidatesDTO(list []*domain.ProtocolCandidate) []protocolCandidateResponse {
+	out := make([]protocolCandidateResponse, 0, len(list))
+	for _, c := range list {
+		out = append(out, protocolCandidateResponse{
+			ApplicationID:   c.ApplicationID,
+			StudentID:       c.StudentID,
+			StudentFullName: c.StudentFullName,
+			DormitoryID:     c.DormitoryID,
+			DormitoryName:   c.DormitoryName,
+			RoomNumber:      c.RoomNumber,
+		})
+	}
+	return out
+}
+
+// protocolStudentResponse describes an approved applicant or, with the
+// application and dormitory id fields null, a current resident.
 type protocolStudentResponse struct {
-	ApplicationID     uuid.UUID  `json:"application_id"`
-	ApplicationStatus string     `json:"application_status"`
+	ApplicationID     *uuid.UUID `json:"application_id"`
+	ApplicationStatus *string    `json:"application_status"`
 	StudentID         uuid.UUID  `json:"student_id"`
 	StudentFullName   string     `json:"student_full_name"`
 	StudentEmail      string     `json:"student_email"`
 	StudentPhone      string     `json:"student_phone"`
-	DormitoryID       uuid.UUID  `json:"dormitory_id"`
+	DormitoryID       *uuid.UUID `json:"dormitory_id"`
 	DormitoryName     string     `json:"dormitory_name"`
 	AssignedRoomID    *uuid.UUID `json:"assigned_room_id"`
 	RoomNumber        *string    `json:"room_number"`
@@ -65,14 +91,15 @@ type protocolDetailResponse struct {
 }
 
 func protocolDetailDTO(d *service.ProtocolDetail) protocolDetailResponse {
-	students := make([]protocolStudentResponse, 0, len(d.Applications))
+	students := make([]protocolStudentResponse, 0, len(d.Applications)+len(d.Residents))
 	for _, app := range d.Applications {
 		student := d.Students[app.StudentID]
+		applicationStatus := string(app.Status)
 		row := protocolStudentResponse{
-			ApplicationID:     app.ID,
-			ApplicationStatus: string(app.Status),
+			ApplicationID:     &app.ID,
+			ApplicationStatus: &applicationStatus,
 			StudentID:         app.StudentID,
-			DormitoryID:       app.DormitoryID,
+			DormitoryID:       &app.DormitoryID,
 			AssignedRoomID:    app.AssignedRoomID,
 		}
 		if student != nil {
@@ -89,6 +116,16 @@ func protocolDetailDTO(d *service.ProtocolDetail) protocolDetailResponse {
 			}
 		}
 		students = append(students, row)
+	}
+	for _, res := range d.Residents {
+		students = append(students, protocolStudentResponse{
+			StudentID:       res.StudentID,
+			StudentFullName: res.FullName,
+			StudentEmail:    res.Email,
+			StudentPhone:    res.Phone,
+			DormitoryName:   res.DormitoryName,
+			RoomNumber:      &res.RoomNumber,
+		})
 	}
 
 	votes := make([]committeeVoteResponse, 0, len(d.Votes))

@@ -60,7 +60,8 @@ func (h *ProtocolHandler) GetByApplication(c *gin.Context) {
 }
 
 type createProtocolRequest struct {
-	ApplicationIDs []uuid.UUID `json:"application_ids" binding:"required"`
+	ApplicationIDs     []uuid.UUID `json:"application_ids"`
+	ResidentStudentIDs []uuid.UUID `json:"resident_student_ids"`
 }
 
 // Create ("Хаттама дайындау") is manager/admin-only.
@@ -71,7 +72,7 @@ func (h *ProtocolHandler) Create(c *gin.Context) {
 		return
 	}
 	actorID, _ := middleware.UserID(c)
-	protocol, err := h.protocols.Create(c.Request.Context(), actorID, req.ApplicationIDs)
+	protocol, err := h.protocols.Create(c.Request.Context(), actorID, req.ApplicationIDs, req.ResidentStudentIDs)
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -99,15 +100,15 @@ func (h *ProtocolHandler) List(c *gin.Context) {
 	response.OK(c, protocolsDTO(list))
 }
 
-// EligibleApplications is manager/admin-only: approved applications not yet
-// attached to any protocol — the "prepare protocol" candidate list.
-func (h *ProtocolHandler) EligibleApplications(c *gin.Context) {
-	list, err := h.protocols.EligibleApplications(c.Request.Context())
+// Candidates is manager/admin-only: approved applicants and current residents
+// not yet in any protocol — the "prepare protocol" candidate list.
+func (h *ProtocolHandler) Candidates(c *gin.Context) {
+	list, err := h.protocols.Candidates(c.Request.Context())
 	if err != nil {
 		response.Error(c, err)
 		return
 	}
-	response.OK(c, applicationsDTO(list))
+	response.OK(c, protocolCandidatesDTO(list))
 }
 
 // GetDetail is for managers/admin and committee members (who vote on these).

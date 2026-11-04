@@ -10,18 +10,70 @@ export interface ProtocolStudentEntry {
 export interface ProtocolFieldValues {
   protocolNumber: number
   protocolDate?: string
-  // The selected students paired with their dormitory, in the order they
-  // should be numbered in the "Қаулы етілді" resolution list — each renders
-  // as "name — dormitory" so it's clear at a glance who goes where.
+  // The selected students paired with their dormitory for the "Қаулы етілді"
+  // resolution list — each renders as "name — dormitory" so it's clear at a
+  // glance who goes where. getFilledProtocolPages sorts them.
   students: ProtocolStudentEntry[]
+}
+
+const STUDENT_LIST_COLUMNS = 2
+
+// Sorted by dormitory, then name, so the numbering is the same however the
+// list was gathered: the PDF made on creation matches the detail page's.
+export function sortProtocolStudents<T>(
+  students: T[],
+  dormitoryName: (student: T) => string,
+  name: (student: T) => string,
+): T[] {
+  return [...students].sort(
+    (a, b) =>
+      dormitoryName(a).localeCompare(dormitoryName(b), 'kk') || name(a).localeCompare(name(b), 'kk'),
+  )
+}
+
+// A table, because a protocol can list hundreds of students: two numbered
+// entries per row, read left to right, keep it to far fewer sheets.
+function buildStudentListTable(students: ProtocolStudentEntry[]): HTMLTableElement {
+  const table = document.createElement('table')
+  table.style.width = '100%'
+  table.style.tableLayout = 'fixed'
+  table.style.borderCollapse = 'collapse'
+  const tbody = table.createTBody()
+
+  for (let start = 0; start < students.length; start += STUDENT_LIST_COLUMNS) {
+    const row = tbody.insertRow()
+    for (let i = start; i < start + STUDENT_LIST_COLUMNS; i++) {
+      const cell = row.insertCell()
+      cell.style.width = `${100 / STUDENT_LIST_COLUMNS}%`
+      cell.style.padding = '0 12px 2px 0'
+      cell.style.verticalAlign = 'top'
+      if (i < students.length) {
+        cell.textContent = `${i + 1}. ${students[i].name} — ${students[i].dormitoryName};`
+      }
+    }
+  }
+  return table
+}
+
+// A table can't live inside a <p>: the browser would close the paragraph when
+// the saved HTML is parsed again, so it goes right after one instead.
+function replaceWithStudentList(el: HTMLElement, table: HTMLTableElement) {
+  const parent = el.parentElement
+  if (parent?.tagName !== 'P') {
+    el.replaceWith(table)
+    return
+  }
+  el.remove()
+  parent.after(table)
+  if (!parent.textContent?.trim()) parent.remove()
 }
 
 // The saved template stores {{student_list}} as
 // <span class="protocol-var" data-token="{{student_list}}">...</span> —
 // unlike every other token (a single value swapped in as plain text), this
-// one expands into a whole numbered paragraph per selected student, so it's
-// handled separately from the rest. Applied per page since a template can
-// now span more than one.
+// one expands into a whole table of selected students, so it's handled
+// separately from the rest. Applied per page since a template can now span
+// more than one.
 function fillProtocolTemplate(pages: string[], values: Required<ProtocolFieldValues>): string[] {
   return pages.map((page) => {
     const container = document.createElement('div')
@@ -31,14 +83,7 @@ function fillProtocolTemplate(pages: string[], values: Required<ProtocolFieldVal
       const key = token.replace(/^\{\{|\}\}$/g, '')
 
       if (key === 'student_list') {
-        const fragment = document.createDocumentFragment()
-        values.students.forEach(({ name, dormitoryName }, i) => {
-          const p = document.createElement('p')
-          p.style.margin = '0 0 2px'
-          p.textContent = `${i + 1}. ${name} — ${dormitoryName};`
-          fragment.appendChild(p)
-        })
-        el.replaceWith(fragment)
+        replaceWithStudentList(el, buildStudentListTable(values.students))
         return
       }
 
@@ -62,6 +107,11 @@ export async function getFilledProtocolPages(values: ProtocolFieldValues): Promi
   const template = await getProtocolTemplate()
   return fillProtocolTemplate(template.pages, {
     ...values,
+    students: sortProtocolStudents(
+      values.students,
+      (s) => s.dormitoryName,
+      (s) => s.name,
+    ),
     protocolDate: values.protocolDate ?? formatDate(new Date()),
   })
 }

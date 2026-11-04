@@ -35,6 +35,33 @@ const RENDER_SCALE = 2
 // Rasterizing here and slicing the canvas ourselves, one page at a time,
 // removes that whole class of bug: page boundaries are computed from the
 // canvas we actually produced, not inferred from mismatched options.
+// Moves a page break up to the nearest fully white pixel row, the gap between
+// two lines of text, so that a long document isn't sliced through a line. If
+// there's no such gap within the last 15% of the page (a large image, say), the
+// break stays where it was.
+function findPageBreak(canvas: HTMLCanvasElement, startPx: number, pageHeightPx: number): number {
+  const idealBreakPx = startPx + pageHeightPx
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return idealBreakPx
+
+  const searchHeightPx = Math.floor(pageHeightPx * 0.15)
+  const searchTopPx = idealBreakPx - searchHeightPx
+  const { data } = ctx.getImageData(0, searchTopPx, canvas.width, searchHeightPx)
+  const bytesPerRow = canvas.width * 4
+
+  for (let row = searchHeightPx - 1; row >= 0; row--) {
+    let isWhite = true
+    for (let i = row * bytesPerRow; i < (row + 1) * bytesPerRow; i++) {
+      if (data[i] < 250) {
+        isWhite = false
+        break
+      }
+    }
+    if (isWhite) return searchTopPx + row + 1
+  }
+  return idealBreakPx
+}
+
 async function renderPageIntoDoc(doc: jsPDF, innerHTML: string, isFirstPageOfDoc: boolean): Promise<void> {
   const container = document.createElement('div')
   container.style.position = 'absolute'
@@ -64,7 +91,9 @@ async function renderPageIntoDoc(doc: jsPDF, innerHTML: string, isFirstPageOfDoc
     let offsetPx = 0
     let firstSlice = true
     while (offsetPx < canvas.height) {
-      const sliceHeightPx = Math.min(pageHeightPx, canvas.height - offsetPx)
+      const remainingPx = canvas.height - offsetPx
+      const sliceHeightPx =
+        remainingPx > pageHeightPx ? findPageBreak(canvas, offsetPx, pageHeightPx) - offsetPx : remainingPx
 
       const sliceCanvas = document.createElement('canvas')
       sliceCanvas.width = canvas.width
@@ -77,7 +106,17 @@ async function renderPageIntoDoc(doc: jsPDF, innerHTML: string, isFirstPageOfDoc
         doc.addPage()
       }
       const imgHeightPt = (sliceHeightPx / RENDER_SCALE) * pxToPt
-      doc.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', MARGIN_PT, MARGIN_PT, CONTENT_WIDTH_PT, imgHeightPt)
+      // 'FAST' compression: left uncompressed, each page is about 11 MB.
+      doc.addImage(
+        sliceCanvas.toDataURL('image/png'),
+        'PNG',
+        MARGIN_PT,
+        MARGIN_PT,
+        CONTENT_WIDTH_PT,
+        imgHeightPt,
+        undefined,
+        'FAST',
+      )
 
       offsetPx += sliceHeightPx
       firstSlice = false

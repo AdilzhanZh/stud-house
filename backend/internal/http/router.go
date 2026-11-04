@@ -260,7 +260,7 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 				mgmt.PUT("/contract-template", h.ContractTemplate.Update)
 
 				mgmt.POST("/protocols", h.Protocol.Create)
-				mgmt.GET("/protocols/eligible-applications", h.Protocol.EligibleApplications)
+				mgmt.GET("/protocols/candidates", h.Protocol.Candidates)
 				mgmt.DELETE("/protocols/:id", h.Protocol.Delete)
 
 				mgmt.POST("/admin/contracts/expire-check", h.Contract.ExpireCheck)

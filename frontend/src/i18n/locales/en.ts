@@ -900,7 +900,12 @@ export const en: typeof kk = {
       backToProtocols: 'Back to protocols',
       gatherStudents: 'Gather students',
       noEligibleApplications:
-        'There are no applications eligible to add to a protocol (approved, and not already in another protocol).',
+        'There are no students to add to a protocol: every approved applicant and dormitory resident is already in one.',
+      filterByDormitory: 'Filter by dormitory',
+      allDormitories: 'All dormitories',
+      selectedCount: 'Selected: {{count}} / {{max}}',
+      selectionLimit: 'You can select at most {{max}} students for one protocol.',
+      residentLabel: 'resident',
       selectAll: 'Select all',
       createFailed: 'Failed to prepare the protocol',
     },

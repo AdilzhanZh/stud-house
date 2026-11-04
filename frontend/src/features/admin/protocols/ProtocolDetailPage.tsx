@@ -9,7 +9,7 @@ import { ProtocolStatusBadge } from '../../../components/ProtocolStatusBadge'
 import { extractErrorMessage } from '../../../api/client'
 import { TemplatePages } from '../../../components/TemplatePages'
 import { deleteProtocol, getProtocolDetail, voteProtocol } from '../../../api/protocolApi'
-import { downloadProtocolPdf, getFilledProtocolPages } from '../../../utils/protocolPdf'
+import { downloadProtocolPdf, getFilledProtocolPages, sortProtocolStudents } from '../../../utils/protocolPdf'
 import { formatDate } from '../../../utils/dateFormat'
 import { useAuth } from '../../auth/useAuth'
 import { canManage } from '../../../constants/roles'
@@ -193,8 +193,12 @@ export function ProtocolDetailPage() {
               </tr>
             </thead>
             <tbody>
-              {protocol.students.map((s) => (
-                <tr key={s.application_id}>
+              {sortProtocolStudents(
+                protocol.students,
+                (s) => s.dormitory_name,
+                (s) => s.student_full_name,
+              ).map((s) => (
+                <tr key={s.application_id ?? s.student_id}>
                   <td className="px-2 py-1.5 text-sand-100">{s.student_full_name}</td>
                   <td className="px-2 py-1.5 text-sand-100">{s.dormitory_name}</td>
                   <td className="px-2 py-1.5 text-sand-100">{s.room_number ?? '—'}</td>

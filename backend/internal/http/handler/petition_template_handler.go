@@ -31,7 +31,8 @@ type petitionTemplateResponse struct {
 	Variables []petitionVariableResponse `json:"variables,omitempty"`
 }
 
-// Get is manager/admin-only: loads the single system-wide template plus the
+// Get is open to any authenticated user (a student's browser fills it in to
+// generate their own copy): loads the single system-wide template plus the
 // fixed variable whitelist the editor UI lets a manager insert.
 func (h *PetitionTemplateHandler) Get(c *gin.Context) {
 	t, err := h.templates.Get(c.Request.Context())

@@ -145,6 +145,11 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 			// (see the PUT below, alongside the other admin template routes).
 			protected.GET("/contract-template", h.ContractTemplate.Get)
 
+			// Same for the petition template: the student's own copy is generated
+			// client-side when they submit an application (see frontend's
+			// petitionPdf.ts). Only admin/manager may edit it (see the PUT below).
+			protected.GET("/petition-template", h.PetitionTemplate.Get)
+
 			// Committee-only: is_committee_member=true, an admin-toggled flag on
 			// a user (chairperson is a further flag on top of that).
 			committeeGroup := protected.Group("")
@@ -246,7 +251,6 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 				// Aggregate intake-campaign progress for the dashboard.
 				mgmt.GET("/campaign-stats", h.Campaign.Get)
 
-				mgmt.GET("/petition-template", h.PetitionTemplate.Get)
 				mgmt.PUT("/petition-template", h.PetitionTemplate.Update)
 
 				mgmt.POST("/notifications/broadcast", h.Notification.Broadcast)

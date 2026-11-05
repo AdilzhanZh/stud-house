@@ -72,6 +72,8 @@ type ProtocolCandidate struct {
 	DormitoryID     uuid.UUID
 	DormitoryName   string
 	RoomNumber      *string
+	// StudyGroup is empty for a resident who never applied through the system.
+	StudyGroup string
 }
 
 // ProtocolResident is a current resident's entry in a protocol. DormitoryName
@@ -83,6 +85,9 @@ type ProtocolResident struct {
 	Phone         string
 	DormitoryName string
 	RoomNumber    string
+	// StudyGroup comes from the student's latest application that has one, and
+	// is empty for a resident who never applied through the system.
+	StudyGroup string
 }
 
 // NotificationProtocolReview is a notification_type enum value (added by a

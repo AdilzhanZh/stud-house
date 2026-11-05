@@ -58,6 +58,7 @@ type studentProfileResponse struct {
 	Gender         *string   `json:"gender"`
 	Course         *int16    `json:"course"`
 	AcademicDegree *string   `json:"academic_degree"`
+	Institute      string    `json:"institute"`
 }
 
 func studentProfileDTO(p *domain.StudentProfile) studentProfileResponse {
@@ -71,7 +72,7 @@ func studentProfileDTO(p *domain.StudentProfile) studentProfileResponse {
 		d := string(*p.AcademicDegree)
 		academicDegree = &d
 	}
-	return studentProfileResponse{UserID: p.UserID, Gender: gender, Course: p.Course, AcademicDegree: academicDegree}
+	return studentProfileResponse{UserID: p.UserID, Gender: gender, Course: p.Course, AcademicDegree: academicDegree, Institute: p.Institute}
 }
 
 type dormitoryResponse struct {

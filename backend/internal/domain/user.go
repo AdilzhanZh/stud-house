@@ -124,6 +124,9 @@ type StudentProfile struct {
 	Gender         *Gender
 	Course         *int16
 	AcademicDegree *AcademicDegree
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	// Institute is free text printed on the student's referral, empty until
+	// they enter it. Saved on its own (UpdateInstitute), not through Upsert.
+	Institute string
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }

@@ -18,6 +18,7 @@ type Handlers struct {
 	Application      *handler.ApplicationHandler
 	Notification     *handler.NotificationHandler
 	Protocol         *handler.ProtocolHandler
+	Referral         *handler.ReferralHandler
 	ProtocolTemplate *handler.ProtocolTemplateHandler
 	PetitionTemplate *handler.PetitionTemplateHandler
 	ContractTemplate *handler.ContractTemplateHandler
@@ -51,6 +52,10 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 		// Publicly readable (files are only linked from admin-authored
 		// content, same trust level as the plain external URLs this replaces).
 		api.Static("/uploads", uploadDir)
+
+		// Public: the QR code on a referral opens this for anyone who scans it,
+		// and its token can't be guessed.
+		api.GET("/referrals/verify/:token", h.Referral.Verify)
 
 		authGroup := api.Group("/auth")
 		{
@@ -106,6 +111,7 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 			protected.PUT("/students/:id/profile", h.User.UpsertStudentProfile)
 			protected.GET("/students/:id/profile", h.User.GetStudentProfile)
 			protected.GET("/students/:id/residence", h.Room.GetMyResidence)
+			protected.PATCH("/students/:id/institute", h.User.UpdateStudentInstitute)
 			protected.PATCH("/users/:id/avatar", h.User.UpdateAvatar)
 
 			// Any authenticated user: their own password/email.
@@ -190,6 +196,8 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 				studentGroup.PATCH("/applications/:id", h.Application.Resubmit)
 				studentGroup.DELETE("/applications/:id", h.Application.Delete)
 				studentGroup.POST("/applications/:id/documents", h.Application.AddDocument)
+
+				studentGroup.GET("/referrals/my", h.Referral.GetMine)
 
 				studentGroup.GET("/contracts/my", h.Contract.ListMine)
 				studentGroup.PATCH("/contracts/:id/respond", h.Contract.Respond)

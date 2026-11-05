@@ -31,6 +31,7 @@ export interface StudentProfile {
   gender: Gender | null
   course: number | null
   academic_degree: AcademicDegree | null
+  institute: string
 }
 
 export interface TokenPair {

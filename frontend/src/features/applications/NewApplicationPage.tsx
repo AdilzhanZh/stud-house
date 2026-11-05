@@ -17,7 +17,7 @@ import {
 } from '../../api/applicationApi'
 import { assignOwnBenefit, listBenefitRequiredDocuments, listBenefits } from '../../api/benefitApi'
 import { listRoomsByDormitory } from '../../api/roomApi'
-import { getStudentProfile } from '../../api/profileApi'
+import { getStudentProfile, updateStudentInstitute } from '../../api/profileApi'
 import { uploadFile } from '../../api/uploadApi'
 import { generatePetitionPdfBlob, PETITION_RECEIPT_DOCUMENT_NAME } from '../../utils/petitionPdf'
 import { downloadContractPdf, getFilledContractDocument } from '../../utils/contractPdf'
@@ -131,6 +131,7 @@ export function NewApplicationPage() {
   >({})
   const [docFiles, setDocFiles] = useState<Record<string, File | null>>({})
   const [studyGroup, setStudyGroup] = useState('')
+  const [institute, setInstitute] = useState('')
   const [hometown, setHometown] = useState('')
   const [parentContact, setParentContact] = useState('')
   const [wish, setWish] = useState('')
@@ -175,7 +176,10 @@ export function NewApplicationPage() {
       .catch(() => {})
     if (user) {
       getStudentProfile(user.id)
-        .then((profile) => setStudentGender(profile.gender))
+        .then((profile) => {
+          setStudentGender(profile.gender)
+          setInstitute(profile.institute)
+        })
         .catch(() => {})
     }
   }, [user])
@@ -287,7 +291,7 @@ export function NewApplicationPage() {
         )
         return
       }
-      if (!studyGroup.trim() || !hometown.trim() || !parentContact.trim()) {
+      if (!institute.trim() || !studyGroup.trim() || !hometown.trim() || !parentContact.trim()) {
         setServerError(t('wizard.missingPetitionFieldsError'))
         return
       }
@@ -350,6 +354,10 @@ export function NewApplicationPage() {
         contract_agreed: contractAgreed,
       })
       createdApplicationId = application.id
+
+      // Only ever printed on the referral, and the student can still enter it in
+      // their profile, so this must not fail a submitted application.
+      if (user) await updateStudentInstitute(user.id, institute.trim()).catch(() => undefined)
 
       // Attach the already-uploaded documents. If any of this fails, roll
       // back the just-created application rather than leaving it without
@@ -661,6 +669,14 @@ export function NewApplicationPage() {
             <Card className="!p-4">
               <p className="mb-3 text-sm text-sand-300">{t('wizard.petitionSection')}</p>
               <div className="flex flex-col gap-3">
+                <Input
+                  label={t('referral.instituteLabel')}
+                  placeholder={t('referral.institutePlaceholder')}
+                  value={institute}
+                  onChange={(e) => setInstitute(e.target.value)}
+                  maxLength={200}
+                  required
+                />
                 <Input
                   label={t('wizard.studyGroupLabel')}
                   placeholder={t('wizard.studyGroupPlaceholder')}

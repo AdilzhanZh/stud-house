@@ -45,6 +45,10 @@ type Config struct {
 	// once its deadline is within this window (phase 5).
 	ContractReminderWindow time.Duration
 
+	// ReferralSignatoryName is the prorector printed on newly issued referrals;
+	// referrals already issued keep the name they were issued with.
+	ReferralSignatoryName string
+
 	// DataRetentionPeriod is how long applications, contracts, and
 	// protocols are kept after creation before RetentionService purges
 	// them. Applications are only purged once nothing (contract, protocol)
@@ -104,6 +108,7 @@ func Load() (*Config, error) {
 		SMTPFrom:     getEnv("SMTP_FROM", getEnv("SMTP_USERNAME", "")),
 	}
 	cfg.FeedbackEmail = getEnv("FEEDBACK_EMAIL", cfg.SMTPFrom)
+	cfg.ReferralSignatoryName = getEnv("REFERRAL_SIGNATORY_NAME", "У.С. Ибраев")
 	cfg.AIProvider, cfg.AIAPIKey = aiProvider(getEnv("OPENROUTER_API_KEY", ""), getEnv("ANTHROPIC_API_KEY", ""))
 	cfg.DocumentCheckModel = getEnv("DOCUMENT_CHECK_MODEL", "")
 	cfg.AssistantModel = getEnv("ASSISTANT_MODEL", "")

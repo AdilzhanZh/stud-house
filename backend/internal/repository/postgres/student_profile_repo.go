@@ -39,12 +39,21 @@ func (r *StudentProfileRepo) Upsert(ctx context.Context, p *domain.StudentProfil
 	return r.db.QueryRow(ctx, q, p.UserID, gender, p.Course, academicDegree).Scan(&p.CreatedAt, &p.UpdatedAt)
 }
 
+func (r *StudentProfileRepo) UpdateInstitute(ctx context.Context, userID uuid.UUID, institute string) error {
+	const q = `
+		INSERT INTO student_profiles (user_id, institute)
+		VALUES ($1, $2)
+		ON CONFLICT (user_id) DO UPDATE SET institute = $2, updated_at = now()`
+	_, err := r.db.Exec(ctx, q, userID, institute)
+	return err
+}
+
 func (r *StudentProfileRepo) GetByUserID(ctx context.Context, userID uuid.UUID) (*domain.StudentProfile, error) {
-	const q = `SELECT user_id, gender, course, academic_degree, created_at, updated_at FROM student_profiles WHERE user_id = $1`
+	const q = `SELECT user_id, gender, course, academic_degree, COALESCE(institute, ''), created_at, updated_at FROM student_profiles WHERE user_id = $1`
 	p := &domain.StudentProfile{}
 	var gender *string
 	var academicDegree *string
-	err := r.db.QueryRow(ctx, q, userID).Scan(&p.UserID, &gender, &p.Course, &academicDegree, &p.CreatedAt, &p.UpdatedAt)
+	err := r.db.QueryRow(ctx, q, userID).Scan(&p.UserID, &gender, &p.Course, &academicDegree, &p.Institute, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, repository.ErrNotFound

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ChevronLeft, Camera } from 'lucide-react'
@@ -10,6 +10,7 @@ import { Alert } from '../../components/Alert'
 import { useAuth } from '../auth/useAuth'
 import { uploadFile } from '../../api/uploadApi'
 import { updateAvatar, changeOwnPassword, changeOwnEmail } from '../../api/userApi'
+import { getStudentProfile, updateStudentInstitute } from '../../api/profileApi'
 import { extractErrorMessage } from '../../api/client'
 
 export function EditProfilePage() {
@@ -33,7 +34,36 @@ export function EditProfilePage() {
   const [emailSuccess, setEmailSuccess] = useState(false)
   const [isChangingEmail, setIsChangingEmail] = useState(false)
 
+  const [institute, setInstitute] = useState('')
+  const [instituteError, setInstituteError] = useState<string | null>(null)
+  const [instituteSaved, setInstituteSaved] = useState(false)
+  const [isSavingInstitute, setIsSavingInstitute] = useState(false)
+
+  const userId = user?.id
+  useEffect(() => {
+    if (!userId) return
+    getStudentProfile(userId)
+      .then((profile) => setInstitute(profile.institute))
+      .catch(() => undefined)
+  }, [userId])
+
   if (!user) return null
+
+  async function handleSaveInstitute(e: React.FormEvent) {
+    e.preventDefault()
+    if (!user) return
+    setInstituteError(null)
+    setInstituteSaved(false)
+    setIsSavingInstitute(true)
+    try {
+      await updateStudentInstitute(user.id, institute)
+      setInstituteSaved(true)
+    } catch (err) {
+      setInstituteError(extractErrorMessage(err, t('referral.instituteSaveFailed')))
+    } finally {
+      setIsSavingInstitute(false)
+    }
+  }
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -133,6 +163,28 @@ export function EditProfilePage() {
         </div>
         {avatarError && <Alert variant="error" message={avatarError} />}
       </Card>
+
+      {user.role === 'student' && (
+        <Card>
+          <p className="mb-3 text-[15px] font-bold text-sand-100">{t('referral.instituteTitle')}</p>
+          <form className="flex flex-col gap-3" onSubmit={handleSaveInstitute}>
+            {instituteError && <Alert variant="error" message={instituteError} />}
+            {instituteSaved && <Alert variant="success" message={t('referral.instituteSaved')} />}
+            <Input
+              id="institute"
+              label={t('referral.instituteLabel')}
+              placeholder={t('referral.institutePlaceholder')}
+              value={institute}
+              onChange={(e) => setInstitute(e.target.value)}
+              maxLength={200}
+              required
+            />
+            <Button type="submit" isLoading={isSavingInstitute} className="self-start">
+              {t('referral.instituteSave')}
+            </Button>
+          </form>
+        </Card>
+      )}
 
       <Card>
         <p className="mb-3 text-[15px] font-bold text-sand-100">{t('profile.editProfile.emailTitle')}</p>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, QrCode } from 'lucide-react'
 import { Card } from '../../components/Card'
 import { Alert } from '../../components/Alert'
 import { extractErrorMessage } from '../../api/client'
@@ -84,6 +84,19 @@ export function MyResidencePage() {
             </div>
           </div>
         )}
+      </Card>
+
+      <Card onClick={() => navigate('/my-residence/referral')}>
+        <div className="flex items-center gap-3.5">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-turquoise-500/15 text-turquoise-400">
+            <QrCode className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[15px] font-semibold text-sand-100">{t('referral.title')}</p>
+            <p className="mt-0.5 text-sm text-sand-300">{t('referral.cardHint')}</p>
+          </div>
+          <span className="text-sand-300">→</span>
+        </div>
       </Card>
 
       <ResidenceRequestsSection />

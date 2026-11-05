@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"time"
+
+	"github.com/google/uuid"
 
 	"student-house/internal/config"
 	"student-house/internal/domain"
@@ -47,6 +50,7 @@ func main() {
 	notificationRepo := postgres.NewNotificationRepo(pool)
 	protocolTemplateRepo := postgres.NewProtocolTemplateRepo(pool)
 	protocolRepo := postgres.NewProtocolRepo(pool)
+	referralRepo := postgres.NewReferralRepo(pool)
 	contractRepo := postgres.NewContractRepo(pool)
 	exitRequestRepo := postgres.NewExitRequestRepo(pool)
 	transferRequestRepo := postgres.NewTransferRequestRepo(pool)
@@ -129,9 +133,18 @@ func main() {
 	retentionService := service.NewRetentionService(protocolRepo, contractRepo, applicationRepo, cfg.DataRetentionPeriod)
 	academicYearService := service.NewAcademicYearService(academicYearRepo)
 
-	// Once a protocol's vote tally resolves to approved, auto-generate
-	// contracts for its applications.
-	protocolService.SetOnApproved(contractService.OnProtocolApproved)
+	referralService := service.NewReferralService(referralRepo, notifierService, cfg.ReferralSignatoryName)
+
+	// Once a protocol's vote tally resolves to approved, settle its students and
+	// then issue their referrals, in that order: whether a referral is valid
+	// depends on the student having a room. A failure to settle one batch must
+	// not cost the others their referrals, so both always run.
+	protocolService.SetOnApproved(func(ctx context.Context, protocolID uuid.UUID) error {
+		return errors.Join(
+			contractService.OnProtocolApproved(ctx, protocolID),
+			referralService.OnProtocolApproved(ctx, protocolID),
+		)
+	})
 
 	handlers := apihttp.Handlers{
 		Auth:             handler.NewAuthHandler(authService),
@@ -143,6 +156,7 @@ func main() {
 		Application:      handler.NewApplicationHandler(applicationService, triageService),
 		Notification:     handler.NewNotificationHandler(notificationService),
 		Protocol:         handler.NewProtocolHandler(protocolService, applicationService),
+		Referral:         handler.NewReferralHandler(referralService),
 		ProtocolTemplate: handler.NewProtocolTemplateHandler(protocolTemplateService),
 		Contract:         handler.NewContractHandler(contractService, applicationService),
 		Feedback:         handler.NewFeedbackHandler(feedbackService),

@@ -54,6 +54,7 @@ type UserRepository interface {
 type StudentProfileRepository interface {
 	Upsert(ctx context.Context, p *domain.StudentProfile) error
 	GetByUserID(ctx context.Context, userID uuid.UUID) (*domain.StudentProfile, error)
+	UpdateInstitute(ctx context.Context, userID uuid.UUID, institute string) error
 }
 
 type DormitoryRepository interface {

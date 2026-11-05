@@ -323,6 +323,39 @@ func (h *UserHandler) UpsertStudentProfile(c *gin.Context) {
 	response.OK(c, studentProfileDTO(profile))
 }
 
+type updateStudentInstituteRequest struct {
+	Institute string `json:"institute"`
+}
+
+// UpdateStudentInstitute is allowed for admin/manager (any student) or the
+// student themselves (their own profile only).
+func (h *UserHandler) UpdateStudentInstitute(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, apperror.BadRequest("пайдаланушы идентификаторы дұрыс емес"))
+		return
+	}
+	if !canAccessStudentResource(c, id) {
+		response.Error(c, apperror.Forbidden("тек өз профиліңізді ғана басқара аласыз"))
+		return
+	}
+	var req updateStudentInstituteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.BadRequest(err.Error()))
+		return
+	}
+	if err := h.users.UpdateStudentInstitute(c.Request.Context(), id, req.Institute); err != nil {
+		response.Error(c, err)
+		return
+	}
+	profile, err := h.users.GetStudentProfile(c.Request.Context(), id)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, studentProfileDTO(profile))
+}
+
 func (h *UserHandler) GetStudentProfile(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {

@@ -46,6 +46,8 @@ import { ContractTemplatePage } from './features/admin/contracts/ContractTemplat
 import { ContractDetailPage } from './features/admin/contracts/ContractDetailPage'
 import { ExitRequestListPage } from './features/admin/requests/ExitRequestListPage'
 import { TransferRequestListPage } from './features/admin/requests/TransferRequestListPage'
+import { MyReferralPage } from './features/referral/MyReferralPage'
+import { ReferralVerifyPage } from './features/referral/ReferralVerifyPage'
 import { ProtectedRoute } from './routes/ProtectedRoute'
 import { RoleBasedRedirect } from './routes/RoleBasedRedirect'
 import { useAuthBootstrap } from './features/auth/useAuthBootstrap'
@@ -64,6 +66,9 @@ function App() {
 
   return (
     <Routes>
+      {/* Public: a QR code scanned by someone with no account here. */}
+      <Route path="/r/:token" element={<ReferralVerifyPage />} />
+
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
@@ -83,6 +88,7 @@ function App() {
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/contracts/my" element={<ContractsPage />} />
           <Route path="/my-residence" element={<MyResidencePage />} />
+          <Route path="/my-residence/referral" element={<MyReferralPage />} />
         </Route>
       </Route>
 

@@ -1,0 +1,2 @@
+-- PostgreSQL has no ALTER TYPE ... DROP VALUE; see the equivalent note in
+-- 000016_add_report_review_notification_type.down.sql.

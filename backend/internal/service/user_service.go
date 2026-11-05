@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 
@@ -283,6 +285,22 @@ func (s *UserService) UpsertStudentProfile(ctx context.Context, userID uuid.UUID
 		}
 	}
 	return s.profiles.Upsert(ctx, &domain.StudentProfile{UserID: userID, Gender: gender, Course: course, AcademicDegree: academicDegree})
+}
+
+// UpdateStudentInstitute saves the institute printed on the student's referral.
+func (s *UserService) UpdateStudentInstitute(ctx context.Context, userID uuid.UUID, institute string) error {
+	user, err := s.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if user.Role != domain.RoleStudent {
+		return apperror.BadRequest("профиль (жынысы/курсы) тек студентке ғана орнатылады")
+	}
+	institute = strings.TrimSpace(institute)
+	if utf8.RuneCountInString(institute) > domain.MaxInstituteLength {
+		return apperror.BadRequest("институт атауы тым ұзын")
+	}
+	return s.profiles.UpdateInstitute(ctx, userID, institute)
 }
 
 // ListPendingStudents is manager/admin-only: self-registered students

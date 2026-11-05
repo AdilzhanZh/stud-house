@@ -649,6 +649,10 @@ export const ru: typeof kk = {
       bulkDownloadSelected: 'Выбрано: {{count}}',
       bulkDownloadButton: 'Скачать PDF',
       bulkDownloadFailed: 'Не удалось сформировать документ',
+      bulkDownloadIncludeDocuments: 'Скачать вместе с документами студента',
+      bulkDownloadProgress: 'Подготовка: {{done}} / {{total}}',
+      bulkDownloadSkipped: 'PDF скачан, но в него не вошли эти документы (распечатайте их отдельно):',
+      bulkDownloadSkippedAll: 'не удалось получить документы',
       triage: {
         column: 'Проверка',
         all: 'Все',

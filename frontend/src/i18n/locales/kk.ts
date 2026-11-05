@@ -646,6 +646,10 @@ export const kk = {
       bulkDownloadSelected: 'Таңдалды: {{count}}',
       bulkDownloadButton: 'PDF жүктеу',
       bulkDownloadFailed: 'Құжатты жасау сәтсіз аяқталды',
+      bulkDownloadIncludeDocuments: 'Студенттің құжаттарын бірге жүктеу',
+      bulkDownloadProgress: 'Дайындалып жатыр: {{done}} / {{total}}',
+      bulkDownloadSkipped: 'PDF жүктелді, бірақ мына құжаттар оған кірмеді (оларды жеке басып шығарыңыз):',
+      bulkDownloadSkippedAll: 'құжаттарды алу мүмкін болмады',
       triage: {
         column: 'Тексеру',
         all: 'Барлығы',

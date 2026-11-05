@@ -646,6 +646,10 @@ export const en: typeof kk = {
       bulkDownloadSelected: 'Selected: {{count}}',
       bulkDownloadButton: 'Download PDF',
       bulkDownloadFailed: 'Failed to generate the document',
+      bulkDownloadIncludeDocuments: "Download together with the student's documents",
+      bulkDownloadProgress: 'Preparing: {{done}} / {{total}}',
+      bulkDownloadSkipped: "The PDF was downloaded, but these documents aren't in it (print them separately):",
+      bulkDownloadSkippedAll: 'could not get the documents',
       triage: {
         column: 'Check',
         all: 'All',

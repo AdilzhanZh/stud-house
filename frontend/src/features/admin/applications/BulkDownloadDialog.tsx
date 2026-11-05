@@ -8,6 +8,8 @@ import { StatusBadge } from '../../../components/StatusBadge'
 import { extractErrorMessage } from '../../../api/client'
 import { formatDate } from '../../../utils/dateFormat'
 import { downloadPetitionsBulkPdf } from '../../../utils/petitionPdf'
+import { downloadPetitionsWithDocumentsPdf, type SkippedDocument } from '../../../utils/applicationBundlePdf'
+import { bilingualField } from '../../../utils/bilingualField'
 import type { Application, ApplicationStatus } from '../../../types/applications'
 import type { User } from '../../../types'
 
@@ -41,7 +43,7 @@ export function BulkDownloadDialog({
   priorityByStudent,
   statusLabels,
 }: BulkDownloadDialogProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [statusFilter, setStatusFilter] = useState<ApplicationStatus | 'all'>('all')
   const [dormitoryFilter, setDormitoryFilter] = useState('')
   const [dateFrom, setDateFrom] = useState('')
@@ -51,6 +53,9 @@ export function BulkDownloadDialog({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isDownloading, setIsDownloading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [includeDocuments, setIncludeDocuments] = useState(false)
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+  const [skipped, setSkipped] = useState<SkippedDocument[]>([])
 
   // Reset the picker each time the dialog is (re)opened rather than leaving
   // a stale selection/error from the previous open.
@@ -58,6 +63,7 @@ export function BulkDownloadDialog({
     if (open) {
       setSelectedIds(new Set())
       setError(null)
+      setSkipped([])
     }
   }, [open])
 
@@ -119,6 +125,7 @@ export function BulkDownloadDialog({
     const selected = sortApps(applications.filter((a) => selectedIds.has(a.id)))
     if (selected.length === 0) return
     setError(null)
+    setSkipped([])
     setIsDownloading(true)
     try {
       const values = selected.map((app) => {
@@ -133,11 +140,31 @@ export function BulkDownloadDialog({
           date: formatDate(app.created_at),
         }
       })
-      await downloadPetitionsBulkPdf(values, `applications-${new Date().toISOString().slice(0, 10)}.pdf`)
-      onClose()
+      const filename = `applications-${new Date().toISOString().slice(0, 10)}.pdf`
+      if (!includeDocuments) {
+        await downloadPetitionsBulkPdf(values, filename)
+        onClose()
+        return
+      }
+      const notIncluded = await downloadPetitionsWithDocumentsPdf(
+        selected.map((app, index) => ({
+          applicationId: app.id,
+          studentName: values[index].full_name,
+          petition: values[index],
+        })),
+        filename,
+        {
+          documentLabel: (doc) => bilingualField(doc.display_name_kk, doc.display_name_ru, i18n.language),
+          onProgress: (done, total) => setProgress({ done, total }),
+        },
+      )
+      // Stays open if something is missing: the manager is about to print this.
+      if (notIncluded.length > 0) setSkipped(notIncluded)
+      else onClose()
     } catch (err) {
       setError(extractErrorMessage(err, t('admin.applications.bulkDownloadFailed')))
     } finally {
+      setProgress(null)
       setIsDownloading(false)
     }
   }
@@ -205,6 +232,21 @@ export function BulkDownloadDialog({
           </div>
         )}
 
+        {skipped.length > 0 && (
+          <div className="mt-3 max-h-40 overflow-y-auto">
+            <Alert
+              variant="warning"
+              message={[
+                t('admin.applications.bulkDownloadSkipped'),
+                ...skipped.map(
+                  (item) =>
+                    `${item.studentName} — ${item.documentName ?? t('admin.applications.bulkDownloadSkippedAll')}`,
+                ),
+              ].join('\n')}
+            />
+          </div>
+        )}
+
         <div className="mt-4 flex-1 overflow-y-auto rounded-[14px] border border-navy-700">
           <table className="w-full text-left text-sm">
             <thead className="sticky top-0 border-b border-navy-700 bg-navy-900 text-xs font-semibold tracking-wide text-sand-300 uppercase">
@@ -261,9 +303,21 @@ export function BulkDownloadDialog({
           </table>
         </div>
 
-        <div className="mt-5 flex items-center justify-between gap-3">
+        <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm text-sand-100">
+          <input
+            type="checkbox"
+            checked={includeDocuments}
+            disabled={isDownloading}
+            onChange={(e) => setIncludeDocuments(e.target.checked)}
+          />
+          {t('admin.applications.bulkDownloadIncludeDocuments')}
+        </label>
+
+        <div className="mt-4 flex items-center justify-between gap-3">
           <span className="text-sm text-sand-300">
-            {t('admin.applications.bulkDownloadSelected', { count: selectedIds.size })}
+            {progress
+              ? t('admin.applications.bulkDownloadProgress', { done: progress.done + 1, total: progress.total })
+              : t('admin.applications.bulkDownloadSelected', { count: selectedIds.size })}
           </span>
           <div className="flex gap-3">
             <Button variant="secondary" onClick={onClose} disabled={isDownloading}>

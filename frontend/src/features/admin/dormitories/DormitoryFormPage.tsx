@@ -355,7 +355,7 @@ export function DormitoryFormPage() {
           ) : (
             <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
               {images.map((img, i) => (
-                <div key={img.id} className="group relative h-24 overflow-hidden rounded-[14px]">
+                <div key={img.id} className="group relative h-24 overflow-hidden rounded-lg">
                   <img
                     src={img.image_url}
                     alt=""
@@ -404,7 +404,7 @@ export function DormitoryFormPage() {
                 accept="image/*"
                 required={images.length === 0}
                 onChange={(e) => setNewImageFile(e.target.files?.[0] ?? null)}
-                className="flex-1 rounded-[14px] border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sand-100 text-sm outline-none file:mr-3 file:rounded-lg file:border-0 file:bg-turquoise-500/10 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-turquoise-400 hover:file:bg-turquoise-500/15 focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
+                className="flex-1 rounded-lg border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sand-100 text-sm outline-none file:mr-3 file:rounded-lg file:border-0 file:bg-turquoise-500/10 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-turquoise-400 hover:file:bg-turquoise-500/15 focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
               />
               <Button
                 type="button"

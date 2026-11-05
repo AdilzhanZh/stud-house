@@ -44,7 +44,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
           type={isPassword ? (visible ? 'text' : 'password') : type}
           required={required}
           onWheel={handleWheel}
-          className={`w-full rounded-[14px] border bg-navy-900 px-4 py-3 text-sm text-sand-100 outline-none transition-colors placeholder:text-sand-400/50 focus:ring-4 ${
+          className={`w-full rounded-lg border bg-navy-900 px-4 py-3 text-sm text-sand-100 outline-none transition-colors placeholder:text-sand-400/50 focus:ring-4 ${
             isPassword ? 'pr-10' : ''
           } ${
             error

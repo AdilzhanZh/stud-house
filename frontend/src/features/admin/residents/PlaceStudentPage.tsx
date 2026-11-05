@@ -309,7 +309,7 @@ export function PlaceStudentPage() {
                         onClick={() => setSelectedFloor(floor)}
                         className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                           floor === activeFloor
-                            ? 'bg-turquoise-500 text-white'
+                            ? 'bg-turquoise-500 text-on-accent'
                             : 'bg-navy-800 text-sand-300 hover:bg-navy-700'
                         }`}
                       >

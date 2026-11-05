@@ -38,9 +38,6 @@ export function LoginPage() {
 
   return (
     <div className="flex flex-col gap-3.5">
-      <span className="mx-auto flex h-28 w-28 items-center justify-center">
-        <img src="/favicon.svg" alt="" className="brand-icon h-full w-full object-contain" />
-      </span>
       <div>
         <p className="text-[26px] leading-tight font-bold text-sand-100">{t('auth.welcome')}</p>
         <p className="mt-1.5 text-sm text-sand-300">{t('auth.tagline')}</p>

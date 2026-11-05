@@ -247,7 +247,7 @@ export function BulkDownloadDialog({
           </div>
         )}
 
-        <div className="mt-4 flex-1 overflow-y-auto rounded-[14px] border border-navy-700">
+        <div className="mt-4 flex-1 overflow-y-auto rounded-lg border border-navy-700">
           <table className="w-full text-left text-sm">
             <thead className="sticky top-0 border-b border-navy-700 bg-navy-900 text-xs font-semibold tracking-wide text-sand-300 uppercase">
               <tr>

@@ -32,7 +32,7 @@ function StepNode({ done, active }: { done: boolean; active: boolean }) {
   if (done) {
     return (
       <span className="flex h-6.5 w-6.5 shrink-0 items-center justify-center rounded-full bg-turquoise-500">
-        <Check className="h-3.5 w-3.5 text-ink" strokeWidth={3} />
+        <Check className="h-3.5 w-3.5 text-on-accent" strokeWidth={3} />
       </span>
     )
   }

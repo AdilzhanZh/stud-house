@@ -7,6 +7,7 @@ import { BrandMark } from '../components/BrandMark'
 import { Avatar } from '../components/Avatar'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { LanguageSwitcher } from '../components/LanguageSwitcher'
+import { UniversityContacts } from '../components/UniversityContacts'
 import { useUnreadCount } from '../features/notifications/useUnreadCount'
 
 type MobileSection = 'home' | 'dorm' | 'apps' | 'profile' | null
@@ -64,9 +65,12 @@ export function DashboardLayout() {
   ]
 
   return (
-    <div className="min-h-screen bg-navy-950 font-body pb-20 md:pb-0">
-      <header className="sticky top-0 z-10 hidden border-b border-navy-700 bg-navy-900/90 backdrop-blur-sm md:block">
-        <div className="mx-auto flex max-w-6xl items-center gap-5 px-9 py-4">
+    <div className="flex min-h-screen flex-col bg-navy-950 font-body pb-20 md:pb-0">
+      <div className="on-chrome border-t-[3px] border-gold-400 px-4 py-2.5 md:hidden">
+        <BrandMark />
+      </div>
+      <header className="on-chrome sticky top-0 z-10 hidden border-t-[3px] border-gold-400 md:block">
+        <div className="mx-auto flex max-w-6xl items-center gap-5 px-9 py-3">
           <button onClick={() => navigate('/dashboard/home')} className="shrink-0">
             <BrandMark />
           </button>
@@ -75,10 +79,10 @@ export function DashboardLayout() {
               <NavLink
                 key={item.to}
                 to={item.to}
-                className={`shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-sm font-semibold transition-colors ${
+                className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold transition-colors ${
                   deskNavMatch(location.pathname, item.to)
-                    ? 'bg-turquoise-500/10 text-turquoise-400'
-                    : 'text-sand-300 hover:text-sand-100'
+                    ? 'border-gold-400 text-sand-100'
+                    : 'border-transparent text-sand-300 hover:text-sand-100'
                 }`}
               >
                 {item.label}
@@ -103,9 +107,19 @@ export function DashboardLayout() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-4 md:px-10 md:py-8">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-4 md:px-10 md:py-8">
         <Outlet />
       </main>
+
+      <footer className="on-chrome">
+        <div className="mx-auto flex max-w-6xl flex-col gap-5 px-4 py-6 md:flex-row md:items-start md:justify-between md:px-9">
+          <div className="max-w-sm">
+            <BrandMark />
+            <p className="mt-3 text-sm text-sand-300">{t('brand.university')}</p>
+          </div>
+          <UniversityContacts />
+        </div>
+      </footer>
 
       <AssistantWidget className="bottom-24 md:bottom-6" />
 

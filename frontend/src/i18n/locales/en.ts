@@ -36,6 +36,11 @@ export const en: typeof kk = {
     profile: 'Profile',
     notifications: 'Notifications',
   },
+  brand: {
+    university: 'Korkyt Ata Kyzylorda University',
+    universityShort: 'Korkyt Ata University',
+    address: '29A Aiteke Bi St, Kyzylorda',
+  },
   auth: {
     welcome: 'Welcome!',
     tagline: 'Apply for a dormitory and track it — all in one place.',

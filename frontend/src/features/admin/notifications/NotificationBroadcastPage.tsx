@@ -183,7 +183,7 @@ export function NotificationBroadcastPage() {
             <textarea
               rows={4}
               placeholder={t('admin.notifications.bodyPlaceholder')}
-              className="w-full resize-y rounded-[14px] border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sm text-sand-100 outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
+              className="w-full resize-y rounded-lg border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sm text-sand-100 outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
               value={body}
               onChange={(e) => setBody(e.target.value)}
             />

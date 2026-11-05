@@ -1,22 +1,23 @@
 <!doctype html>
-<html lang="en">
+<html lang="kk">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" href="/brand/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#113060" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
-    <title>Student House</title>
+    <title>Student House — Қорқыт Ата атындағы Қызылорда университеті</title>
     <script>
-      // Applies the saved theme before first paint so switching to "day"
-      // doesn't flash the default dark theme on reload.
+      // Applies the saved theme before first paint so choosing "night"
+      // doesn't flash the default light theme on reload.
       (function () {
         var stored = localStorage.getItem('student-house-theme');
-        document.documentElement.dataset.theme = stored === 'day' ? 'day' : 'night';
+        document.documentElement.dataset.theme = stored === 'night' ? 'night' : 'day';
       })();
     </script>
   </head>

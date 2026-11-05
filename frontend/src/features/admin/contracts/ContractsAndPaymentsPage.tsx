@@ -182,7 +182,7 @@ export function ContractsAndPaymentsPage() {
                   <div className="mt-3.5 flex flex-col gap-3">
                     <input
                       type="datetime-local"
-                      className="rounded-[14px] border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sm text-sand-100 outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
+                      className="rounded-lg border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sm text-sand-100 outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
                       value={contractNewDeadline}
                       onChange={(e) => setContractNewDeadline(e.target.value)}
                     />

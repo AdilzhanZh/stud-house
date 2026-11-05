@@ -126,7 +126,7 @@ export function ProtocolCreatePage() {
                 <select
                   value={dormitoryFilter}
                   onChange={(e) => changeDormitoryFilter(e.target.value)}
-                  className="max-w-sm rounded-[14px] border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sm text-sand-100 outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
+                  className="max-w-sm rounded-lg border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sm text-sand-100 outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
                 >
                   <option value="">
                     {t('admin.protocols.allDormitories')} ({candidates.length})

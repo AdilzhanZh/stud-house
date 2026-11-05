@@ -20,13 +20,14 @@ import { useAuth } from '../features/auth/useAuth'
 import { AssistantWidget } from '../features/assistant/AssistantWidget'
 import { canManage } from '../constants/roles'
 import { Avatar } from '../components/Avatar'
+import { BrandLogo } from '../components/BrandMark'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { LanguageSwitcher } from '../components/LanguageSwitcher'
 import { usePendingStudentsCount } from '../features/admin/users/usePendingStudentsCount'
 import { usePendingApplicationsCount } from '../features/admin/applications/usePendingApplicationsCount'
 
 function navLinkClass({ isActive }: { isActive: boolean }) {
-  return `flex items-center gap-2.5 rounded-2xl px-3 py-2.5 text-sm font-semibold transition-colors ${
+  return `flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors ${
     isActive ? 'bg-turquoise-500/10 text-turquoise-400' : 'text-sand-300 hover:bg-navy-800 hover:text-sand-100'
   }`
 }
@@ -34,7 +35,7 @@ function navLinkClass({ isActive }: { isActive: boolean }) {
 function CountBadge({ count }: { count: number }) {
   if (count <= 0) return null
   return (
-    <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-turquoise-500 px-1.5 py-0.5 text-xs font-bold text-ink">
+    <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-turquoise-500 px-1.5 py-0.5 text-xs font-bold text-on-accent">
       {count}
     </span>
   )
@@ -77,13 +78,12 @@ export function AdminLayout() {
 
   return (
     <div className="min-h-screen bg-navy-950 font-body md:flex">
-      <aside className="flex shrink-0 flex-col border-r border-navy-700 bg-navy-900 p-4 md:sticky md:top-0 md:h-screen md:w-62">
+      <aside className="on-chrome flex shrink-0 flex-col border-t-[3px] border-gold-400 p-4 md:sticky md:top-0 md:h-screen md:w-62">
         <div className="flex items-center gap-2.5 px-1 pb-4">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center">
-            <img src="/favicon.svg" alt="" className="brand-icon h-full w-full object-contain" />
-          </span>
+          <BrandLogo className="h-8" />
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-sand-100">Student House</p>
+            <p className="truncate text-xs text-gold-text">{t('brand.universityShort')}</p>
             <p className="text-xs text-sand-300">
               {panelLabel}
             </p>
@@ -189,7 +189,7 @@ export function AdminLayout() {
           <Avatar fullName={user?.full_name} avatarUrl={user?.avatar_url} sizeClass="h-9 w-9" textClass="text-xs" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-sand-100">{user?.full_name}</p>
-            <p className="text-xs text-sand-300">{roleLabel}</p>
+            <p className="truncate text-xs text-sand-300">{roleLabel}</p>
           </div>
           <LanguageSwitcher languages={['kk', 'ru']} dropUp />
           <ThemeToggle />

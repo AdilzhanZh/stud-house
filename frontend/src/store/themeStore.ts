@@ -5,7 +5,7 @@ export type Theme = 'day' | 'night'
 const STORAGE_KEY = 'student-house-theme'
 
 function readStoredTheme(): Theme {
-  return localStorage.getItem(STORAGE_KEY) === 'day' ? 'day' : 'night'
+  return localStorage.getItem(STORAGE_KEY) === 'night' ? 'night' : 'day'
 }
 
 // index.html has a tiny inline bootstrap script that sets this same

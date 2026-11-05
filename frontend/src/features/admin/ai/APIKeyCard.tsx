@@ -110,7 +110,7 @@ export function APIKeyCard({ settings, onChange }: { settings: AISettings; onCha
               autoComplete="off"
               spellCheck={false}
               placeholder="sk-or-… / sk-ant-…"
-              className="rounded-[14px] border border-navy-700 bg-navy-950 px-4 py-3 text-sm text-sand-100 outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
+              className="rounded-lg border border-navy-700 bg-navy-950 px-4 py-3 text-sm text-sand-100 outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
             />
           </label>
           <Button type="submit" isLoading={busy} disabled={!key.trim()}>

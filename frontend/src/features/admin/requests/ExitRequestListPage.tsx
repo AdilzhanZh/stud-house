@@ -112,7 +112,7 @@ export function ExitRequestListPage() {
                 <textarea
                   rows={3}
                   placeholder={t('admin.requests.reasonRequired')}
-                  className="rounded-[14px] border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sand-100 text-sm outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
+                  className="rounded-lg border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sand-100 text-sm outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                 />

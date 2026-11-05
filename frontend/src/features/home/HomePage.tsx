@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { SectionEyebrow } from '../../components/SectionEyebrow'
 import type { TFunction } from 'i18next'
 import { Bell, Building2, Clock } from 'lucide-react'
 import { Card } from '../../components/Card'
@@ -76,7 +77,7 @@ export function HomePage() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-sand-300">{t('home.greeting')}</p>
+          <SectionEyebrow>{t('home.greeting')}</SectionEyebrow>
           <p className="text-[23px] font-bold text-sand-100">{firstName}</p>
         </div>
         <button

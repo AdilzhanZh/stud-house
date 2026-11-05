@@ -19,7 +19,7 @@ import type { RequiredDocument } from '../../../types/documents'
 import type { Benefit } from '../../../types/benefits'
 
 const inputClass =
-  'rounded-[14px] border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sand-100 text-sm outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15'
+  'rounded-lg border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sand-100 text-sm outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15'
 
 // "" -> null (never expires); anything else must be a positive whole number.
 function parseValidity(raw: string): number | null | undefined {
@@ -174,13 +174,13 @@ export function DocumentListPage() {
         <div className="flex flex-col gap-2 sm:flex-row">
           <input
             placeholder={t('admin.documents.namePlaceholderKk')}
-            className="flex-1 rounded-[14px] border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sand-100 text-sm outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
+            className="flex-1 rounded-lg border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sand-100 text-sm outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
             value={newDocumentNameKk}
             onChange={(e) => setNewDocumentNameKk(e.target.value)}
           />
           <input
             placeholder={t('admin.documents.namePlaceholderRu')}
-            className="flex-1 rounded-[14px] border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sand-100 text-sm outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
+            className="flex-1 rounded-lg border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sand-100 text-sm outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
             value={newDocumentNameRu}
             onChange={(e) => setNewDocumentNameRu(e.target.value)}
           />

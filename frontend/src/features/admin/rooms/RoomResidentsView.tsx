@@ -281,7 +281,7 @@ export function RoomResidentsView() {
                 </div>
 
                 {transferTarget?.id === r.id && (
-                  <div className="mx-3 mb-3 flex flex-col gap-3 rounded-[14px] bg-navy-950/60 p-3">
+                  <div className="mx-3 mb-3 flex flex-col gap-3 rounded-lg bg-navy-950/60 p-3">
                     <p className="text-sm font-medium text-sand-100">
                       {t('admin.rooms.transferTitle', { name: namesById[r.student_id] ?? r.student_id })}
                     </p>

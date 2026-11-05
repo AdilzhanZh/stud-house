@@ -4,9 +4,14 @@
    custom properties (Tailwind v4's @theme mechanism) so every utility class
    built from them — bg-navy-950, text-sand-100, text-turquoise-400, etc. —
    re-resolves automatically when [data-theme] overrides the variables below.
-   Default (no attribute, or data-theme="night") is the dark palette; the
-   day palette lives in the `[data-theme="day"]` block further down. No
-   component needs its own day/night variant classes because of this. */
+   The palette follows Korkyt Ata Kyzylorda University's identity (korkyt.edu.kz):
+   deep blue #113060, gold #dbc38f, logo blue #0070c0. These values are the
+   night palette; the day palette, which is what visitors get by default, lives
+   in the `[data-theme="day"]` block further down. No component needs its own
+   day/night variant classes because of this.
+
+   Slot names predate the university palette and stay put: `turquoise-*` is the
+   primary accent, `navy-*` the surfaces and `sand-*` the text. */
 @theme {
   --font-heading: 'Golos Text', system-ui, sans-serif;
   --font-body: 'Golos Text', system-ui, sans-serif;
@@ -15,21 +20,24 @@
   /* navy-950 = page background, navy-900 = card surface, navy-800 = a
      secondary/tinted surface (progress-bar tracks, subtle chips), navy-700
      = hairline borders, navy-600 = a slightly stronger border/hover tone. */
-  --color-navy-950: #141c26;
-  --color-navy-900: #1c2733;
-  --color-navy-800: #22303c;
-  --color-navy-700: #2b3844;
-  --color-navy-600: #3a4954;
+  --color-navy-950: #0a1830;
+  --color-navy-900: #102444;
+  --color-navy-800: #172f57;
+  --color-navy-700: #223e6b;
+  --color-navy-600: #34507f;
 
-  --color-sand-100: #f4ecdd;
-  --color-sand-200: #d8c9a8;
-  --color-sand-300: #9c8f73;
-  --color-sand-400: #71685a;
+  --color-sand-100: #f2f5fa;
+  --color-sand-200: #c8d3e5;
+  --color-sand-300: #9dacc5;
+  --color-sand-400: #8293ae;
 
-  --color-turquoise-300: #82e0d3;
-  --color-turquoise-400: #45c4b6;
-  --color-turquoise-500: #45c4b6;
-  --color-turquoise-600: #2f9c8f;
+  /* Primary accent. Night: gold, because university blue would disappear into
+     a blue page. Day: 500/600 are the university blue fill, 300/400 the logo
+     blue for links and small text. */
+  --color-turquoise-300: #efdfb8;
+  --color-turquoise-400: #e3ca94;
+  --color-turquoise-500: #dbc38f;
+  --color-turquoise-600: #c8ad72;
 
   --color-clay-400: #e08a6e;
   --color-clay-500: #c1654c;
@@ -37,36 +45,42 @@
   --color-mint-400: #7ed7a5;
   --color-mint-500: #55b881;
 
-  --color-amber-400: #e8b05c;
-  --color-amber-500: #c9924a;
+  /* Warning status. Kept visibly more orange than the gold accent, otherwise
+     a warning badge reads as decoration. */
+  --color-amber-400: #f2a65a;
+  --color-amber-500: #d9823b;
 
-  /* Fixed — does NOT flip between day/night. Used only as text sitting on
-     top of a solid turquoise/clay accent button; dark ink reads correctly
-     on that mid-toned accent color regardless of which theme is active. */
+  /* Text/icons sitting on a solid accent or danger fill. */
+  --color-on-accent: #0d1a26;
+  --color-on-danger: #0d1a26;
+
+  /* Gold as decoration (lines, dots). Too pale to be text on a light page —
+     gold-text is the readable variant for that. */
+  --color-gold-400: #dbc38f;
+  --color-gold-text: #dbc38f;
+
   --color-ink: #0d1a26;
 }
 
 /* Day palette: same slots, light values. navy-* becomes the light
    surface/background scale and sand-* becomes the dark ink/text scale —
-   the names stay put, only what they point to changes. Turquoise/clay/mint
-   are deepened where they're used as small text/icons (needs real contrast
-   against a light page), not where they're a button's own fill color. */
+   the names stay put, only what they point to changes. */
 :root[data-theme='day'] {
-  --color-navy-950: #fbf7ef;
+  --color-navy-950: #f3f7fe;
   --color-navy-900: #ffffff;
-  --color-navy-800: #f3ecdd;
-  --color-navy-700: #ede4d3;
-  --color-navy-600: #d8cbb0;
+  --color-navy-800: #e9eff8;
+  --color-navy-700: #dfe7f3;
+  --color-navy-600: #c5d2e6;
 
-  --color-sand-100: #1f2933;
-  --color-sand-200: #5c4b34;
-  --color-sand-300: #8a7355;
-  --color-sand-400: #a79878;
+  --color-sand-100: #12233f;
+  --color-sand-200: #37496a;
+  --color-sand-300: #56688a;
+  --color-sand-400: #6f7f9b;
 
-  --color-turquoise-300: #1f8a7f;
-  --color-turquoise-400: #1f8a7f;
-  --color-turquoise-500: #2aa89a;
-  --color-turquoise-600: #145f58;
+  --color-turquoise-300: #0070c0;
+  --color-turquoise-400: #0060a8;
+  --color-turquoise-500: #113060;
+  --color-turquoise-600: #0c2447;
 
   --color-clay-400: #b8462b;
   --color-clay-500: #9c3a22;
@@ -74,10 +88,46 @@
   --color-mint-400: #1e6b4f;
   --color-mint-500: #175a41;
 
-  --color-amber-400: #9c5a22;
-  --color-amber-500: #7a4419;
+  --color-amber-400: #b45309;
+  --color-amber-500: #92400e;
+
+  --color-on-accent: #ffffff;
+  --color-on-danger: #ffffff;
+
+  --color-gold-text: #7c6226;
 
   color-scheme: light;
+}
+
+/* University-blue band (header, admin sidebar, login panel, footer), the same
+   in both themes. Re-points the slots rather than recoloring each child, so
+   the theme toggle, language switcher, avatar and nav inside just work. */
+.on-chrome {
+  --color-navy-950: #0c2447;
+  --color-navy-900: #113060;
+  --color-navy-800: #1a3d73;
+  --color-navy-700: #2a4d85;
+  --color-navy-600: #3d6199;
+
+  --color-sand-100: #ffffff;
+  --color-sand-200: #dbe4f2;
+  --color-sand-300: #b9c7de;
+  --color-sand-400: #9fb0cc;
+
+  --color-turquoise-300: #efdfb8;
+  --color-turquoise-400: #e3ca94;
+  --color-turquoise-500: #dbc38f;
+  --color-turquoise-600: #c8ad72;
+
+  --color-clay-400: #f0a58d;
+  --color-clay-500: #c1654c;
+
+  --color-on-accent: #0d1a26;
+  --color-gold-text: #dbc38f;
+
+  background-color: var(--color-navy-900);
+  color: var(--color-sand-100);
+  color-scheme: dark;
 }
 
 :root {
@@ -86,7 +136,7 @@
 }
 
 :root[data-theme='day'] {
-  --shadow-card: 0 8px 24px rgba(31, 41, 51, 0.06);
+  --shadow-card: 0 8px 24px rgba(17, 48, 96, 0.07);
 }
 
 body {
@@ -109,16 +159,6 @@ input:-webkit-autofill:focus {
   -webkit-box-shadow: 0 0 0px 1000px var(--color-navy-900) inset;
   box-shadow: 0 0 0px 1000px var(--color-navy-900) inset;
   transition: background-color 5000s ease-in-out 0s;
-}
-
-/* The brand icon is a plain black-fill SVG — fine on the day theme's light
-   background, but invisible on night's dark background. Invert it (black ->
-   white) by default (night) and reset to the original black on day. */
-.brand-icon {
-  filter: invert(1);
-}
-:root[data-theme='day'] .brand-icon {
-  filter: none;
 }
 
 /* Leaflet map, restyled to sit inside the app's themes. OSM only serves light

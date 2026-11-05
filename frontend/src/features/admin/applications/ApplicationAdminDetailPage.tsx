@@ -271,7 +271,7 @@ export function ApplicationAdminDetailPage() {
             <textarea
               rows={3}
               placeholder={t('admin.common.required')}
-              className="rounded-[14px] border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sm text-sand-100 outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
+              className="rounded-lg border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sm text-sand-100 outline-none focus:border-turquoise-400 focus:ring-4 focus:ring-turquoise-400/15"
               value={comment}
               onChange={(e) => setComment(e.target.value)}
             />
@@ -351,7 +351,7 @@ export function ApplicationAdminDetailPage() {
                           onClick={() => setSelectedFloor(floor)}
                           className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                             floor === activeFloor
-                              ? 'bg-turquoise-500 text-white'
+                              ? 'bg-turquoise-500 text-on-accent'
                               : 'bg-navy-800 text-sand-300 hover:bg-navy-700'
                           }`}
                         >

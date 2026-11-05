@@ -19,7 +19,7 @@ import { assignOwnBenefit, listBenefitRequiredDocuments, listBenefits } from '..
 import { listRoomsByDormitory } from '../../api/roomApi'
 import { getStudentProfile } from '../../api/profileApi'
 import { uploadFile } from '../../api/uploadApi'
-import { generatePetitionPdfBlob } from '../../utils/petitionPdf'
+import { generatePetitionPdfBlob, PETITION_RECEIPT_DOCUMENT_NAME } from '../../utils/petitionPdf'
 import { downloadContractPdf, getFilledContractDocument } from '../../utils/contractPdf'
 import { formatDate } from '../../utils/dateFormat'
 import { formatTenge } from '../../utils/dormitoryLabels'
@@ -387,7 +387,7 @@ export function NewApplicationPage() {
           })
           const pdfUrl = await uploadFile(pdfFile)
           await addApplicationDocument(application.id, {
-            document_name: 'Өтініш парағы (PDF)',
+            document_name: PETITION_RECEIPT_DOCUMENT_NAME,
             file_url: pdfUrl,
           })
         } catch {

@@ -2,6 +2,10 @@ import { renderHtmlPagesToPdf } from './pdf'
 import { getPetitionTemplate } from '../api/petitionTemplateApi'
 import { formatDate } from './dateFormat'
 
+// The name a student's automatic petition copy is stored under among their
+// application's documents (see NewApplicationPage).
+export const PETITION_RECEIPT_DOCUMENT_NAME = 'Өтініш парағы (PDF)'
+
 export interface PetitionFieldValues {
   full_name: string
   study_group: string
@@ -50,6 +54,19 @@ export async function downloadPetitionPdf(values: PetitionFieldValues, filename:
 export async function generatePetitionPdfBlob(values: PetitionFieldValues): Promise<Blob> {
   const doc = await renderPetition(values)
   return doc.output('blob')
+}
+
+// For rendering many petitions as separate PDFs: fetches the template once.
+export async function createPetitionRenderer(): Promise<(values: PetitionFieldValues) => Promise<ArrayBuffer>> {
+  const template = await getPetitionTemplate()
+  return async (values) => {
+    const filled = fillPetitionTemplate(template.pages, {
+      ...values,
+      date: values.date ?? formatDate(new Date()),
+    })
+    const doc = await renderHtmlPagesToPdf(filled, { twoPagesPerSheet: template.two_pages_per_sheet })
+    return doc.output('arraybuffer')
+  }
 }
 
 // Used by the manager's "download applications" bulk action (queue page) —

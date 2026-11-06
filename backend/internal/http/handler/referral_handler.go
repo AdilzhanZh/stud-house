@@ -13,10 +13,11 @@ import (
 
 type ReferralHandler struct {
 	referrals *service.ReferralService
+	templates *service.ReferralTemplateService
 }
 
-func NewReferralHandler(referrals *service.ReferralService) *ReferralHandler {
-	return &ReferralHandler{referrals: referrals}
+func NewReferralHandler(referrals *service.ReferralService, templates *service.ReferralTemplateService) *ReferralHandler {
+	return &ReferralHandler{referrals: referrals, templates: templates}
 }
 
 // referralResponse leaves everything about the student empty on an invalid
@@ -34,10 +35,13 @@ type referralResponse struct {
 	DormitoryAddress string    `json:"dormitory_address"`
 	RoomNumber       string    `json:"room_number"`
 	SignatoryName    string    `json:"signatory_name"`
+	// TemplatePages is the wording to fill in on the client: whoever scans a QR
+	// code has no account to fetch the template with.
+	TemplatePages []string `json:"template_pages"`
 }
 
-func referralDTO(r *domain.Referral) referralResponse {
-	dto := referralResponse{Number: r.Number, Token: r.Token, Valid: r.Valid, IssuedAt: r.IssuedAt}
+func referralDTO(r *domain.Referral, templatePages []string) referralResponse {
+	dto := referralResponse{Number: r.Number, Token: r.Token, Valid: r.Valid, IssuedAt: r.IssuedAt, TemplatePages: []string{}}
 	if r.Valid {
 		dto.ProtocolNumber = r.ProtocolNumber
 		dto.StudentFullName = r.StudentFullName
@@ -47,6 +51,7 @@ func referralDTO(r *domain.Referral) referralResponse {
 		dto.DormitoryAddress = r.DormitoryAddress
 		dto.RoomNumber = r.RoomNumber
 		dto.SignatoryName = r.SignatoryName
+		dto.TemplatePages = templatePages
 	}
 	return dto
 }
@@ -60,7 +65,7 @@ func (h *ReferralHandler) Verify(c *gin.Context) {
 		response.Error(c, err)
 		return
 	}
-	response.OK(c, referralDTO(referral))
+	h.respond(c, referral)
 }
 
 func (h *ReferralHandler) GetMine(c *gin.Context) {
@@ -70,5 +75,14 @@ func (h *ReferralHandler) GetMine(c *gin.Context) {
 		response.Error(c, err)
 		return
 	}
-	response.OK(c, referralDTO(referral))
+	h.respond(c, referral)
+}
+
+func (h *ReferralHandler) respond(c *gin.Context, referral *domain.Referral) {
+	template, err := h.templates.Get(c.Request.Context())
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, referralDTO(referral, template.Pages))
 }

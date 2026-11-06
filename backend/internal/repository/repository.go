@@ -48,13 +48,14 @@ type UserRepository interface {
 	// UserService.ChangeOwnEmail for a user changing their own email from
 	// their profile.
 	UpdateEmail(ctx context.Context, id uuid.UUID, email string) error
+	UpdatePhone(ctx context.Context, id uuid.UUID, phone string) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 
 type StudentProfileRepository interface {
 	Upsert(ctx context.Context, p *domain.StudentProfile) error
 	GetByUserID(ctx context.Context, userID uuid.UUID) (*domain.StudentProfile, error)
-	UpdateInstitute(ctx context.Context, userID uuid.UUID, institute string) error
+	UpdateDetails(ctx context.Context, userID uuid.UUID, d domain.StudentDetails) error
 }
 
 type DormitoryRepository interface {

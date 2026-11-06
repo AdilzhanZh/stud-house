@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -39,5 +40,21 @@ func TestReferralOnProtocolApprovedReportsIssueFailure(t *testing.T) {
 	s := NewReferralService(stubReferralRepo{err: boom}, nil, "")
 	if err := s.OnProtocolApproved(context.Background(), uuid.New()); !errors.Is(err, boom) {
 		t.Fatalf("got %v", err)
+	}
+}
+
+func TestValidateReferralTemplatePages(t *testing.T) {
+	if err := validateReferralTemplatePages(defaultReferralTemplatePages); err != nil {
+		t.Fatalf("the default template must be valid: %v", err)
+	}
+	withoutRoom := strings.ReplaceAll(defaultReferralTemplatePages[0], `data-token="{{room_number}}"`, "")
+	for name, pages := range map[string][]string{
+		"no pages":       {},
+		"blank page":     {defaultReferralTemplatePages[0], "  "},
+		"missing a room": {withoutRoom},
+	} {
+		if err := validateReferralTemplatePages(pages); err == nil {
+			t.Errorf("%s: want an error", name)
+		}
 	}
 }

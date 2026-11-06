@@ -9,30 +9,32 @@ import (
 )
 
 type Handlers struct {
-	Auth             *handler.AuthHandler
-	User             *handler.UserHandler
-	Dormitory        *handler.DormitoryHandler
-	Room             *handler.RoomHandler
-	Benefit          *handler.BenefitHandler
-	Document         *handler.DocumentHandler
-	Application      *handler.ApplicationHandler
-	Notification     *handler.NotificationHandler
-	Protocol         *handler.ProtocolHandler
-	Referral         *handler.ReferralHandler
-	ProtocolTemplate *handler.ProtocolTemplateHandler
-	PetitionTemplate *handler.PetitionTemplateHandler
-	ContractTemplate *handler.ContractTemplateHandler
-	Contract         *handler.ContractHandler
-	Feedback         *handler.FeedbackHandler
-	ExitRequest      *handler.ExitRequestHandler
-	TransferRequest  *handler.TransferRequestHandler
-	Upload           *handler.UploadHandler
-	Retention        *handler.RetentionHandler
-	AcademicYear     *handler.AcademicYearHandler
-	Triage           *handler.TriageHandler
-	Campaign         *handler.CampaignHandler
-	Assistant        *handler.AssistantHandler
-	AISettings       *handler.AISettingsHandler
+	Auth                 *handler.AuthHandler
+	User                 *handler.UserHandler
+	Dormitory            *handler.DormitoryHandler
+	Room                 *handler.RoomHandler
+	Benefit              *handler.BenefitHandler
+	Document             *handler.DocumentHandler
+	Application          *handler.ApplicationHandler
+	Notification         *handler.NotificationHandler
+	Protocol             *handler.ProtocolHandler
+	Referral             *handler.ReferralHandler
+	ReferralTemplate     *handler.ReferralTemplateHandler
+	ResidenceCertificate *handler.ResidenceCertificateHandler
+	ProtocolTemplate     *handler.ProtocolTemplateHandler
+	PetitionTemplate     *handler.PetitionTemplateHandler
+	ContractTemplate     *handler.ContractTemplateHandler
+	Contract             *handler.ContractHandler
+	Feedback             *handler.FeedbackHandler
+	ExitRequest          *handler.ExitRequestHandler
+	TransferRequest      *handler.TransferRequestHandler
+	Upload               *handler.UploadHandler
+	Retention            *handler.RetentionHandler
+	AcademicYear         *handler.AcademicYearHandler
+	Triage               *handler.TriageHandler
+	Campaign             *handler.CampaignHandler
+	Assistant            *handler.AssistantHandler
+	AssistantAccess      *handler.AssistantAccessHandler
 }
 
 func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
@@ -56,6 +58,8 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 		// Public: the QR code on a referral opens this for anyone who scans it,
 		// and its token can't be guessed.
 		api.GET("/referrals/verify/:token", h.Referral.Verify)
+		// Public too, for the QR code on a certificate of residence.
+		api.GET("/residence-certificates/verify/:token", h.ResidenceCertificate.Verify)
 
 		authGroup := api.Group("/auth")
 		{
@@ -83,11 +87,10 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 				adminGroup.POST("/retention/purge", h.Retention.Purge)
 				adminGroup.POST("/academic-year/rollover", h.AcademicYear.Rollover)
 
-				// AI feature settings (the API key stays in the environment).
-				adminGroup.GET("/ai-settings", h.AISettings.Get)
-				adminGroup.PUT("/ai-settings", h.AISettings.Update)
-				adminGroup.PUT("/ai-settings/api-key", h.AISettings.SetAPIKey)
-				adminGroup.DELETE("/ai-settings/api-key", h.AISettings.ClearAPIKey)
+				// Who may use the AI assistant (everything else about it is
+				// fixed in code; the API key is in the environment).
+				adminGroup.GET("/assistant-access", h.AssistantAccess.Get)
+				adminGroup.PUT("/assistant-access", h.AssistantAccess.Update)
 			}
 
 			// Read-only for any authenticated role.
@@ -111,7 +114,7 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 			protected.PUT("/students/:id/profile", h.User.UpsertStudentProfile)
 			protected.GET("/students/:id/profile", h.User.GetStudentProfile)
 			protected.GET("/students/:id/residence", h.Room.GetMyResidence)
-			protected.PATCH("/students/:id/institute", h.User.UpdateStudentInstitute)
+			protected.PATCH("/students/:id/details", h.User.UpdateStudentDetails)
 			protected.PATCH("/users/:id/avatar", h.User.UpdateAvatar)
 
 			// Any authenticated user: their own password/email.
@@ -198,6 +201,8 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 				studentGroup.POST("/applications/:id/documents", h.Application.AddDocument)
 
 				studentGroup.GET("/referrals/my", h.Referral.GetMine)
+				studentGroup.GET("/residence-certificates/my", h.ResidenceCertificate.GetMine)
+				studentGroup.POST("/residence-certificates", h.ResidenceCertificate.Issue)
 
 				studentGroup.GET("/contracts/my", h.Contract.ListMine)
 				studentGroup.PATCH("/contracts/:id/respond", h.Contract.Respond)
@@ -264,6 +269,9 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 				mgmt.POST("/notifications/broadcast", h.Notification.Broadcast)
 
 				mgmt.PUT("/protocol-template", h.ProtocolTemplate.Update)
+
+				mgmt.GET("/referral-template", h.ReferralTemplate.Get)
+				mgmt.PUT("/referral-template", h.ReferralTemplate.Update)
 
 				mgmt.PUT("/contract-template", h.ContractTemplate.Update)
 

@@ -3,12 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { SectionEyebrow } from '../../components/SectionEyebrow'
 import type { TFunction } from 'i18next'
-import { Bell, Building2, Clock } from 'lucide-react'
+import { Bell, Clock } from 'lucide-react'
 import { Card } from '../../components/Card'
 import { StatusBadge } from '../../components/StatusBadge'
 import { SegmentedProgress } from '../../components/SegmentedProgress'
 import { Alert } from '../../components/Alert'
-import { DormitoryCard } from '../dormitories/DormitoryCard'
+import { DormitoryCarousel } from '../dormitories/DormitoryCarousel'
 import { useDormitoriesWithMeta } from '../dormitories/useDormitoriesWithMeta'
 import { useApplicationJourneys } from '../applications/useApplicationJourneys'
 import { journeyStepCaption, journeyStepIndex } from '../applications/statusHelpers'
@@ -132,33 +132,11 @@ export function HomePage() {
                 </div>
               </Card>
             )}
-
-          <Card onClick={() => navigate('/dormitories')} className="!p-3.5 flex flex-col gap-2.5">
-            <span className="flex h-8.5 w-8.5 items-center justify-center rounded-full bg-navy-800">
-              <Building2 className="h-4 w-4 text-turquoise-400" />
-            </span>
-            <span className="text-sm font-semibold text-sand-100">{t('home.dormsCard')}</span>
-          </Card>
         </div>
 
         <div className="flex flex-col gap-2.5">
-          <div className="flex items-baseline justify-between">
-            <span className="text-[15px] font-bold text-sand-100">{t('home.dormsSectionTitle')}</span>
-            <button
-              onClick={() => navigate('/dormitories')}
-              className="text-sm font-semibold text-sand-100 hover:text-turquoise-400"
-            >
-              {t('home.seeAll')}
-            </button>
-          </div>
-          {dormitories?.slice(0, 2).map((d) => (
-            <DormitoryCard
-              key={d.id}
-              dormitory={d}
-              variant="compact"
-              onClick={() => navigate(`/dormitories/${d.id}`)}
-            />
-          ))}
+          <span className="text-[15px] font-bold text-sand-100">{t('home.dormsSectionTitle')}</span>
+          {dormitories && <DormitoryCarousel dormitories={dormitories} onClick={() => navigate('/dormitories')} />}
         </div>
       </div>
     </div>

@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 
 	"student-house/internal/config"
-	"student-house/internal/domain"
 	apihttp "student-house/internal/http"
 	"student-house/internal/http/handler"
 	"student-house/internal/repository/postgres"
@@ -51,6 +50,7 @@ func main() {
 	protocolTemplateRepo := postgres.NewProtocolTemplateRepo(pool)
 	protocolRepo := postgres.NewProtocolRepo(pool)
 	referralRepo := postgres.NewReferralRepo(pool)
+	referralTemplateRepo := postgres.NewReferralTemplateRepo(pool)
 	contractRepo := postgres.NewContractRepo(pool)
 	exitRequestRepo := postgres.NewExitRequestRepo(pool)
 	transferRequestRepo := postgres.NewTransferRequestRepo(pool)
@@ -79,23 +79,16 @@ func main() {
 	applicationService := service.NewApplicationService(applicationRepo, applicationDocumentRepo, dormitoryRepo, roomRepo, roomService, userRepo, notifierService)
 	// Env values are only defaults; an admin can change them (and switch
 	// the features on/off) from the admin panel without a restart.
-	aiSettingsService := service.NewAISettingsService(postgres.NewAISettingsRepo(pool), domain.AISettings{
-		AssistantEnabled:      true,
-		AssistantModel:        cfg.AssistantModel,
-		AssistantEffort:       cfg.AssistantEffort,
-		AssistantDailyLimit:   cfg.AssistantDailyLimit,
-		DocumentChecksEnabled: true,
-		DocumentCheckModel:    cfg.DocumentCheckModel,
-	}, cfg.AIProvider, cfg.AIAPIKey, cfg.SettingsEncryptionKey)
-	if err := aiSettingsService.Load(context.Background()); err != nil {
-		log.Fatalf("loading AI settings: %v", err)
+	assistantAccessService := service.NewAssistantAccessService(postgres.NewAssistantAccessRepo(pool), cfg.AIAPIKey)
+	if err := assistantAccessService.Load(context.Background()); err != nil {
+		log.Fatalf("loading assistant access: %v", err)
 	}
-	if st := aiSettingsService.KeyStatus(); st.Configured {
-		log.Printf("AI provider: %s (key from %s)", st.Provider, st.Source)
+	if assistantAccessService.APIKeyPresent() {
+		log.Printf("AI: alem.ai, model %s", service.AIModelName)
 	} else {
-		log.Print("no AI API key set (admin panel or OPENROUTER_API_KEY / ANTHROPIC_API_KEY) — AI document checks and the assistant are off")
+		log.Print("ALEM_API_KEY not set — AI document checks and the assistant are off")
 	}
-	documentCheckService := service.NewDocumentCheckService(applicationDocumentRepo, aiSettingsService, cfg.UploadDir)
+	documentCheckService := service.NewDocumentCheckService(applicationDocumentRepo, assistantAccessService, cfg.UploadDir)
 	applicationService.SetDocumentChecks(documentCheckService)
 	triageService := service.NewTriageService(applicationRepo, applicationDocumentRepo, roomService, applicationService)
 	triageService.SetDocumentChecks(documentCheckService)
@@ -120,7 +113,7 @@ func main() {
 		Triage:           triageService,
 		Campaign:         campaignService,
 		StatsQuery:       statsQueryService,
-	}), aiSettingsService)
+	}), assistantAccessService)
 	notificationService := service.NewNotificationService(notificationRepo, roomRepo, userRepo, notifierService)
 	protocolService := service.NewProtocolService(protocolRepo, applicationRepo, userRepo, dormitoryRepo, roomRepo, notifierService)
 	contractService := service.NewContractService(contractRepo, applicationRepo, protocolRepo, userRepo, roomService, notifierService, cfg.ContractResponseDeadline, cfg.ContractReminderWindow)
@@ -134,6 +127,9 @@ func main() {
 	academicYearService := service.NewAcademicYearService(academicYearRepo)
 
 	referralService := service.NewReferralService(referralRepo, notifierService, cfg.ReferralSignatoryName)
+	referralTemplateService := service.NewReferralTemplateService(referralTemplateRepo)
+	residenceCertificateService := service.NewResidenceCertificateService(
+		postgres.NewResidenceCertificateRepo(pool), cfg.ReferralSignatoryName)
 
 	// Once a protocol's vote tally resolves to approved, settle its students and
 	// then issue their referrals, in that order: whether a referral is valid
@@ -147,30 +143,32 @@ func main() {
 	})
 
 	handlers := apihttp.Handlers{
-		Auth:             handler.NewAuthHandler(authService),
-		User:             handler.NewUserHandler(userService),
-		Dormitory:        handler.NewDormitoryHandler(dormitoryService),
-		Room:             handler.NewRoomHandler(roomService),
-		Benefit:          handler.NewBenefitHandler(benefitService),
-		Document:         handler.NewDocumentHandler(documentService),
-		Application:      handler.NewApplicationHandler(applicationService, triageService),
-		Notification:     handler.NewNotificationHandler(notificationService),
-		Protocol:         handler.NewProtocolHandler(protocolService, applicationService),
-		Referral:         handler.NewReferralHandler(referralService),
-		ProtocolTemplate: handler.NewProtocolTemplateHandler(protocolTemplateService),
-		Contract:         handler.NewContractHandler(contractService, applicationService),
-		Feedback:         handler.NewFeedbackHandler(feedbackService),
-		ExitRequest:      handler.NewExitRequestHandler(exitRequestService),
-		TransferRequest:  handler.NewTransferRequestHandler(transferRequestService),
-		Upload:           handler.NewUploadHandler(cfg.UploadDir),
-		PetitionTemplate: handler.NewPetitionTemplateHandler(petitionTemplateService),
-		ContractTemplate: handler.NewContractTemplateHandler(contractTemplateService),
-		Retention:        handler.NewRetentionHandler(retentionService),
-		AcademicYear:     handler.NewAcademicYearHandler(academicYearService),
-		Triage:           handler.NewTriageHandler(triageService),
-		Campaign:         handler.NewCampaignHandler(campaignService),
-		Assistant:        handler.NewAssistantHandler(assistantService),
-		AISettings:       handler.NewAISettingsHandler(aiSettingsService),
+		Auth:                 handler.NewAuthHandler(authService),
+		User:                 handler.NewUserHandler(userService),
+		Dormitory:            handler.NewDormitoryHandler(dormitoryService),
+		Room:                 handler.NewRoomHandler(roomService),
+		Benefit:              handler.NewBenefitHandler(benefitService),
+		Document:             handler.NewDocumentHandler(documentService),
+		Application:          handler.NewApplicationHandler(applicationService, triageService),
+		Notification:         handler.NewNotificationHandler(notificationService),
+		Protocol:             handler.NewProtocolHandler(protocolService, applicationService),
+		Referral:             handler.NewReferralHandler(referralService, referralTemplateService),
+		ReferralTemplate:     handler.NewReferralTemplateHandler(referralTemplateService),
+		ResidenceCertificate: handler.NewResidenceCertificateHandler(residenceCertificateService),
+		ProtocolTemplate:     handler.NewProtocolTemplateHandler(protocolTemplateService),
+		Contract:             handler.NewContractHandler(contractService, applicationService),
+		Feedback:             handler.NewFeedbackHandler(feedbackService),
+		ExitRequest:          handler.NewExitRequestHandler(exitRequestService),
+		TransferRequest:      handler.NewTransferRequestHandler(transferRequestService),
+		Upload:               handler.NewUploadHandler(cfg.UploadDir),
+		PetitionTemplate:     handler.NewPetitionTemplateHandler(petitionTemplateService),
+		ContractTemplate:     handler.NewContractTemplateHandler(contractTemplateService),
+		Retention:            handler.NewRetentionHandler(retentionService),
+		AcademicYear:         handler.NewAcademicYearHandler(academicYearService),
+		Triage:               handler.NewTriageHandler(triageService),
+		Campaign:             handler.NewCampaignHandler(campaignService),
+		Assistant:            handler.NewAssistantHandler(assistantService),
+		AssistantAccess:      handler.NewAssistantAccessHandler(assistantAccessService),
 	}
 
 	router := apihttp.NewRouter(cfg.JWTSecret, cfg.UploadDir, handlers)

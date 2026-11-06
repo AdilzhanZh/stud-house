@@ -13,4 +13,5 @@ export interface Referral {
   dormitory_address: string
   room_number: string
   signatory_name: string
+  template_pages: string[]
 }

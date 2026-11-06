@@ -33,21 +33,17 @@ type chatConversationResponse struct {
 	Messages       []chatMessageResponse `json:"messages"`
 }
 
-// Current is available to any authenticated user: their latest assistant
-// conversation (empty when there is none, or their role changed since).
+// Current is available to any authenticated user: whether the assistant is
+// open to them, and their latest conversation (empty when there is none, or
+// their role changed since).
 func (h *AssistantHandler) Current(c *gin.Context) {
-	out := chatConversationResponse{Enabled: h.assistant.Enabled(), Messages: []chatMessageResponse{}}
-	if !out.Enabled {
-		response.OK(c, out)
-		return
-	}
 	userID, _ := middleware.UserID(c)
 	conv, err := h.assistant.Current(c.Request.Context(), userID)
 	if err != nil {
 		response.Error(c, err)
 		return
 	}
-	out.ConversationID = conv.ID
+	out := chatConversationResponse{Enabled: conv.Enabled, ConversationID: conv.ID, Messages: []chatMessageResponse{}}
 	for _, m := range conv.Messages {
 		out.Messages = append(out.Messages, chatMessageResponse{Role: m.Role, Text: m.Text, CreatedAt: m.CreatedAt})
 	}

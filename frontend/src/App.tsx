@@ -46,8 +46,11 @@ import { ContractTemplatePage } from './features/admin/contracts/ContractTemplat
 import { ContractDetailPage } from './features/admin/contracts/ContractDetailPage'
 import { ExitRequestListPage } from './features/admin/requests/ExitRequestListPage'
 import { TransferRequestListPage } from './features/admin/requests/TransferRequestListPage'
+import { ReferralTemplatePage } from './features/admin/protocols/ReferralTemplatePage'
 import { MyReferralPage } from './features/referral/MyReferralPage'
 import { ReferralVerifyPage } from './features/referral/ReferralVerifyPage'
+import { MyCertificatePage } from './features/certificate/MyCertificatePage'
+import { CertificateVerifyPage } from './features/certificate/CertificateVerifyPage'
 import { ProtectedRoute } from './routes/ProtectedRoute'
 import { RoleBasedRedirect } from './routes/RoleBasedRedirect'
 import { useAuthBootstrap } from './features/auth/useAuthBootstrap'
@@ -68,6 +71,7 @@ function App() {
     <Routes>
       {/* Public: a QR code scanned by someone with no account here. */}
       <Route path="/r/:token" element={<ReferralVerifyPage />} />
+      <Route path="/c/:token" element={<CertificateVerifyPage />} />
 
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<LoginPage />} />
@@ -89,6 +93,7 @@ function App() {
           <Route path="/contracts/my" element={<ContractsPage />} />
           <Route path="/my-residence" element={<MyResidencePage />} />
           <Route path="/my-residence/referral" element={<MyReferralPage />} />
+          <Route path="/my-residence/certificate" element={<MyCertificatePage />} />
         </Route>
       </Route>
 
@@ -127,6 +132,7 @@ function App() {
             <Route path="/admin/protocols" element={<ProtocolListPage />} />
             <Route path="/admin/protocols/new" element={<ProtocolCreatePage />} />
             <Route path="/admin/protocols/template" element={<ProtocolTemplatePage />} />
+            <Route path="/admin/protocols/referral-template" element={<ReferralTemplatePage />} />
 
             <Route path="/admin/contracts" element={<ContractsAndPaymentsPage />} />
             <Route path="/admin/contracts/contract-template" element={<ContractTemplatePage />} />

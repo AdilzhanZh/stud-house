@@ -69,10 +69,7 @@ function buildReferralHtml(referral: Referral, qrDataUrl: string): string {
         <tr>
           <td style="padding-right:24px;vertical-align:top;">
             <div>Әлеуметтік және тәрбие жұмыстары жөніндегі проректор</div>
-            <div style="margin-top:34px;">
-              <span style="display:inline-block;width:150px;border-bottom:1px solid ${INK};">&nbsp;</span>
-              <span style="margin-left:8px;font-weight:bold;">${escapeHtml(referral.signatory_name)}</span>
-            </div>
+            <div style="margin-top:34px;font-weight:bold;">${escapeHtml(referral.signatory_name)}</div>
             <div style="margin-top:22px;color:${MUTED};">Берілген күні: ${formatDate(referral.issued_at)}</div>
           </td>
           <td style="width:152px;vertical-align:top;text-align:center;">
@@ -84,7 +81,7 @@ function buildReferralHtml(referral: Referral, qrDataUrl: string): string {
       </table>
 
       <div style="position:relative;margin-top:40px;padding-top:12px;border-top:1px solid ${GOLD};font-family:${SANS};font-size:11.5px;line-height:1.5;color:${MUTED};">
-        Жолдама Student House жүйесінде жасалды. Мөрдің орнына QR код қолданылады: оны сканерлеп, жолдаманың жарамдылығын және студенттің қазіргі бөлмесін тексеріңіз.
+        Жолдама Student House жүйесінде жасалды. QR код сканерлеп, жолдаманың жарамдылығын және студенттің қазіргі бөлмесін тексеріңіз.
         <div style="margin-top:2px;color:${INK};">${escapeHtml(url)}</div>
       </div>
     </div>`

@@ -287,20 +287,84 @@ func (s *UserService) UpsertStudentProfile(ctx context.Context, userID uuid.UUID
 	return s.profiles.Upsert(ctx, &domain.StudentProfile{UserID: userID, Gender: gender, Course: course, AcademicDegree: academicDegree})
 }
 
-// UpdateStudentInstitute saves the institute printed on the student's referral.
-func (s *UserService) UpdateStudentInstitute(ctx context.Context, userID uuid.UUID, institute string) error {
+// StudentDetailsInput is a partial update: a nil field keeps its saved value,
+// so the application form can save what it asks for without touching the rest.
+type StudentDetailsInput struct {
+	Phone         *string
+	Institute     *string
+	StudyGroup    *string
+	Hometown      *string
+	ParentContact *string
+}
+
+// UpdateStudentDetails saves the data a student's documents are filled from:
+// their phone (on the account) and the free-text StudentDetails (on the
+// profile). Everything is validated before anything is written.
+func (s *UserService) UpdateStudentDetails(ctx context.Context, userID uuid.UUID, in StudentDetailsInput) (*domain.User, *domain.StudentProfile, error) {
 	user, err := s.GetByID(ctx, userID)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	if user.Role != domain.RoleStudent {
-		return apperror.BadRequest("профиль (жынысы/курсы) тек студентке ғана орнатылады")
+		return nil, nil, apperror.BadRequest("профиль (жынысы/курсы) тек студентке ғана орнатылады")
 	}
-	institute = strings.TrimSpace(institute)
-	if utf8.RuneCountInString(institute) > domain.MaxInstituteLength {
-		return apperror.BadRequest("институт атауы тым ұзын")
+	profile, err := s.GetStudentProfile(ctx, userID)
+	if err != nil {
+		return nil, nil, err
 	}
-	return s.profiles.UpdateInstitute(ctx, userID, institute)
+
+	details := profile.StudentDetails
+	fields := []struct {
+		value   *string
+		dst     *string
+		max     int
+		tooLong string
+	}{
+		{in.Institute, &details.Institute, domain.MaxInstituteLength, "институт атауы тым ұзын"},
+		{in.StudyGroup, &details.StudyGroup, domain.MaxStudyGroupLength, "оқу тобы тым ұзын"},
+		{in.Hometown, &details.Hometown, domain.MaxHometownLength, "келген жері тым ұзын"},
+		{in.ParentContact, &details.ParentContact, domain.MaxParentContactLength, "ата-ана телефоны тым ұзын"},
+	}
+	for _, f := range fields {
+		if f.value == nil {
+			continue
+		}
+		v := strings.TrimSpace(*f.value)
+		if utf8.RuneCountInString(v) > f.max {
+			return nil, nil, apperror.BadRequest(f.tooLong)
+		}
+		*f.dst = v
+	}
+
+	phone := user.Phone
+	if in.Phone != nil {
+		phone = strings.TrimSpace(*in.Phone)
+		if phone == "" {
+			return nil, nil, apperror.BadRequest("телефон нөмірін көрсетіңіз")
+		}
+		if utf8.RuneCountInString(phone) > domain.MaxPhoneLength {
+			return nil, nil, apperror.BadRequest("телефон нөмірі тым ұзын")
+		}
+	}
+
+	if details != profile.StudentDetails {
+		if err := s.profiles.UpdateDetails(ctx, userID, details); err != nil {
+			return nil, nil, err
+		}
+	}
+	if phone != user.Phone {
+		if err := s.users.UpdatePhone(ctx, userID, phone); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	if user, err = s.GetByID(ctx, userID); err != nil {
+		return nil, nil, err
+	}
+	if profile, err = s.GetStudentProfile(ctx, userID); err != nil {
+		return nil, nil, err
+	}
+	return user, profile, nil
 }
 
 // ListPendingStudents is manager/admin-only: self-registered students

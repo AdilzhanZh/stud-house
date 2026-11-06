@@ -14,7 +14,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /app/seed ./cmd/seed
 FROM alpine:latest
 WORKDIR /app
 
-RUN apk add --no-cache ca-certificates
+# poppler-utils: pdftoppm renders PDF pages to images for AI document checks.
+RUN apk add --no-cache ca-certificates poppler-utils
 
 COPY --from=build /app/server ./server
 COPY --from=build /app/hashpw ./hashpw

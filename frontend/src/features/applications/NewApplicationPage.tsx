@@ -17,7 +17,7 @@ import {
 } from '../../api/applicationApi'
 import { assignOwnBenefit, listBenefitRequiredDocuments, listBenefits } from '../../api/benefitApi'
 import { listRoomsByDormitory } from '../../api/roomApi'
-import { getStudentProfile, updateStudentInstitute } from '../../api/profileApi'
+import { getStudentProfile, updateStudentDetails } from '../../api/profileApi'
 import { uploadFile } from '../../api/uploadApi'
 import { generatePetitionPdfBlob, PETITION_RECEIPT_DOCUMENT_NAME } from '../../utils/petitionPdf'
 import { downloadContractPdf, getFilledContractDocument } from '../../utils/contractPdf'
@@ -178,7 +178,11 @@ export function NewApplicationPage() {
       getStudentProfile(user.id)
         .then((profile) => {
           setStudentGender(profile.gender)
-          setInstitute(profile.institute)
+          // Prefill from the profile, but never over what the student already typed.
+          setInstitute((v) => v || profile.institute)
+          setStudyGroup((v) => v || profile.study_group)
+          setHometown((v) => v || profile.hometown)
+          setParentContact((v) => v || profile.parent_contact)
         })
         .catch(() => {})
     }
@@ -355,9 +359,17 @@ export function NewApplicationPage() {
       })
       createdApplicationId = application.id
 
-      // Only ever printed on the referral, and the student can still enter it in
-      // their profile, so this must not fail a submitted application.
-      if (user) await updateStudentInstitute(user.id, institute.trim()).catch(() => undefined)
+      // Keep the profile current so the next form and the referral use what was
+      // just entered. The application already holds its own copy, so this
+      // must not fail a submitted application.
+      if (user) {
+        await updateStudentDetails(user.id, {
+          institute: institute.trim(),
+          study_group: studyGroup.trim(),
+          hometown: hometown.trim(),
+          parent_contact: parentContact.trim(),
+        }).catch(() => undefined)
+      }
 
       // Attach the already-uploaded documents. If any of this fails, roll
       // back the just-created application rather than leaving it without
@@ -682,6 +694,7 @@ export function NewApplicationPage() {
                   placeholder={t('wizard.studyGroupPlaceholder')}
                   value={studyGroup}
                   onChange={(e) => setStudyGroup(e.target.value)}
+                  maxLength={50}
                   required
                 />
                 <Input
@@ -689,6 +702,7 @@ export function NewApplicationPage() {
                   placeholder={t('wizard.hometownPlaceholder')}
                   value={hometown}
                   onChange={(e) => setHometown(e.target.value)}
+                  maxLength={255}
                   required
                 />
                 <Input
@@ -696,6 +710,7 @@ export function NewApplicationPage() {
                   placeholder={t('wizard.parentContactPlaceholder')}
                   value={parentContact}
                   onChange={(e) => setParentContact(e.target.value)}
+                  maxLength={30}
                   required
                 />
               </div>

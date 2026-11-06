@@ -323,13 +323,19 @@ func (h *UserHandler) UpsertStudentProfile(c *gin.Context) {
 	response.OK(c, studentProfileDTO(profile))
 }
 
-type updateStudentInstituteRequest struct {
-	Institute string `json:"institute"`
+// Omitted fields keep their saved value (see service.StudentDetailsInput).
+type updateStudentDetailsRequest struct {
+	Phone         *string `json:"phone"`
+	Institute     *string `json:"institute"`
+	StudyGroup    *string `json:"study_group"`
+	Hometown      *string `json:"hometown"`
+	ParentContact *string `json:"parent_contact"`
 }
 
-// UpdateStudentInstitute is allowed for admin/manager (any student) or the
-// student themselves (their own profile only).
-func (h *UserHandler) UpdateStudentInstitute(c *gin.Context) {
+// UpdateStudentDetails is allowed for admin/manager (any student) or the
+// student themselves (their own profile only). It returns both the account
+// (the phone lives there) and the profile.
+func (h *UserHandler) UpdateStudentDetails(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		response.Error(c, apperror.BadRequest("пайдаланушы идентификаторы дұрыс емес"))
@@ -339,21 +345,23 @@ func (h *UserHandler) UpdateStudentInstitute(c *gin.Context) {
 		response.Error(c, apperror.Forbidden("тек өз профиліңізді ғана басқара аласыз"))
 		return
 	}
-	var req updateStudentInstituteRequest
+	var req updateStudentDetailsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, apperror.BadRequest(err.Error()))
 		return
 	}
-	if err := h.users.UpdateStudentInstitute(c.Request.Context(), id, req.Institute); err != nil {
-		response.Error(c, err)
-		return
-	}
-	profile, err := h.users.GetStudentProfile(c.Request.Context(), id)
+	user, profile, err := h.users.UpdateStudentDetails(c.Request.Context(), id, service.StudentDetailsInput{
+		Phone:         req.Phone,
+		Institute:     req.Institute,
+		StudyGroup:    req.StudyGroup,
+		Hometown:      req.Hometown,
+		ParentContact: req.ParentContact,
+	})
 	if err != nil {
 		response.Error(c, err)
 		return
 	}
-	response.OK(c, studentProfileDTO(profile))
+	response.OK(c, gin.H{"user": userDTO(user), "profile": studentProfileDTO(profile)})
 }
 
 func (h *UserHandler) GetStudentProfile(c *gin.Context) {

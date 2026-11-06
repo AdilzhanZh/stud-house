@@ -67,10 +67,10 @@ export function PendingStudentsPage() {
       <div className="flex flex-col gap-3">
         {visibleStudents?.map((s) => (
           <Card key={s.id}>
-            <div className="flex items-start justify-between gap-4">
-              <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+              <div className="min-w-0">
                 <p className="font-medium text-sand-100">{s.full_name}</p>
-                <p className="text-sm text-sand-300">{s.email}</p>
+                <p className="text-sm break-all text-sand-300">{s.email}</p>
                 <p className="text-sm text-sand-300">{t('admin.applications.phone')}: {s.phone || '—'}</p>
                 <p className="font-mono text-sm text-sand-300">{t('admin.applications.iin')}: {s.iin ?? '—'}</p>
               </div>

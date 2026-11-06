@@ -591,6 +591,8 @@ export const kk = {
   },
   admin: {
     layout: {
+      openMenu: 'Мәзірді ашу',
+      closeMenu: 'Мәзірді жабу',
       managerPanel: 'Менеджер панелі',
       adminPanel: 'Админ панелі',
       userPanel: 'Пайдаланушы панелі',

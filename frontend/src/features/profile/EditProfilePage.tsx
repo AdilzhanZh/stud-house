@@ -150,7 +150,7 @@ export function EditProfilePage() {
     <div className="flex flex-col gap-3.5">
       <div className="flex items-center gap-3">
         <button
-          onClick={() => navigate('/dashboard/profile')}
+          onClick={() => navigate(user.role === 'student' ? '/dashboard/profile' : '/admin/profile')}
           aria-label={t('appDetail.backToList')}
           className="flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-full border border-navy-700 bg-navy-900 text-sand-200"
         >

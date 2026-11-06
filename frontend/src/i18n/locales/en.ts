@@ -591,6 +591,8 @@ export const en: typeof kk = {
   },
   admin: {
     layout: {
+      openMenu: 'Open menu',
+      closeMenu: 'Close menu',
       managerPanel: 'Manager panel',
       adminPanel: 'Admin panel',
       userPanel: 'User panel',

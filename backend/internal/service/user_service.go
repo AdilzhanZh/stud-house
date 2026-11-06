@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 
@@ -274,15 +276,156 @@ func (s *UserService) UpsertStudentProfile(ctx context.Context, userID uuid.UUID
 				return err
 			}
 		}
-		maxCourse := domain.DegreeBachelor.MaxCourse()
-		if effectiveDegree != nil {
-			maxCourse = effectiveDegree.MaxCourse()
-		}
-		if *course < 1 || *course > maxCourse {
-			return apperror.BadRequest(fmt.Sprintf("курс 1 мен %d аралығында болуы керек", maxCourse))
+		if err := validateCourse(*course, effectiveDegree); err != nil {
+			return err
 		}
 	}
 	return s.profiles.Upsert(ctx, &domain.StudentProfile{UserID: userID, Gender: gender, Course: course, AcademicDegree: academicDegree})
+}
+
+// validateCourse checks course against the degree's length; with no degree on
+// record, a bachelor's is assumed.
+func validateCourse(course int16, degree *domain.AcademicDegree) error {
+	maxCourse := domain.DegreeBachelor.MaxCourse()
+	if degree != nil {
+		maxCourse = degree.MaxCourse()
+	}
+	if course < 1 || course > maxCourse {
+		return apperror.BadRequest(fmt.Sprintf("курс 1 мен %d аралығында болуы керек", maxCourse))
+	}
+	return nil
+}
+
+// StudentDetailsInput is a partial update: a nil field keeps its saved value,
+// so the application form can save what it asks for without touching the rest.
+//
+// IIN and Course can only fill a gap: many accounts were created without them,
+// and the contract and certificate need them, but once set they identify the
+// student (IIN is also their login) and decide room eligibility (course), so
+// changing a recorded value stays with a manager.
+type StudentDetailsInput struct {
+	IIN           *string
+	Course        *int16
+	Phone         *string
+	Institute     *string
+	StudyGroup    *string
+	Hometown      *string
+	ParentContact *string
+}
+
+// UpdateStudentDetails saves the data a student's documents are filled from:
+// IIN and phone (on the account), course and the free-text StudentDetails (on
+// the profile). Everything is validated before anything is written, and the
+// IIN, the one write that can still be refused (it's unique), goes first.
+func (s *UserService) UpdateStudentDetails(ctx context.Context, userID uuid.UUID, in StudentDetailsInput) (*domain.User, *domain.StudentProfile, error) {
+	user, err := s.GetByID(ctx, userID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if user.Role != domain.RoleStudent {
+		return nil, nil, apperror.BadRequest("профиль (жынысы/курсы) тек студентке ғана орнатылады")
+	}
+	profile, err := s.GetStudentProfile(ctx, userID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	details := profile.StudentDetails
+	fields := []struct {
+		value   *string
+		dst     *string
+		max     int
+		tooLong string
+	}{
+		{in.Institute, &details.Institute, domain.MaxInstituteLength, "институт атауы тым ұзын"},
+		{in.StudyGroup, &details.StudyGroup, domain.MaxStudyGroupLength, "оқу тобы тым ұзын"},
+		{in.Hometown, &details.Hometown, domain.MaxHometownLength, "келген жері тым ұзын"},
+		{in.ParentContact, &details.ParentContact, domain.MaxParentContactLength, "ата-ана телефоны тым ұзын"},
+	}
+	for _, f := range fields {
+		if f.value == nil {
+			continue
+		}
+		v := strings.TrimSpace(*f.value)
+		if utf8.RuneCountInString(v) > f.max {
+			return nil, nil, apperror.BadRequest(f.tooLong)
+		}
+		*f.dst = v
+	}
+
+	phone := user.Phone
+	if in.Phone != nil {
+		phone = strings.TrimSpace(*in.Phone)
+		if phone == "" {
+			return nil, nil, apperror.BadRequest("телефон нөмірін көрсетіңіз")
+		}
+		if utf8.RuneCountInString(phone) > domain.MaxPhoneLength {
+			return nil, nil, apperror.BadRequest("телефон нөмірі тым ұзын")
+		}
+	}
+
+	var newIIN string
+	if in.IIN != nil {
+		v := strings.TrimSpace(*in.IIN)
+		switch {
+		case user.IIN != nil && *user.IIN != "":
+			if v != *user.IIN {
+				return nil, nil, apperror.BadRequest("ЖСН-ді тек менеджер өзгерте алады")
+			}
+		case !isValidIIN(v):
+			return nil, nil, apperror.BadRequest("ЖСН (ИИН) 12 таңбалы сан болуы керек")
+		default:
+			newIIN = v
+		}
+	}
+
+	var newCourse *int16
+	if in.Course != nil {
+		if profile.Course != nil {
+			if *in.Course != *profile.Course {
+				return nil, nil, apperror.BadRequest("курсты тек менеджер өзгерте алады")
+			}
+		} else {
+			if err := validateCourse(*in.Course, profile.AcademicDegree); err != nil {
+				return nil, nil, err
+			}
+			newCourse = in.Course
+		}
+	}
+
+	if newIIN != "" {
+		if err := s.users.UpdateIIN(ctx, userID, newIIN); err != nil {
+			if errors.Is(err, repository.ErrConflict) {
+				return nil, nil, apperror.Conflict("бұл ЖСН (ИИН) бұрыннан тіркелген")
+			}
+			return nil, nil, err
+		}
+	}
+	if newCourse != nil {
+		if err := s.profiles.Upsert(ctx, &domain.StudentProfile{
+			UserID: userID, Gender: profile.Gender, Course: newCourse, AcademicDegree: profile.AcademicDegree,
+		}); err != nil {
+			return nil, nil, err
+		}
+	}
+	if details != profile.StudentDetails {
+		if err := s.profiles.UpdateDetails(ctx, userID, details); err != nil {
+			return nil, nil, err
+		}
+	}
+	if phone != user.Phone {
+		if err := s.users.UpdatePhone(ctx, userID, phone); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	if user, err = s.GetByID(ctx, userID); err != nil {
+		return nil, nil, err
+	}
+	if profile, err = s.GetStudentProfile(ctx, userID); err != nil {
+		return nil, nil, err
+	}
+	return user, profile, nil
 }
 
 // ListPendingStudents is manager/admin-only: self-registered students

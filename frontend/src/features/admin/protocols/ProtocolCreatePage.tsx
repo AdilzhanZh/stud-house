@@ -87,7 +87,11 @@ export function ProtocolCreatePage() {
         await downloadProtocolPdf(
           {
             protocolNumber: protocol.number,
-            students: selected.map((c) => ({ name: c.student_full_name, dormitoryName: c.dormitory_name })),
+            students: selected.map((c) => ({
+              name: c.student_full_name,
+              dormitoryName: c.dormitory_name,
+              studyGroup: c.study_group,
+            })),
           },
           `khattama-${protocol.number}.pdf`,
         )

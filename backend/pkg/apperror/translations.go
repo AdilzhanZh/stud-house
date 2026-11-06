@@ -440,7 +440,22 @@ var staticTranslations = map[string]translation{
 	},
 	"хаттама идентификаторы дұрыс емес": {"Неверный идентификатор протокола", "Invalid protocol identifier"},
 	"хаттама табылмады":                 {"Протокол не найден", "Protocol not found"},
-	"хаттама шаблоны табылмады":         {"Шаблон протокола не найден", "Protocol template not found"},
+	"жолдама табылмады":                 {"Направление не найдено", "Referral not found"},
+	"жолдама үлгісінде жолдама нөмірі, студенттің аты-жөні, жатақхана және бөлме нөмірі болуы керек": {"В образце направления должны быть номер направления, ФИО студента, общежитие и номер комнаты", "The referral template must include the referral number, the student's name, the dormitory and the room number"},
+	"институт атауы тым ұзын":           {"Слишком длинное название института", "The institute name is too long"},
+	"оқу тобы тым ұзын":                 {"Слишком длинное название учебной группы", "The study group is too long"},
+	"келген жері тым ұзын":              {"Слишком длинное название места проживания", "The hometown is too long"},
+	"ата-ана телефоны тым ұзын":         {"Слишком длинный телефон родителей", "The parent contact is too long"},
+	"телефон нөмірін көрсетіңіз":        {"Укажите номер телефона", "Enter a phone number"},
+	"ЖСН-ді тек менеджер өзгерте алады": {"Изменить ИИН может только менеджер", "Only a manager can change the IIN"},
+	"курсты тек менеджер өзгерте алады": {"Изменить курс может только менеджер", "Only a manager can change the year of study"},
+	"анықтама табылмады":                {"Справка не найдена", "Certificate not found"},
+	"сіз қазір жатақханада тұрмайсыз, анықтама алу мүмкін емес": {
+		"Вы сейчас не проживаете в общежитии, получить справку нельзя",
+		"You don't live in a dormitory now, so a certificate can't be issued",
+	},
+	"телефон нөмірі тым ұзын":   {"Слишком длинный номер телефона", "The phone number is too long"},
+	"хаттама шаблоны табылмады": {"Шаблон протокола не найден", "Protocol template not found"},
 	"хаттама қабылданбаған емес немесе өтініштердің бірі басқа қаралып жатқан хаттамада бар": {
 		"Протокол не является отклонённым, либо одна из заявок уже есть в другом рассматриваемом протоколе",
 		"The protocol is not rejected, or one of the applications is already in another protocol under review",
@@ -543,24 +558,14 @@ var staticTranslations = map[string]translation{
 		"ИИ-помощник не смог ответить, попробуйте сформулировать вопрос точнее",
 		"The AI assistant could not reply, try asking more specifically",
 	},
-	"модель жарамсыз":         {"Недопустимая модель", "Invalid model"},
-	"effort деңгейі жарамсыз": {"Недопустимый уровень effort", "Invalid effort level"},
-	"күндік лимит 1 мен 1000 аралығында болуы керек": {
-		"Дневной лимит должен быть от 1 до 1000",
-		"The daily limit must be between 1 and 1000",
+	"ЖИ көмекші сіздің рөліңіз үшін қосылмаған": {
+		"ИИ-помощник не включён для вашей роли",
+		"The AI assistant isn't enabled for your role",
 	},
-	"API кілті жарамсыз": {"Недопустимый API-ключ", "Invalid API key"},
-	"кілт танылмады: OpenRouter кілті «sk-or-», Anthropic кілті «sk-ant-» деп басталады": {
-		"Ключ не распознан: ключ OpenRouter начинается с «sk-or-», ключ Anthropic — с «sk-ant-»",
-		"Unrecognised key: OpenRouter keys start with \"sk-or-\", Anthropic keys with \"sk-ant-\"",
-	},
-	"кілт жарамсыз: провайдер оны қабылдамады": {
-		"Ключ недействителен: провайдер его не принял",
-		"The key is invalid: the provider rejected it",
-	},
-	"серверде шифрлау кілті (SETTINGS_ENCRYPTION_KEY немесе JWT_SECRET) жоқ, API кілтін сақтау мүмкін емес": {
-		"На сервере нет ключа шифрования (SETTINGS_ENCRYPTION_KEY или JWT_SECRET), сохранить API-ключ нельзя",
-		"The server has no encryption secret (SETTINGS_ENCRYPTION_KEY or JWT_SECRET), so the API key can't be stored",
+	"белгісіз рөл": {"Неизвестная роль", "Unknown role"},
+	"ЖИ модельіне сұраныс көп, сәлден кейін қайталап көріңіз": {
+		"ИИ-модель перегружена запросами, попробуйте чуть позже",
+		"The AI model is busy, please try again shortly",
 	},
 	"өтініштер таңдалмаған": {"Заявки не выбраны", "No applications selected"},
 	"өтініштің тексеру нәтижесі өзгерді, оны жеке қараңыз": {
@@ -596,17 +601,6 @@ type dynamicPattern struct {
 }
 
 var dynamicPatterns = []dynamicPattern{
-	{
-		// The reason is mostly Kazakh text or a raw network error; only
-		// the fixed prefix is translated.
-		re: regexp.MustCompile(`^кілтті тексеру мүмкін болмады: (.+)$`),
-		translate: func(lang string, g []string) string {
-			if lang == "ru" {
-				return "Не удалось проверить ключ: " + g[0]
-			}
-			return "Couldn't verify the key: " + g[0]
-		},
-	},
 	{
 		re: regexp.MustCompile(`^курс 1 мен (\d+) аралығында болуы керек$`),
 		translate: func(lang string, g []string) string {

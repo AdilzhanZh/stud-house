@@ -124,6 +124,17 @@ type residentSnapshot struct {
 	roomNumber    string
 }
 
+// residentStudyGroupColumn is the study group of the student in the surrounding
+// query's u row. A resident has no application in the protocol to read it from,
+// so it's their latest one that has a group, or empty if there's none.
+const residentStudyGroupColumn = `
+	COALESCE((
+		SELECT sg.study_group FROM applications sg
+		WHERE sg.student_id = u.id AND NULLIF(TRIM(sg.study_group), '') IS NOT NULL
+		ORDER BY sg.created_at DESC
+		LIMIT 1
+	), '')`
+
 // lockEligibleResidents locks each student's active room_residents row and
 // returns where they live now, or ErrResidentNotEligible if any of them can't
 // be added to a protocol.
@@ -274,8 +285,8 @@ func (r *ProtocolRepo) ListVotes(ctx context.Context, protocolID uuid.UUID) ([]*
 }
 
 func (r *ProtocolRepo) ListResidents(ctx context.Context, protocolID uuid.UUID) ([]*domain.ProtocolResident, error) {
-	const q = `
-		SELECT pr.student_id, u.full_name, u.email, u.phone, pr.dormitory_name, pr.room_number
+	q := `
+		SELECT pr.student_id, u.full_name, u.email, u.phone, pr.dormitory_name, pr.room_number, ` + residentStudyGroupColumn + `
 		FROM protocol_residents pr
 		JOIN users u ON u.id = pr.student_id
 		WHERE pr.protocol_id = $1`
@@ -288,7 +299,7 @@ func (r *ProtocolRepo) ListResidents(ctx context.Context, protocolID uuid.UUID) 
 	var out []*domain.ProtocolResident
 	for rows.Next() {
 		res := &domain.ProtocolResident{}
-		if err := rows.Scan(&res.StudentID, &res.FullName, &res.Email, &res.Phone, &res.DormitoryName, &res.RoomNumber); err != nil {
+		if err := rows.Scan(&res.StudentID, &res.FullName, &res.Email, &res.Phone, &res.DormitoryName, &res.RoomNumber, &res.StudyGroup); err != nil {
 			return nil, err
 		}
 		out = append(out, res)
@@ -298,7 +309,7 @@ func (r *ProtocolRepo) ListResidents(ctx context.Context, protocolID uuid.UUID) 
 
 func (r *ProtocolRepo) ListCandidates(ctx context.Context) ([]*domain.ProtocolCandidate, error) {
 	q := `
-		SELECT a.id, a.student_id, u.full_name, d.id AS dormitory_id, d.name AS dormitory_name, r.room_number
+		SELECT a.id, a.student_id, u.full_name, d.id AS dormitory_id, d.name AS dormitory_name, r.room_number, COALESCE(a.study_group, '')
 		FROM applications a
 		JOIN users u ON u.id = a.student_id
 		JOIN dormitories d ON d.id = a.dormitory_id
@@ -306,7 +317,7 @@ func (r *ProtocolRepo) ListCandidates(ctx context.Context) ([]*domain.ProtocolCa
 		WHERE a.status = 'approved'
 			AND NOT EXISTS (SELECT 1 FROM protocol_applications pa WHERE pa.application_id = a.id)
 		UNION ALL
-		SELECT NULL, rr.student_id, u.full_name, d.id, d.name, r.room_number
+		SELECT NULL, rr.student_id, u.full_name, d.id, d.name, r.room_number, ` + residentStudyGroupColumn + `
 		FROM room_residents rr
 		JOIN users u ON u.id = rr.student_id
 		JOIN rooms r ON r.id = rr.room_id
@@ -322,7 +333,7 @@ func (r *ProtocolRepo) ListCandidates(ctx context.Context) ([]*domain.ProtocolCa
 	var out []*domain.ProtocolCandidate
 	for rows.Next() {
 		c := &domain.ProtocolCandidate{}
-		if err := rows.Scan(&c.ApplicationID, &c.StudentID, &c.StudentFullName, &c.DormitoryID, &c.DormitoryName, &c.RoomNumber); err != nil {
+		if err := rows.Scan(&c.ApplicationID, &c.StudentID, &c.StudentFullName, &c.DormitoryID, &c.DormitoryName, &c.RoomNumber, &c.StudyGroup); err != nil {
 			return nil, err
 		}
 		out = append(out, c)

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ChevronLeft, Camera } from 'lucide-react'
@@ -10,6 +10,7 @@ import { Alert } from '../../components/Alert'
 import { useAuth } from '../auth/useAuth'
 import { uploadFile } from '../../api/uploadApi'
 import { updateAvatar, changeOwnPassword, changeOwnEmail } from '../../api/userApi'
+import { getStudentProfile, updateStudentDetails, type StudentDetailsUpdate } from '../../api/profileApi'
 import { extractErrorMessage } from '../../api/client'
 
 export function EditProfilePage() {
@@ -33,7 +34,57 @@ export function EditProfilePage() {
   const [emailSuccess, setEmailSuccess] = useState(false)
   const [isChangingEmail, setIsChangingEmail] = useState(false)
 
+  const [details, setDetails] = useState<Required<Omit<StudentDetailsUpdate, 'iin' | 'course'>>>({
+    phone: user?.phone ?? '',
+    institute: '',
+    study_group: '',
+    hometown: '',
+    parent_contact: '',
+  })
+  const [detailsError, setDetailsError] = useState<string | null>(null)
+  const [detailsSaved, setDetailsSaved] = useState(false)
+  const [isSavingDetails, setIsSavingDetails] = useState(false)
+
+  const userId = user?.id
+  const isStudent = user?.role === 'student'
+  useEffect(() => {
+    if (!userId || !isStudent) return
+    getStudentProfile(userId)
+      .then((profile) =>
+        setDetails((d) => ({
+          ...d,
+          institute: profile.institute,
+          study_group: profile.study_group,
+          hometown: profile.hometown,
+          parent_contact: profile.parent_contact,
+        })),
+      )
+      .catch(() => undefined)
+  }, [userId, isStudent])
+
   if (!user) return null
+
+  function setDetail(field: keyof typeof details, value: string) {
+    setDetails((d) => ({ ...d, [field]: value }))
+    setDetailsSaved(false)
+  }
+
+  async function handleSaveDetails(e: React.FormEvent) {
+    e.preventDefault()
+    if (!user) return
+    setDetailsError(null)
+    setDetailsSaved(false)
+    setIsSavingDetails(true)
+    try {
+      const { user: updated } = await updateStudentDetails(user.id, details)
+      updateUser(updated)
+      setDetailsSaved(true)
+    } catch (err) {
+      setDetailsError(extractErrorMessage(err, t('profile.editProfile.detailsSaveFailed')))
+    } finally {
+      setIsSavingDetails(false)
+    }
+  }
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -133,6 +184,64 @@ export function EditProfilePage() {
         </div>
         {avatarError && <Alert variant="error" message={avatarError} />}
       </Card>
+
+      {isStudent && (
+        <Card>
+          <p className="text-[15px] font-bold text-sand-100">{t('profile.editProfile.detailsTitle')}</p>
+          <p className="mt-1 mb-3 text-sm text-sand-300">{t('profile.editProfile.detailsHint')}</p>
+          <form className="flex flex-col gap-3" onSubmit={handleSaveDetails}>
+            {detailsError && <Alert variant="error" message={detailsError} />}
+            <Input
+              id="phone"
+              label={t('profile.phone')}
+              placeholder={t('profile.editProfile.phonePlaceholder')}
+              type="tel"
+              autoComplete="tel"
+              value={details.phone}
+              onChange={(e) => setDetail('phone', e.target.value)}
+              maxLength={32}
+              required
+            />
+            <Input
+              id="institute"
+              label={t('referral.instituteLabel')}
+              placeholder={t('referral.institutePlaceholder')}
+              value={details.institute}
+              onChange={(e) => setDetail('institute', e.target.value)}
+              maxLength={200}
+            />
+            <Input
+              id="study-group"
+              label={t('wizard.studyGroupLabel')}
+              placeholder={t('wizard.studyGroupPlaceholder')}
+              value={details.study_group}
+              onChange={(e) => setDetail('study_group', e.target.value)}
+              maxLength={50}
+            />
+            <Input
+              id="hometown"
+              label={t('wizard.hometownLabel')}
+              placeholder={t('wizard.hometownPlaceholder')}
+              value={details.hometown}
+              onChange={(e) => setDetail('hometown', e.target.value)}
+              maxLength={255}
+            />
+            <Input
+              id="parent-contact"
+              label={t('wizard.parentContactLabel')}
+              placeholder={t('wizard.parentContactPlaceholder')}
+              type="tel"
+              value={details.parent_contact}
+              onChange={(e) => setDetail('parent_contact', e.target.value)}
+              maxLength={30}
+            />
+            {detailsSaved && <Alert variant="success" message={t('profile.editProfile.detailsSaved')} />}
+            <Button type="submit" isLoading={isSavingDetails} className="self-start">
+              {t('profile.editProfile.saveDetails')}
+            </Button>
+          </form>
+        </Card>
+      )}
 
       <Card>
         <p className="mb-3 text-[15px] font-bold text-sand-100">{t('profile.editProfile.emailTitle')}</p>

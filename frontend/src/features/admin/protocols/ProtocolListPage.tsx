@@ -78,9 +78,12 @@ export function ProtocolListPage() {
     <div className="flex flex-col gap-3.5">
       <div className="flex items-center justify-between gap-3">
         <h1 className={adminPageHeading}>{t('admin.protocols.pageTitle')}</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
           <Button variant="secondary" onClick={() => navigate('/admin/protocols/template')}>
             {t('admin.protocols.templateButton')}
+          </Button>
+          <Button variant="secondary" onClick={() => navigate('/admin/protocols/referral-template')}>
+            {t('referral.templateButton')}
           </Button>
           <Button onClick={() => navigate('/admin/protocols/new')}>{t('admin.protocols.prepareButton')}</Button>
         </div>

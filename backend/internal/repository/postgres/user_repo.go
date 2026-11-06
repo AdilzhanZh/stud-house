@@ -328,6 +328,34 @@ func (r *UserRepo) UpdateEmail(ctx context.Context, id uuid.UUID, email string) 
 	return nil
 }
 
+func (r *UserRepo) UpdateIIN(ctx context.Context, id uuid.UUID, iin string) error {
+	const q = `UPDATE users SET iin = $2, updated_at = now() WHERE id = $1`
+	tag, err := r.db.Exec(ctx, q, id, iin)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return repository.ErrConflict
+		}
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return repository.ErrNotFound
+	}
+	return nil
+}
+
+func (r *UserRepo) UpdatePhone(ctx context.Context, id uuid.UUID, phone string) error {
+	const q = `UPDATE users SET phone = $2, updated_at = now() WHERE id = $1`
+	tag, err := r.db.Exec(ctx, q, id, phone)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return repository.ErrNotFound
+	}
+	return nil
+}
+
 // Delete returns repository.ErrConflict if the user is still referenced
 // elsewhere (applications, contracts, votes, etc. have no ON DELETE clause on
 // their user FKs, so Postgres rejects the delete with a foreign_key_violation).

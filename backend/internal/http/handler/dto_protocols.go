@@ -44,6 +44,7 @@ type protocolCandidateResponse struct {
 	DormitoryID     uuid.UUID  `json:"dormitory_id"`
 	DormitoryName   string     `json:"dormitory_name"`
 	RoomNumber      *string    `json:"room_number"`
+	StudyGroup      string     `json:"study_group"`
 }
 
 func protocolCandidatesDTO(list []*domain.ProtocolCandidate) []protocolCandidateResponse {
@@ -56,6 +57,7 @@ func protocolCandidatesDTO(list []*domain.ProtocolCandidate) []protocolCandidate
 			DormitoryID:     c.DormitoryID,
 			DormitoryName:   c.DormitoryName,
 			RoomNumber:      c.RoomNumber,
+			StudyGroup:      c.StudyGroup,
 		})
 	}
 	return out
@@ -74,6 +76,7 @@ type protocolStudentResponse struct {
 	DormitoryName     string     `json:"dormitory_name"`
 	AssignedRoomID    *uuid.UUID `json:"assigned_room_id"`
 	RoomNumber        *string    `json:"room_number"`
+	StudyGroup        string     `json:"study_group"`
 }
 
 type committeeVoteResponse struct {
@@ -101,6 +104,7 @@ func protocolDetailDTO(d *service.ProtocolDetail) protocolDetailResponse {
 			StudentID:         app.StudentID,
 			DormitoryID:       &app.DormitoryID,
 			AssignedRoomID:    app.AssignedRoomID,
+			StudyGroup:        app.StudyGroup,
 		}
 		if student != nil {
 			row.StudentFullName = student.FullName
@@ -125,6 +129,7 @@ func protocolDetailDTO(d *service.ProtocolDetail) protocolDetailResponse {
 			StudentPhone:    res.Phone,
 			DormitoryName:   res.DormitoryName,
 			RoomNumber:      &res.RoomNumber,
+			StudyGroup:      res.StudyGroup,
 		})
 	}
 

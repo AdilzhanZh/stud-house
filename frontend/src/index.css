@@ -246,3 +246,28 @@ input:-webkit-autofill:focus {
     animation: none;
   }
 }
+
+/* Home dormitory carousel. The outgoing slide stays parked off-screen until
+   its next turn, so `forwards` matters. */
+.dorm-slide-in {
+  animation: dorm-slide-in 600ms ease-in-out both;
+}
+.dorm-slide-out {
+  animation: dorm-slide-out 600ms ease-in-out forwards;
+}
+@keyframes dorm-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes dorm-slide-out {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}

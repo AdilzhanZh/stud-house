@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/google/uuid"
 
 	"student-house/internal/domain"
@@ -194,33 +193,10 @@ stage is one of awaiting_review, awaiting_documents, awaiting_commission, awaiti
 	},
 }
 
-func (t *assistantTools) definitions(c assistantCaps) []anthropic.BetaToolUnionParam {
-	var out []anthropic.BetaToolUnionParam
-	for _, tool := range assistantToolList {
-		if !tool.allowed(c) {
-			continue
-		}
-		props := tool.properties
-		if props == nil {
-			props = map[string]any{}
-		}
-		out = append(out, anthropic.BetaToolUnionParam{OfTool: &anthropic.BetaToolParam{
-			Name:        tool.name,
-			Description: anthropic.String(tool.description),
-			Strict:      anthropic.Bool(true),
-			InputSchema: anthropic.BetaToolInputSchemaParam{
-				Properties:  props,
-				Required:    tool.required,
-				ExtraFields: map[string]any{"additionalProperties": false},
-			},
-		}})
-	}
-	return out
-}
-
-// openRouterDefinitions are the same tools in the OpenAI function format.
-func (t *assistantTools) openRouterDefinitions(c assistantCaps) []orTool {
-	var out []orTool
+// llmDefinitions are the tools this capability set may call, in the
+// OpenAI function format.
+func (t *assistantTools) llmDefinitions(c assistantCaps) []llmTool {
+	var out []llmTool
 	for _, tool := range assistantToolList {
 		if !tool.allowed(c) {
 			continue
@@ -233,7 +209,7 @@ func (t *assistantTools) openRouterDefinitions(c assistantCaps) []orTool {
 		if len(tool.required) > 0 {
 			schema["required"] = tool.required
 		}
-		out = append(out, orTool{Type: "function", Function: orToolFunction{
+		out = append(out, llmTool{Type: "function", Function: llmToolFunction{
 			Name:        tool.name,
 			Description: tool.description,
 			Parameters:  schema,

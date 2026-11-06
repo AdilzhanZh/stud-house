@@ -10,6 +10,7 @@ import {
   decodeAccessTokenClaims,
 } from '../../store/tokenStorage'
 import * as authApi from '../../api/authApi'
+import { getMe } from '../../api/userApi'
 
 // On a hard page load the in-memory access token (and the store holding it)
 // is gone. If a refresh_token + cached user are still in localStorage, this
@@ -51,6 +52,17 @@ export function useAuthBootstrap(): boolean {
         if (claims) setStoredUser(user)
 
         setSession(user, pair.access_token)
+
+        // The cached user is whatever login returned, possibly long ago, so
+        // details a manager has filled in since (IIN, phone) wouldn't show.
+        // Refresh it without holding up the page; the cache is fine meanwhile.
+        void getMe()
+          .then((fresh) => {
+            if (cancelled) return
+            setStoredUser(fresh)
+            useAuthStore.getState().setUser(fresh)
+          })
+          .catch(() => undefined)
       } catch {
         clearRefreshToken()
         clearStoredUser()

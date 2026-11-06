@@ -24,6 +24,7 @@ export interface ProtocolCandidate {
   dormitory_id: string
   dormitory_name: string
   room_number: string | null
+  study_group: string
 }
 
 // The application and dormitory id fields are null for a current resident.
@@ -38,6 +39,7 @@ export interface ProtocolStudent {
   dormitory_name: string
   assigned_room_id: string | null
   room_number: string | null
+  study_group: string
 }
 
 export type VoteDecision = 'approved' | 'rejected'

@@ -117,13 +117,35 @@ func (d AcademicDegree) MaxCourse() int16 {
 }
 
 // StudentProfile holds the attributes (gender, course, academic degree) that
-// room restriction validation checks against; only meaningful for users with
+// room restriction validation checks against, plus the StudentDetails the
+// student's documents are filled from; only meaningful for users with
 // RoleStudent.
 type StudentProfile struct {
 	UserID         uuid.UUID
 	Gender         *Gender
 	Course         *int16
 	AcademicDegree *AcademicDegree
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	StudentDetails
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
+
+// StudentDetails is the free text a student fills in themselves for their
+// documents (referral, petition, contract), empty until entered. It is saved
+// on its own (UpdateDetails), not through Upsert: gender, course and degree
+// decide room eligibility, so a student doesn't edit those.
+type StudentDetails struct {
+	Institute     string
+	StudyGroup    string
+	Hometown      string
+	ParentContact string
+}
+
+// Length caps match the application columns these values are copied into
+// (applications.study_group, hometown, parent_contact) and users.phone.
+const (
+	MaxStudyGroupLength    = 50
+	MaxHometownLength      = 255
+	MaxParentContactLength = 30
+	MaxPhoneLength         = 32
+)

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Pencil, LogOut } from 'lucide-react'
@@ -10,6 +10,26 @@ import { useAuth } from '../auth/useAuth'
 import { useIsSettled } from '../residence/useIsSettled'
 import { getStudentProfile } from '../../api/profileApi'
 import type { StudentProfile } from '../../types'
+
+function ProfileSection({ title, children }: { title?: string; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-2">
+      {title && <h2 className="px-1 text-[13px] font-semibold tracking-wide text-sand-300 uppercase">{title}</h2>}
+      <Card className="!py-1.5 !px-4.5">
+        <dl className="divide-y divide-navy-700">{children}</dl>
+      </Card>
+    </section>
+  )
+}
+
+function ProfileRow({ label, value }: { label: string; value: string | null | undefined }) {
+  return (
+    <div className="flex justify-between gap-3 py-3.5 text-sm">
+      <dt className="shrink-0 text-sand-300">{label}</dt>
+      <dd className="min-w-0 text-right font-semibold break-words text-sand-100">{value?.trim() || '—'}</dd>
+    </div>
+  )
+}
 
 export function ProfilePage() {
   const { t } = useTranslation()
@@ -38,6 +58,19 @@ export function ProfilePage() {
 
   if (!user) return null
 
+  const isStudent = user.role === 'student'
+  // Everything the contract, petition and referral are filled from that the
+  // student can see; the rest (name, gender, room) is always set.
+  const documentFields = [
+    user.phone,
+    user.iin,
+    profile?.institute,
+    profile?.study_group,
+    profile?.hometown,
+    profile?.parent_contact,
+  ]
+  const filledCount = documentFields.filter((v) => v?.trim()).length
+
   async function handleLogout() {
     await logout()
     navigate('/login', { replace: true })
@@ -58,26 +91,47 @@ export function ProfilePage() {
         </div>
       </div>
 
-      <Card className="!py-1.5 !px-4.5">
-        <div className="flex justify-between gap-3 border-b border-navy-700 py-3.5 text-sm">
-          <span className="text-sand-300">{t('profile.email')}</span>
-          <span className="font-semibold text-sand-100">{user.email}</span>
-        </div>
-        <div className="flex justify-between gap-3 border-b border-navy-700 py-3.5 text-sm">
-          <span className="text-sand-300">{t('profile.phone')}</span>
-          <span className="font-semibold text-sand-100">{user.phone || '—'}</span>
-        </div>
-        <div className="flex justify-between gap-3 border-b border-navy-700 py-3.5 text-sm">
-          <span className="text-sand-300">{t('profile.iin')}</span>
-          <span className="font-semibold text-sand-100">{user.iin || '—'}</span>
-        </div>
-        <div className="flex justify-between gap-3 py-3.5 text-sm">
-          <span className="text-sand-300">{t('profile.gender')}</span>
-          <span className="font-semibold text-sand-100">
-            {profile?.gender ? genderLabels[profile.gender] : '—'}
+      {isStudent && profile && filledCount < documentFields.length && (
+        <button
+          type="button"
+          onClick={() => navigate('/dashboard/profile/edit')}
+          className="flex w-full items-center justify-between gap-3 rounded-[20px] border border-amber-500/30 bg-amber-500/10 px-4.5 py-3.5 text-left"
+        >
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold text-sand-100">
+              {t('profile.detailsProgress', { filled: filledCount, total: documentFields.length })}
+            </span>
+            <span className="mt-0.5 block text-xs text-sand-300">{t('profile.detailsProgressHint')}</span>
           </span>
-        </div>
-      </Card>
+          <span className="shrink-0 text-sm font-semibold text-turquoise-400">{t('profile.fillDetails')}</span>
+        </button>
+      )}
+
+      <ProfileSection title={isStudent ? t('profile.personalSection') : undefined}>
+        <ProfileRow label={t('profile.email')} value={user.email} />
+        <ProfileRow label={t('profile.phone')} value={user.phone} />
+        <ProfileRow label={t('profile.iin')} value={user.iin} />
+        {isStudent && (
+          <>
+            <ProfileRow label={t('profile.gender')} value={profile?.gender ? genderLabels[profile.gender] : null} />
+            <ProfileRow label={t('profile.hometown')} value={profile?.hometown} />
+            <ProfileRow label={t('profile.parentContact')} value={profile?.parent_contact} />
+          </>
+        )}
+      </ProfileSection>
+
+      {isStudent && (
+        <ProfileSection title={t('profile.studySection')}>
+          <ProfileRow
+            label={t('profile.degree')}
+            value={profile?.academic_degree ? degreeLabels[profile.academic_degree] : null}
+          />
+          <ProfileRow label={t('profile.courseLabel')} value={profile?.course != null ? String(profile.course) : null} />
+          <ProfileRow label={t('profile.institute')} value={profile?.institute} />
+          <ProfileRow label={t('profile.studyGroup')} value={profile?.study_group} />
+        </ProfileSection>
+      )}
+      {isStudent && <p className="-mt-1.5 px-1 text-xs text-sand-300">{t('profile.lockedHint')}</p>}
 
       <Card className="!py-1.5 !px-4.5">
         <button

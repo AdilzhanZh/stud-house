@@ -10,13 +10,13 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
-	"github.com/anthropics/anthropic-sdk-go"
-	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/invopop/jsonschema"
 
 	"student-house/internal/domain"
@@ -49,28 +49,28 @@ For each document you are told which required document it was uploaded as and th
 
 Only report forgery signs you can point to. Poor photo quality is a readability issue, not a forgery sign.`
 
-// DocumentCheckService reads uploaded required documents with Claude and
+// DocumentCheckService reads uploaded required documents with the AI model
+// (ai_config.go) and
 // stores what it finds (type, holder, issue date, tampering signs), which
 // TriageService then turns into yellow/red triage reasons. Checks run in the
 // background (Run) so an upload never waits on the model.
 type DocumentCheckService struct {
 	documents repository.ApplicationDocumentRepository
-	settings  *AISettingsService
+	access    *AssistantAccessService
 	uploadDir string
 	wake      chan struct{}
 }
 
-// NewDocumentCheckService: on/off, the model, the provider and the API key
-// all come from settings, read on every check, so an admin's change
-// (including a new key) applies immediately.
-func NewDocumentCheckService(documents repository.ApplicationDocumentRepository, settings *AISettingsService, uploadDir string) *DocumentCheckService {
-	return &DocumentCheckService{documents: documents, settings: settings, uploadDir: uploadDir, wake: make(chan struct{}, 1)}
+// NewDocumentCheckService: the API key comes from access; checks run
+// whenever one is configured.
+func NewDocumentCheckService(documents repository.ApplicationDocumentRepository, access *AssistantAccessService, uploadDir string) *DocumentCheckService {
+	return &DocumentCheckService{documents: documents, access: access, uploadDir: uploadDir, wake: make(chan struct{}, 1)}
 }
 
 // Enabled reports whether AI checks run right now: an API key is set and
 // an admin hasn't turned them off.
 func (s *DocumentCheckService) Enabled() bool {
-	return s != nil && s.settings.DocumentChecksActive()
+	return s != nil && s.access.APIKeyPresent()
 }
 
 // Wake asks the background loop (Start) to look at the queue now instead
@@ -177,42 +177,98 @@ func (s *DocumentCheckService) check(ctx context.Context, doc *domain.PendingDoc
 		"Required document this was uploaded as: %q (Russian: %q).\nApplying student's full name: %q.\nToday's date: %s.",
 		doc.ExpectedNameKk, doc.ExpectedNameRu, doc.StudentFullName, time.Now().In(kyzylorda).Format(time.DateOnly),
 	)
-	provider, key := s.settings.Credentials()
-	if provider == AIProviderOpenRouter {
-		return s.checkOpenRouter(ctx, newOpenRouterClient(key, documentCheckTimeout), data, mime, prompt)
+	images, err := documentImages(ctx, data, mime)
+	if err != nil {
+		return nil, err
 	}
+	schema, err := json.Marshal(documentCheckSchema)
+	if err != nil {
+		return nil, err
+	}
+	instructions := prompt + "\n\nAnswer with only a JSON object (no other text) matching this JSON schema:\n" + string(schema)
+	parts := make([]any, 0, len(images)+1)
+	for _, img := range images {
+		parts = append(parts, map[string]any{"type": "image_url", "image_url": map[string]any{"url": img}})
+	}
+	parts = append(parts, map[string]any{"type": "text", "text": instructions})
 
-	client := anthropic.NewClient(option.WithAPIKey(key), option.WithRequestTimeout(documentCheckTimeout))
-	block := fileBlock(data, mime)
-	var result domain.DocumentCheckResult
-	msg, err := client.Beta.Messages.New(ctx, anthropic.BetaMessageNewParams{
-		Model:     anthropic.Model(s.settings.Current().DocumentCheckModel),
-		MaxTokens: 16000,
-		System:    []anthropic.BetaTextBlockParam{{Text: documentCheckSystemPrompt}},
-		Messages: []anthropic.BetaMessageParam{
-			anthropic.NewBetaUserMessage(block, anthropic.NewBetaTextBlock(prompt)),
+	var messages []json.RawMessage
+	for _, m := range []llmMessage{
+		{Role: "system", Content: documentCheckSystemPrompt},
+		{Role: "user", Content: parts},
+	} {
+		raw, err := json.Marshal(m)
+		if err != nil {
+			return nil, err
+		}
+		messages = append(messages, raw)
+	}
+	msg, finish, err := newLLMClient(s.access.APIKey(), documentCheckTimeout).chat(ctx, llmRequest{
+		Model:       aiModel,
+		Messages:    messages,
+		Temperature: documentCheckTemperature,
+		MaxTokens:   documentCheckMaxTokens,
+		// The server constrains the answer to the schema (vLLM guided
+		// decoding); the schema is in the prompt too, for the model's sake.
+		ResponseFormat: map[string]any{
+			"type":        "json_schema",
+			"json_schema": map[string]any{"name": "document_check", "strict": true, "schema": documentCheckSchema},
 		},
-		OutputConfig: anthropic.BetaOutputConfigParam{
-			Format: anthropic.BetaJSONOutputFormatParam{Schema: &result},
-		},
-		// A safety-classifier decline is re-served by a fallback model
-		// inside the same call instead of just stopping.
-		Fallbacks: anthropic.BetaFallbacksParamOfDefault(),
-		Betas:     []anthropic.AnthropicBeta{anthropic.AnthropicBetaServerSideFallback2026_07_01},
+		ChatTemplateKwargs: thinking(documentCheckThinking),
 	})
 	if err != nil {
 		return nil, err
 	}
-	switch msg.StopReason {
-	case anthropic.BetaStopReasonRefusal:
-		return nil, fmt.Errorf("model declined to read the document")
-	case anthropic.BetaStopReasonMaxTokens:
+	if finish == "length" {
 		return nil, fmt.Errorf("model response was cut off")
 	}
-	if err := msg.ParseOutput(&result); err != nil {
+	var result domain.DocumentCheckResult
+	if err := json.Unmarshal([]byte(extractJSONObject(msg.textContent())), &result); err != nil {
 		return nil, fmt.Errorf("parsing model output: %w", err)
 	}
 	return &result, nil
+}
+
+// documentImages returns the file as data-URL images for the model: an
+// image as is, a PDF as PNGs of its first pages (the API reads images, not
+// PDF files), rendered with poppler's pdftoppm.
+func documentImages(ctx context.Context, data []byte, mime string) ([]string, error) {
+	if mime != "application/pdf" {
+		return []string{"data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data)}, nil
+	}
+	bin, err := exec.LookPath("pdftoppm")
+	if err != nil {
+		return nil, &unsupportedDocumentError{"PDF файлын оқу үшін серверде pdftoppm (poppler-utils) орнатылмаған"}
+	}
+	dir, err := os.MkdirTemp("", "doccheck-")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(dir)
+	in := filepath.Join(dir, "in.pdf")
+	if err := os.WriteFile(in, data, 0o600); err != nil {
+		return nil, err
+	}
+	cmd := exec.CommandContext(ctx, bin, "-png", "-r", fmt.Sprint(documentCheckPDFDPI),
+		"-f", "1", "-l", fmt.Sprint(documentCheckMaxPDFPages), in, filepath.Join(dir, "page"))
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return nil, &unsupportedDocumentError{"PDF файлын ашу мүмкін болмады: " + strings.TrimSpace(string(out))}
+	}
+	pages, err := filepath.Glob(filepath.Join(dir, "page*.png"))
+	if err != nil || len(pages) == 0 {
+		return nil, &unsupportedDocumentError{"PDF файлында бет жоқ"}
+	}
+	// pdftoppm pads page numbers to the same width, so names sort in order.
+	slices.Sort(pages)
+	out := make([]string, 0, len(pages))
+	for _, p := range pages {
+		png, err := os.ReadFile(p)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, "data:image/png;base64,"+base64.StdEncoding.EncodeToString(png))
+	}
+	return out, nil
 }
 
 // readFile loads a stored upload from local disk and checks it is a PDF or
@@ -247,20 +303,7 @@ func (s *DocumentCheckService) readFile(fileURL string) ([]byte, string, error) 
 	}
 }
 
-// fileBlock wraps a file from readFile as an image or PDF block.
-func fileBlock(data []byte, mime string) anthropic.BetaContentBlockParamUnion {
-	if mime == "application/pdf" {
-		return anthropic.NewBetaDocumentBlock(anthropic.BetaBase64PDFSourceParam{
-			Data: base64.StdEncoding.EncodeToString(data),
-		})
-	}
-	return anthropic.NewBetaImageBlock(anthropic.BetaBase64ImageSourceParam{
-		Data:      base64.StdEncoding.EncodeToString(data),
-		MediaType: anthropic.BetaBase64ImageSourceMediaType(mime),
-	})
-}
-
-// documentCheckSchema is DocumentCheckResult's JSON schema, for OpenRouter's
+// documentCheckSchema is DocumentCheckResult's JSON schema, for the API's
 // structured output. It's also put in the prompt: not every model honours
 // response_format.
 var documentCheckSchema = func() map[string]any {
@@ -277,55 +320,3 @@ var documentCheckSchema = func() map[string]any {
 	delete(schema, "$id")
 	return schema
 }()
-
-// checkOpenRouter is check for OpenRouter. The model must read images; a
-// PDF's text is extracted by OpenRouter's free pdf-text parser, so a
-// scanned PDF without a text layer comes back unreadable.
-func (s *DocumentCheckService) checkOpenRouter(ctx context.Context, openRouter *openRouterClient, data []byte, mime, prompt string) (*domain.DocumentCheckResult, error) {
-	dataURL := "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data)
-	var filePart map[string]any
-	var plugins []map[string]any
-	if mime == "application/pdf" {
-		filePart = map[string]any{"type": "file", "file": map[string]any{"filename": "document.pdf", "file_data": dataURL}}
-		plugins = []map[string]any{{"id": "file-parser", "pdf": map[string]any{"engine": "pdf-text"}}}
-	} else {
-		filePart = map[string]any{"type": "image_url", "image_url": map[string]any{"url": dataURL}}
-	}
-	schema, err := json.Marshal(documentCheckSchema)
-	if err != nil {
-		return nil, err
-	}
-	instructions := prompt + "\n\nAnswer with only a JSON object (no other text) matching this JSON schema:\n" + string(schema)
-
-	var messages []json.RawMessage
-	for _, m := range []orMessage{
-		{Role: "system", Content: documentCheckSystemPrompt},
-		{Role: "user", Content: []any{filePart, map[string]any{"type": "text", "text": instructions}}},
-	} {
-		raw, err := json.Marshal(m)
-		if err != nil {
-			return nil, err
-		}
-		messages = append(messages, raw)
-	}
-	msg, finish, err := openRouter.chat(ctx, orRequest{
-		Model:    s.settings.Current().DocumentCheckModel,
-		Messages: messages,
-		ResponseFormat: map[string]any{
-			"type":        "json_schema",
-			"json_schema": map[string]any{"name": "document_check", "strict": true, "schema": documentCheckSchema},
-		},
-		Plugins: plugins,
-	})
-	if err != nil {
-		return nil, err
-	}
-	if finish == "length" {
-		return nil, fmt.Errorf("model response was cut off")
-	}
-	var result domain.DocumentCheckResult
-	if err := json.Unmarshal([]byte(extractJSONObject(msg.textContent())), &result); err != nil {
-		return nil, fmt.Errorf("parsing model output: %w", err)
-	}
-	return &result, nil
-}

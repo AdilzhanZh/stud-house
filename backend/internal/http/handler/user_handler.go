@@ -323,6 +323,51 @@ func (h *UserHandler) UpsertStudentProfile(c *gin.Context) {
 	response.OK(c, studentProfileDTO(profile))
 }
 
+// Omitted fields keep their saved value (see service.StudentDetailsInput).
+type updateStudentDetailsRequest struct {
+	IIN           *string `json:"iin"`
+	Course        *int16  `json:"course"`
+	Phone         *string `json:"phone"`
+	Institute     *string `json:"institute"`
+	StudyGroup    *string `json:"study_group"`
+	Hometown      *string `json:"hometown"`
+	ParentContact *string `json:"parent_contact"`
+}
+
+// UpdateStudentDetails is allowed for admin/manager (any student) or the
+// student themselves (their own profile only). It returns both the account
+// (the phone lives there) and the profile.
+func (h *UserHandler) UpdateStudentDetails(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, apperror.BadRequest("пайдаланушы идентификаторы дұрыс емес"))
+		return
+	}
+	if !canAccessStudentResource(c, id) {
+		response.Error(c, apperror.Forbidden("тек өз профиліңізді ғана басқара аласыз"))
+		return
+	}
+	var req updateStudentDetailsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.BadRequest(err.Error()))
+		return
+	}
+	user, profile, err := h.users.UpdateStudentDetails(c.Request.Context(), id, service.StudentDetailsInput{
+		IIN:           req.IIN,
+		Course:        req.Course,
+		Phone:         req.Phone,
+		Institute:     req.Institute,
+		StudyGroup:    req.StudyGroup,
+		Hometown:      req.Hometown,
+		ParentContact: req.ParentContact,
+	})
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, gin.H{"user": userDTO(user), "profile": studentProfileDTO(profile)})
+}
+
 func (h *UserHandler) GetStudentProfile(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -423,6 +468,19 @@ type changeOwnEmailRequest struct {
 
 // ChangeOwnEmail is available to any authenticated user: changes the
 // caller's own email. No confirmation is required — see UserService.ChangeOwnEmail.
+// GetMe returns the caller's own account as it is now. The frontend keeps the
+// user it got at login, so without this a change made since (a manager adding
+// an IIN, say) wouldn't show until the next login.
+func (h *UserHandler) GetMe(c *gin.Context) {
+	userID, _ := middleware.UserID(c)
+	user, err := h.users.GetByID(c.Request.Context(), userID)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, userDTO(user))
+}
+
 func (h *UserHandler) ChangeOwnEmail(c *gin.Context) {
 	var req changeOwnEmailRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

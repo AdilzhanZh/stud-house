@@ -5,7 +5,6 @@ import { ChevronLeft, Check, Upload } from 'lucide-react'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
-import { Input } from '../../components/Input'
 import { SegmentedProgress } from '../../components/SegmentedProgress'
 import { extractErrorMessage } from '../../api/client'
 import { listDormitoryRequiredDocuments } from '../../api/dormitoryApi'
@@ -17,7 +16,16 @@ import {
 } from '../../api/applicationApi'
 import { assignOwnBenefit, listBenefitRequiredDocuments, listBenefits } from '../../api/benefitApi'
 import { listRoomsByDormitory } from '../../api/roomApi'
-import { getStudentProfile } from '../../api/profileApi'
+import { getStudentProfile, updateStudentDetails, type StudentDetailsUpdate } from '../../api/profileApi'
+import { getMe } from '../../api/userApi'
+import { ApplicantDetailsCard } from './ApplicantDetailsCard'
+import {
+  DETAIL_FIELDS,
+  detailsError,
+  visibleDetailFields,
+  type DetailField,
+  type DetailValues,
+} from './applicantDetails'
 import { uploadFile } from '../../api/uploadApi'
 import { generatePetitionPdfBlob, PETITION_RECEIPT_DOCUMENT_NAME } from '../../utils/petitionPdf'
 import { downloadContractPdf, getFilledContractDocument } from '../../utils/contractPdf'
@@ -39,7 +47,7 @@ import type { ContractLanguage } from '../../api/contractTemplateApi'
 import type { ContractFieldValues } from '../../utils/contractPdf'
 import type { DormitoryRequiredDocument } from '../../types/dormitories'
 import type { Benefit, BenefitRequiredDocument } from '../../types/benefits'
-import type { Gender } from '../../types'
+import type { AcademicDegree, Gender } from '../../types'
 
 type WizardStep = 1 | 2 | 3 | 4
 
@@ -110,7 +118,7 @@ export function NewApplicationPage() {
   const { t, i18n } = useTranslation()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, updateUser } = useAuth()
   const isSettled = useIsSettled()
 
   const [step, setStep] = useState<WizardStep>(1)
@@ -130,9 +138,18 @@ export function NewApplicationPage() {
     Record<string, BenefitRequiredDocument[]>
   >({})
   const [docFiles, setDocFiles] = useState<Record<string, File | null>>({})
-  const [studyGroup, setStudyGroup] = useState('')
-  const [hometown, setHometown] = useState('')
-  const [parentContact, setParentContact] = useState('')
+  const [details, setDetails] = useState<DetailValues>(() =>
+    Object.fromEntries(DETAIL_FIELDS.map((f) => [f, ''])) as DetailValues,
+  )
+  // Which details the profile didn't have, so step 3 asks for them; null until
+  // known. Settled once, so a field doesn't vanish while it's being typed in.
+  const [askedDetails, setAskedDetails] = useState<DetailField[] | null>(null)
+  const [editingKnownDetails, setEditingKnownDetails] = useState(false)
+  const [academicDegree, setAcademicDegree] = useState<AcademicDegree | null>(null)
+  const [isSavingDetails, setIsSavingDetails] = useState(false)
+  const studyGroup = details.study_group
+  const hometown = details.hometown
+  const parentContact = details.parent_contact
   const [wish, setWish] = useState('')
   const [loadError, setLoadError] = useState<string | null>(null)
   const [serverError, setServerError] = useState<string | null>(null)
@@ -174,11 +191,48 @@ export function NewApplicationPage() {
       .then(setBenefits)
       .catch(() => {})
     if (user) {
-      getStudentProfile(user.id)
-        .then((profile) => setStudentGender(profile.gender))
-        .catch(() => {})
+      // The signed-in user is the copy cached at login; what the documents get
+      // must be what the server has now, so read the account afresh.
+      const account = getMe()
+        .then((fresh) => {
+          if (fresh.iin !== user.iin || fresh.phone !== user.phone) updateUser(fresh)
+          return fresh
+        })
+        .catch(() => user)
+      account
+        .then((acc) => Promise.all([acc, getStudentProfile(user.id)]))
+        .then(([acc, profile]) => {
+          const fromAccount = { iin: acc.iin ?? '', phone: acc.phone ?? '' }
+          setStudentGender(profile.gender)
+          setAcademicDegree(profile.academic_degree)
+          const saved: DetailValues = {
+            ...fromAccount,
+            course: profile.course != null ? String(profile.course) : '',
+            institute: profile.institute,
+            study_group: profile.study_group,
+            hometown: profile.hometown,
+            parent_contact: profile.parent_contact,
+          }
+          // Prefill from the profile, but never over what the student already typed.
+          setDetails((d) => Object.fromEntries(DETAIL_FIELDS.map((f) => [f, d[f] || saved[f]])) as DetailValues)
+          setAskedDetails((asked) => asked ?? DETAIL_FIELDS.filter((f) => !saved[f].trim()))
+        })
+        .catch(async () => {
+          // Without the profile, ask for everything the account doesn't show
+          // (the course can't be checked against a degree, so it's left out).
+          const acc = await account
+          const fromAccount = { iin: acc.iin ?? '', phone: acc.phone ?? '' }
+          setDetails((d) => ({ ...d, iin: d.iin || fromAccount.iin, phone: d.phone || fromAccount.phone }))
+          setAskedDetails(
+            (asked) =>
+              asked ??
+              DETAIL_FIELDS.filter((f) =>
+                f === 'iin' ? !fromAccount.iin : f === 'phone' ? !fromAccount.phone : f !== 'course',
+              ),
+          )
+        })
     }
-  }, [user])
+  }, [user, updateUser])
 
   useEffect(() => {
     if (!dormitoryId) {
@@ -256,7 +310,40 @@ export function NewApplicationPage() {
   const selectedRequiredDocs = selectedBenefitIds.flatMap((id) => requiredDocsByBenefit[id] ?? [])
   const allRequiredDocs = [...dormitoryRequiredDocs, ...selectedRequiredDocs]
 
-  function goNext() {
+  // Saves what step 3 asked for to the profile straight away: the contract on
+  // step 4 is filled in from it, and an IIN someone else already has is best
+  // refused here, not after the documents have been uploaded.
+  async function saveDetails(): Promise<boolean> {
+    if (!user || !askedDetails) return false
+    const visible = visibleDetailFields(askedDetails, editingKnownDetails)
+    const problem = detailsError(details, visible)
+    if (problem) {
+      setServerError(t(problem))
+      return false
+    }
+    if (visible.length === 0) return true
+    const update: StudentDetailsUpdate = {}
+    for (const f of visible) {
+      if (f === 'course') update.course = Number(details.course)
+      else update[f] = details[f].trim()
+    }
+    setIsSavingDetails(true)
+    try {
+      const { user: updated } = await updateStudentDetails(user.id, update)
+      updateUser(updated)
+      // Everything is in the profile now; coming back to this step shows it as such.
+      setAskedDetails([])
+      setEditingKnownDetails(false)
+      return true
+    } catch (err) {
+      setServerError(extractErrorMessage(err, t('wizard.details.saveFailed')))
+      return false
+    } finally {
+      setIsSavingDetails(false)
+    }
+  }
+
+  async function goNext() {
     setServerError(null)
     if (step === 1) {
       if (!dormitoryId) {
@@ -287,10 +374,7 @@ export function NewApplicationPage() {
         )
         return
       }
-      if (!studyGroup.trim() || !hometown.trim() || !parentContact.trim()) {
-        setServerError(t('wizard.missingPetitionFieldsError'))
-        return
-      }
+      if (!(await saveDetails())) return
     }
     setStep((s) => (s < 4 ? ((s + 1) as WizardStep) : s))
   }
@@ -658,32 +742,20 @@ export function NewApplicationPage() {
               )}
             </Card>
 
-            <Card className="!p-4">
-              <p className="mb-3 text-sm text-sand-300">{t('wizard.petitionSection')}</p>
-              <div className="flex flex-col gap-3">
-                <Input
-                  label={t('wizard.studyGroupLabel')}
-                  placeholder={t('wizard.studyGroupPlaceholder')}
-                  value={studyGroup}
-                  onChange={(e) => setStudyGroup(e.target.value)}
-                  required
-                />
-                <Input
-                  label={t('wizard.hometownLabel')}
-                  placeholder={t('wizard.hometownPlaceholder')}
-                  value={hometown}
-                  onChange={(e) => setHometown(e.target.value)}
-                  required
-                />
-                <Input
-                  label={t('wizard.parentContactLabel')}
-                  placeholder={t('wizard.parentContactPlaceholder')}
-                  value={parentContact}
-                  onChange={(e) => setParentContact(e.target.value)}
-                  required
-                />
-              </div>
-            </Card>
+            {askedDetails ? (
+              <ApplicantDetailsCard
+                values={details}
+                onChange={(field, value) => setDetails((d) => ({ ...d, [field]: value }))}
+                asked={askedDetails}
+                editingKnown={editingKnownDetails}
+                onEditKnown={() => setEditingKnownDetails(true)}
+                degree={academicDegree}
+              />
+            ) : (
+              <Card className="!p-4">
+                <p className="text-sm text-sand-300">{t('wizard.details.loading')}</p>
+              </Card>
+            )}
 
             <Card className="!p-4">
               <p className="mb-1.5 text-sm text-sand-300">{t('wizard.wishLabel')}</p>
@@ -698,7 +770,7 @@ export function NewApplicationPage() {
           </div>
 
           <div className="mt-1">
-            <Button className="w-full" onClick={goNext}>
+            <Button className="w-full" onClick={goNext} isLoading={isSavingDetails} disabled={!askedDetails}>
               {t('wizard.continueButton')}
             </Button>
             <p className="mt-2.5 text-center text-xs text-sand-300">{t('wizard.nextContractHint')}</p>

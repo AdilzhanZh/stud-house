@@ -6,14 +6,15 @@ import { formatDate } from './dateFormat'
 export interface ProtocolStudentEntry {
   name: string
   dormitoryName: string
+  studyGroup: string
 }
 
 export interface ProtocolFieldValues {
   protocolNumber: number
   protocolDate?: string
-  // The selected students paired with their dormitory for the "Қаулы етілді"
-  // resolution list — each renders as "name — dormitory" so it's clear at a
-  // glance who goes where. getFilledProtocolDocument sorts them.
+  // The selected students for the "Қаулы етілді" resolution list. Each renders
+  // as "name — study group", or just the name if the group isn't known.
+  // getFilledProtocolDocument sorts them.
   students: ProtocolStudentEntry[]
 }
 
@@ -49,7 +50,8 @@ function buildStudentListTable(students: ProtocolStudentEntry[]): HTMLTableEleme
       cell.style.padding = '0 12px 2px 0'
       cell.style.verticalAlign = 'top'
       if (i < students.length) {
-        cell.textContent = `${i + 1}. ${students[i].name} — ${students[i].dormitoryName};`
+        const { name, studyGroup } = students[i]
+        cell.textContent = `${i + 1}. ${name}${studyGroup ? ` — ${studyGroup}` : ''};`
       }
     }
   }

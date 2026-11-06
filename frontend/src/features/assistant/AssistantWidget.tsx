@@ -23,8 +23,10 @@ export function AssistantWidget({ className = 'bottom-6' }: { className?: string
   const [error, setError] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
+  // Loaded up front (not on open): the button is hidden for roles the
+  // admin hasn't opened the assistant to.
   useEffect(() => {
-    if (!open || loaded) return
+    if (!user || loaded) return
     getAssistantConversation()
       .then((c) => {
         setEnabled(c.enabled)
@@ -33,13 +35,13 @@ export function AssistantWidget({ className = 'bottom-6' }: { className?: string
       })
       .catch((err) => setError(extractErrorMessage(err, t('assistant.loadError'))))
       .finally(() => setLoaded(true))
-  }, [open, loaded, t])
+  }, [user, loaded, t])
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages, sending, open])
 
-  if (!user) return null
+  if (!user || (loaded && !enabled)) return null
 
   const suggestionKeys =
     user.role === 'student'

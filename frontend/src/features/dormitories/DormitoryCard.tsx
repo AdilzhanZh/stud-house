@@ -5,7 +5,7 @@ import { DormitoryCover } from './DormitoryCover'
 import { DormitoryMapButton } from './DormitoryMapViewer'
 import type { DormitoryCardData } from './useDormitoriesWithMeta'
 
-function VacancyChip({ vacancy }: { vacancy: number }) {
+export function VacancyChip({ vacancy }: { vacancy: number }) {
   const { t } = useTranslation()
   if (vacancy <= 0) {
     return (
@@ -28,35 +28,13 @@ function VacancyChip({ vacancy }: { vacancy: number }) {
 interface DormitoryCardProps {
   dormitory: DormitoryCardData
   onClick: () => void
-  variant?: 'grid' | 'compact'
 }
 
-// Two layouts sourced from the design spec: the full "Жатақханалар" grid
-// card (photo, name + availability chip, address/type/floor, price row) and
-// the compact preview used on Home (smaller photo, name+address next to
-// price, no chip) — same underlying data, different density.
-export function DormitoryCard({ dormitory: d, onClick, variant = 'grid' }: DormitoryCardProps) {
+// The full "Жатақханалар" grid card: photo, name + availability chip,
+// address/type/floor, price row.
+export function DormitoryCard({ dormitory: d, onClick }: DormitoryCardProps) {
   const { t } = useTranslation()
   const noVacancy = d.vacancy <= 0
-
-  if (variant === 'compact') {
-    return (
-      <Card onClick={onClick} className={`!p-3 ${noVacancy ? 'opacity-55' : ''}`}>
-        <DormitoryCover src={d.imageUrl} alt={d.name} placeholder={t('dorm.photoPlaceholder')} className="aspect-[16/9] rounded-xl" />
-        <div className="mt-2.5 flex items-center justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-sand-100">{d.name}</p>
-            <p className="truncate text-xs text-sand-300">{d.address}</p>
-          </div>
-          <DormitoryMapButton dormitory={d} />
-          <span className="shrink-0 text-sm font-bold text-sand-100">
-            {formatTenge(d.monthly_payment_bachelor)}
-            <span className="text-xs font-normal text-sand-300">{t('dorm.perMonth')}</span>
-          </span>
-        </div>
-      </Card>
-    )
-  }
 
   return (
     <Card onClick={onClick} className={`!p-3.5 ${noVacancy ? 'opacity-55' : ''}`}>

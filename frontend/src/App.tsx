@@ -51,6 +51,7 @@ import { MyReferralPage } from './features/referral/MyReferralPage'
 import { ReferralVerifyPage } from './features/referral/ReferralVerifyPage'
 import { MyCertificatePage } from './features/certificate/MyCertificatePage'
 import { CertificateVerifyPage } from './features/certificate/CertificateVerifyPage'
+import { StaffProfilePage } from './features/admin/profile/StaffProfilePage'
 import { ProtectedRoute } from './routes/ProtectedRoute'
 import { RoleBasedRedirect } from './routes/RoleBasedRedirect'
 import { useAuthBootstrap } from './features/auth/useAuthBootstrap'
@@ -104,6 +105,9 @@ function App() {
           <Route path="/admin/dormitories" element={<DormitoryListPage />} />
           <Route path="/admin/dormitories/:id" element={<DormitoryDetailPage />} />
           <Route path="/admin/rooms/:roomId/residents" element={<RoomResidentsView />} />
+          <Route path="/admin/profile" element={<StaffProfilePage />} />
+          <Route path="/admin/profile/edit" element={<EditProfilePage />} />
+          <Route path="/admin/notifications" element={<NotificationsPage />} />
 
           {/* Committee members vote here whether or not they're managers. */}
           <Route element={<ProtectedRoute allow={(u) => canManage(u) || u.is_committee_member} />}>

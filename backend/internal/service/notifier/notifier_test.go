@@ -17,8 +17,9 @@ func TestPushURL(t *testing.T) {
 	}{
 		"student with an application": {domain.RoleStudent, &appID, "/applications/" + appID.String()},
 		"student without one":         {domain.RoleStudent, nil, "/notifications"},
-		// Staff have no /applications/:id page of their own to land on.
-		"staff": {domain.RoleUser, &appID, "/notifications"},
+		// Staff have their own notifications page, in the admin panel.
+		"staff": {domain.RoleUser, &appID, "/admin/notifications"},
+		"admin": {domain.RoleAdmin, nil, "/admin/notifications"},
 	} {
 		if got := pushURL(tc.role, tc.app); got != tc.want {
 			t.Errorf("%s: got %q, want %q", name, got, tc.want)

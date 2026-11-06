@@ -594,6 +594,8 @@ export const ru: typeof kk = {
   },
   admin: {
     layout: {
+      openMenu: 'Открыть меню',
+      closeMenu: 'Закрыть меню',
       managerPanel: 'Панель менеджера',
       adminPanel: 'Панель администратора',
       userPanel: 'Панель пользователя',

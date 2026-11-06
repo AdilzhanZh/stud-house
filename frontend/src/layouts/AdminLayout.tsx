@@ -1,7 +1,9 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowLeftRight,
+  Bell,
   Bot,
   Building2,
   ClipboardList,
@@ -11,10 +13,12 @@ import {
   Gavel,
   LayoutDashboard,
   Megaphone,
+  Menu,
   UserCheck,
   UserCog,
   UserPlus,
   Users,
+  X,
 } from 'lucide-react'
 import { useAuth } from '../features/auth/useAuth'
 import { AssistantWidget } from '../features/assistant/AssistantWidget'
@@ -25,6 +29,8 @@ import { ThemeToggle } from '../components/ThemeToggle'
 import { LanguageSwitcher } from '../components/LanguageSwitcher'
 import { usePendingStudentsCount } from '../features/admin/users/usePendingStudentsCount'
 import { usePendingApplicationsCount } from '../features/admin/applications/usePendingApplicationsCount'
+import { useUnreadCount } from '../features/notifications/useUnreadCount'
+import { staffPanelLabel, staffRoleLabel } from '../features/admin/staffRole'
 
 function navLinkClass({ isActive }: { isActive: boolean }) {
   return `flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors ${
@@ -48,28 +54,37 @@ function CountBadge({ count }: { count: number }) {
 // screens) and a secondary group below a divider for everything the mockup
 // doesn't cover but the app still needs (documents, protocols, committee,
 // requests, users) — same visual treatment, just not the mockup's focus.
+//
+// On a phone the sidebar would push every page a full screen down, so there
+// it becomes a menu behind a top bar instead, with notifications and the
+// profile kept one tap away in the bar itself.
 export function AdminLayout() {
   const { t } = useTranslation()
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const [menuOpen, setMenuOpen] = useState(false)
   // Users without the manager position only see the dashboard, read-only
   // dormitories and (if elected) committee voting — every other section is
   // hidden from the nav, not just disabled.
   const isManager = canManage(user)
   const pendingStudentsCount = usePendingStudentsCount(isManager)
   const pendingApplicationsCount = usePendingApplicationsCount(isManager)
-  const panelLabel =
-    user?.role === 'admin'
-      ? t('admin.layout.adminPanel')
-      : isManager
-        ? t('admin.layout.managerPanel')
-        : t('admin.layout.userPanel')
-  const roleLabel =
-    user?.role === 'admin'
-      ? t('admin.layout.adminRole')
-      : isManager
-        ? t('admin.layout.managerRole')
-        : t('admin.layout.userRole')
+  const unreadCount = useUnreadCount()
+  const panelLabel = staffPanelLabel(user, t)
+  const roleLabel = staffRoleLabel(user, t)
+
+  // Choosing a page closes the menu; so does Escape.
+  useEffect(() => {
+    setMenuOpen(false)
+  }, [location.pathname])
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMenuOpen(false)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [menuOpen])
 
   async function handleLogout() {
     await logout()
@@ -78,16 +93,65 @@ export function AdminLayout() {
 
   return (
     <div className="min-h-screen bg-navy-950 font-body md:flex">
-      <aside className="on-chrome flex shrink-0 flex-col border-t-[3px] border-gold-400 p-4 md:sticky md:top-0 md:h-screen md:w-62">
+      <header className="on-chrome sticky top-0 z-30 flex items-center gap-2 border-t-[3px] border-gold-400 px-4 py-2.5 md:hidden">
+        <button
+          type="button"
+          onClick={() => setMenuOpen(true)}
+          aria-label={t('admin.layout.openMenu')}
+          aria-expanded={menuOpen}
+          aria-controls="admin-menu"
+          className="-ml-1.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sand-100 hover:bg-navy-800"
+        >
+          <Menu className="h-5.5 w-5.5" />
+        </button>
+        <button onClick={() => navigate('/admin/dashboard')} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+          <BrandLogo className="h-7 shrink-0" />
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-bold text-sand-100">Student House</span>
+            <span className="block truncate text-xs text-sand-300">{panelLabel}</span>
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => navigate('/admin/notifications')}
+          aria-label={t('nav.notifications')}
+          className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sand-200 hover:bg-navy-800"
+        >
+          <Bell className="h-5 w-5" />
+          {unreadCount > 0 && (
+            <span className="absolute top-2 right-2 h-2.5 w-2.5 rounded-full border-2 border-navy-900 bg-clay-400" />
+          )}
+        </button>
+        <button type="button" onClick={() => navigate('/admin/profile')} aria-label={t('nav.profile')} className="shrink-0">
+          <Avatar fullName={user?.full_name} avatarUrl={user?.avatar_url} sizeClass="h-9 w-9" textClass="text-xs" />
+        </button>
+      </header>
+
+      {menuOpen && (
+        <div className="fixed inset-0 z-40 bg-navy-950/70 backdrop-blur-[2px] md:hidden" onClick={() => setMenuOpen(false)} aria-hidden />
+      )}
+
+      <aside
+        id="admin-menu"
+        className={`on-chrome fixed inset-y-0 left-0 z-50 w-[min(18rem,85vw)] shrink-0 flex-col border-t-[3px] border-gold-400 p-4 shadow-2xl md:sticky md:top-0 md:z-auto md:flex md:h-screen md:w-62 md:shadow-none ${
+          menuOpen ? 'flex' : 'hidden'
+        }`}
+      >
         <div className="flex items-center gap-2.5 px-1 pb-4">
           <BrandLogo className="h-8" />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-bold text-sand-100">Student House</p>
             <p className="truncate text-xs text-gold-text">{t('brand.universityShort')}</p>
-            <p className="text-xs text-sand-300">
-              {panelLabel}
-            </p>
+            <p className="text-xs text-sand-300">{panelLabel}</p>
           </div>
+          <button
+            type="button"
+            onClick={() => setMenuOpen(false)}
+            aria-label={t('admin.layout.closeMenu')}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sand-200 hover:bg-navy-800 md:hidden"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
         {/* The only part that scrolls — keeps the account footer below always
@@ -129,6 +193,11 @@ export function AdminLayout() {
                 </NavLink>
               </>
             )}
+            <NavLink to="/admin/notifications" end className={navLinkClass}>
+              <Bell className="h-4.5 w-4.5 shrink-0" />
+              {t('nav.notifications')}
+              <CountBadge count={unreadCount} />
+            </NavLink>
           </nav>
 
           {(isManager || user?.is_committee_member) && (
@@ -186,11 +255,17 @@ export function AdminLayout() {
         </div>
 
         <div className="mt-3.5 flex shrink-0 items-center gap-2.5 border-t border-navy-700 px-1 pt-3.5">
-          <Avatar fullName={user?.full_name} avatarUrl={user?.avatar_url} sizeClass="h-9 w-9" textClass="text-xs" />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-sand-100">{user?.full_name}</p>
-            <p className="truncate text-xs text-sand-300">{roleLabel}</p>
-          </div>
+          <NavLink
+            to="/admin/profile"
+            className="-m-1 flex min-w-0 flex-1 items-center gap-2.5 rounded-xl p-1 hover:bg-navy-800"
+            title={t('nav.profile')}
+          >
+            <Avatar fullName={user?.full_name} avatarUrl={user?.avatar_url} sizeClass="h-9 w-9" textClass="text-xs" />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold text-sand-100">{user?.full_name}</span>
+              <span className="block truncate text-xs text-sand-300">{roleLabel}</span>
+            </span>
+          </NavLink>
           <LanguageSwitcher languages={['kk', 'ru']} dropUp />
           <ThemeToggle />
         </div>
@@ -202,7 +277,7 @@ export function AdminLayout() {
         </button>
       </aside>
 
-      <main className="min-w-0 flex-1 p-6 md:p-8">
+      <main className="min-w-0 flex-1 p-4 sm:p-6 md:p-8">
         <Outlet />
       </main>
 

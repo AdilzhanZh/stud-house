@@ -95,9 +95,13 @@ func (n *Notifier) Notify(ctx context.Context, userID uuid.UUID, notifType domai
 }
 
 // pushURL is where tapping the notification leads: a student's own
-// application when there is one, otherwise the notifications list.
+// application when there is one, otherwise their notifications list; staff
+// land on the list in their own panel.
 func pushURL(role domain.Role, relatedApplicationID *uuid.UUID) string {
-	if role == domain.RoleStudent && relatedApplicationID != nil {
+	if role != domain.RoleStudent {
+		return "/admin/notifications"
+	}
+	if relatedApplicationID != nil {
 		return "/applications/" + relatedApplicationID.String()
 	}
 	return "/notifications"

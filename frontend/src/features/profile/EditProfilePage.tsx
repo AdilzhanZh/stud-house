@@ -34,7 +34,7 @@ export function EditProfilePage() {
   const [emailSuccess, setEmailSuccess] = useState(false)
   const [isChangingEmail, setIsChangingEmail] = useState(false)
 
-  const [details, setDetails] = useState<Required<StudentDetailsUpdate>>({
+  const [details, setDetails] = useState<Required<Omit<StudentDetailsUpdate, 'iin' | 'course'>>>({
     phone: user?.phone ?? '',
     institute: '',
     study_group: '',
@@ -64,7 +64,7 @@ export function EditProfilePage() {
 
   if (!user) return null
 
-  function setDetail(field: keyof StudentDetailsUpdate, value: string) {
+  function setDetail(field: keyof typeof details, value: string) {
     setDetails((d) => ({ ...d, [field]: value }))
     setDetailsSaved(false)
   }

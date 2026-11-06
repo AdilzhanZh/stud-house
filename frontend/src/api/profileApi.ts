@@ -9,6 +9,9 @@ export async function getStudentProfile(userId: string): Promise<StudentProfile>
 // What a student's documents are filled from. A field left out keeps its
 // saved value.
 export interface StudentDetailsUpdate {
+  // IIN and course only fill a gap: a recorded value is changed by a manager.
+  iin?: string
+  course?: number
   phone?: string
   institute?: string
   study_group?: string

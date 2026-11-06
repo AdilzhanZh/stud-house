@@ -276,20 +276,36 @@ func (s *UserService) UpsertStudentProfile(ctx context.Context, userID uuid.UUID
 				return err
 			}
 		}
-		maxCourse := domain.DegreeBachelor.MaxCourse()
-		if effectiveDegree != nil {
-			maxCourse = effectiveDegree.MaxCourse()
-		}
-		if *course < 1 || *course > maxCourse {
-			return apperror.BadRequest(fmt.Sprintf("курс 1 мен %d аралығында болуы керек", maxCourse))
+		if err := validateCourse(*course, effectiveDegree); err != nil {
+			return err
 		}
 	}
 	return s.profiles.Upsert(ctx, &domain.StudentProfile{UserID: userID, Gender: gender, Course: course, AcademicDegree: academicDegree})
 }
 
+// validateCourse checks course against the degree's length; with no degree on
+// record, a bachelor's is assumed.
+func validateCourse(course int16, degree *domain.AcademicDegree) error {
+	maxCourse := domain.DegreeBachelor.MaxCourse()
+	if degree != nil {
+		maxCourse = degree.MaxCourse()
+	}
+	if course < 1 || course > maxCourse {
+		return apperror.BadRequest(fmt.Sprintf("курс 1 мен %d аралығында болуы керек", maxCourse))
+	}
+	return nil
+}
+
 // StudentDetailsInput is a partial update: a nil field keeps its saved value,
 // so the application form can save what it asks for without touching the rest.
+//
+// IIN and Course can only fill a gap: many accounts were created without them,
+// and the contract and certificate need them, but once set they identify the
+// student (IIN is also their login) and decide room eligibility (course), so
+// changing a recorded value stays with a manager.
 type StudentDetailsInput struct {
+	IIN           *string
+	Course        *int16
 	Phone         *string
 	Institute     *string
 	StudyGroup    *string
@@ -298,8 +314,9 @@ type StudentDetailsInput struct {
 }
 
 // UpdateStudentDetails saves the data a student's documents are filled from:
-// their phone (on the account) and the free-text StudentDetails (on the
-// profile). Everything is validated before anything is written.
+// IIN and phone (on the account), course and the free-text StudentDetails (on
+// the profile). Everything is validated before anything is written, and the
+// IIN, the one write that can still be refused (it's unique), goes first.
 func (s *UserService) UpdateStudentDetails(ctx context.Context, userID uuid.UUID, in StudentDetailsInput) (*domain.User, *domain.StudentProfile, error) {
 	user, err := s.GetByID(ctx, userID)
 	if err != nil {
@@ -347,6 +364,50 @@ func (s *UserService) UpdateStudentDetails(ctx context.Context, userID uuid.UUID
 		}
 	}
 
+	var newIIN string
+	if in.IIN != nil {
+		v := strings.TrimSpace(*in.IIN)
+		switch {
+		case user.IIN != nil && *user.IIN != "":
+			if v != *user.IIN {
+				return nil, nil, apperror.BadRequest("ЖСН-ді тек менеджер өзгерте алады")
+			}
+		case !isValidIIN(v):
+			return nil, nil, apperror.BadRequest("ЖСН (ИИН) 12 таңбалы сан болуы керек")
+		default:
+			newIIN = v
+		}
+	}
+
+	var newCourse *int16
+	if in.Course != nil {
+		if profile.Course != nil {
+			if *in.Course != *profile.Course {
+				return nil, nil, apperror.BadRequest("курсты тек менеджер өзгерте алады")
+			}
+		} else {
+			if err := validateCourse(*in.Course, profile.AcademicDegree); err != nil {
+				return nil, nil, err
+			}
+			newCourse = in.Course
+		}
+	}
+
+	if newIIN != "" {
+		if err := s.users.UpdateIIN(ctx, userID, newIIN); err != nil {
+			if errors.Is(err, repository.ErrConflict) {
+				return nil, nil, apperror.Conflict("бұл ЖСН (ИИН) бұрыннан тіркелген")
+			}
+			return nil, nil, err
+		}
+	}
+	if newCourse != nil {
+		if err := s.profiles.Upsert(ctx, &domain.StudentProfile{
+			UserID: userID, Gender: profile.Gender, Course: newCourse, AcademicDegree: profile.AcademicDegree,
+		}); err != nil {
+			return nil, nil, err
+		}
+	}
 	if details != profile.StudentDetails {
 		if err := s.profiles.UpdateDetails(ctx, userID, details); err != nil {
 			return nil, nil, err

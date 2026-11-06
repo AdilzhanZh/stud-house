@@ -118,6 +118,7 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 			protected.PATCH("/users/:id/avatar", h.User.UpdateAvatar)
 
 			// Any authenticated user: their own password/email.
+			protected.GET("/users/me", h.User.GetMe)
 			protected.PATCH("/users/me/password", h.User.ChangeOwnPassword)
 			protected.PATCH("/users/me/email", h.User.ChangeOwnEmail)
 

@@ -325,6 +325,8 @@ func (h *UserHandler) UpsertStudentProfile(c *gin.Context) {
 
 // Omitted fields keep their saved value (see service.StudentDetailsInput).
 type updateStudentDetailsRequest struct {
+	IIN           *string `json:"iin"`
+	Course        *int16  `json:"course"`
 	Phone         *string `json:"phone"`
 	Institute     *string `json:"institute"`
 	StudyGroup    *string `json:"study_group"`
@@ -351,6 +353,8 @@ func (h *UserHandler) UpdateStudentDetails(c *gin.Context) {
 		return
 	}
 	user, profile, err := h.users.UpdateStudentDetails(c.Request.Context(), id, service.StudentDetailsInput{
+		IIN:           req.IIN,
+		Course:        req.Course,
 		Phone:         req.Phone,
 		Institute:     req.Institute,
 		StudyGroup:    req.StudyGroup,
@@ -464,6 +468,19 @@ type changeOwnEmailRequest struct {
 
 // ChangeOwnEmail is available to any authenticated user: changes the
 // caller's own email. No confirmation is required — see UserService.ChangeOwnEmail.
+// GetMe returns the caller's own account as it is now. The frontend keeps the
+// user it got at login, so without this a change made since (a manager adding
+// an IIN, say) wouldn't show until the next login.
+func (h *UserHandler) GetMe(c *gin.Context) {
+	userID, _ := middleware.UserID(c)
+	user, err := h.users.GetByID(c.Request.Context(), userID)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, userDTO(user))
+}
+
 func (h *UserHandler) ChangeOwnEmail(c *gin.Context) {
 	var req changeOwnEmailRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

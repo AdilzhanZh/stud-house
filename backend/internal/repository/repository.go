@@ -49,6 +49,8 @@ type UserRepository interface {
 	// their profile.
 	UpdateEmail(ctx context.Context, id uuid.UUID, email string) error
 	UpdatePhone(ctx context.Context, id uuid.UUID, phone string) error
+	// UpdateIIN returns ErrConflict if another account already has that IIN.
+	UpdateIIN(ctx context.Context, id uuid.UUID, iin string) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 

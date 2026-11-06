@@ -1,6 +1,12 @@
 import { apiClient } from './client'
 import type { User } from '../types'
 
+// The caller's account as the server has it now (the cached login copy can lag).
+export async function getMe(): Promise<User> {
+  const { data } = await apiClient.get<{ data: User }>('/users/me')
+  return data.data
+}
+
 export async function updateAvatar(userId: string, avatarUrl: string): Promise<User> {
   const { data } = await apiClient.patch<{ data: User }>(`/users/${userId}/avatar`, {
     avatar_url: avatarUrl,

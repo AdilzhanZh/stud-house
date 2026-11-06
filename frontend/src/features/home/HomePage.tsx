@@ -16,6 +16,7 @@ import { listMyApplications } from '../../api/applicationApi'
 import { getDormitory } from '../../api/dormitoryApi'
 import { useUnreadCount } from '../notifications/useUnreadCount'
 import { useAuth } from '../auth/useAuth'
+import { PushNudge } from './PushNudge'
 import type { Application } from '../../types/applications'
 import type { JourneyStep } from '../../components/ApplicationJourneyStepper'
 
@@ -93,6 +94,7 @@ export function HomePage() {
       </div>
 
       {loadError && <Alert variant="error" message={loadError} />}
+      <PushNudge />
 
       <div className="flex flex-col gap-5 md:grid md:grid-cols-2 md:items-start md:gap-5">
         <div className="flex flex-col gap-3.5">

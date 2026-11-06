@@ -8,6 +8,7 @@ import { ThemeToggle } from '../../components/ThemeToggle'
 import { LanguageSwitcher } from '../../components/LanguageSwitcher'
 import { useAuth } from '../auth/useAuth'
 import { useIsSettled } from '../residence/useIsSettled'
+import { AppOnPhoneCard } from './AppOnPhoneCard'
 import { getStudentProfile } from '../../api/profileApi'
 import type { StudentProfile } from '../../types'
 
@@ -132,6 +133,8 @@ export function ProfilePage() {
         </ProfileSection>
       )}
       {isStudent && <p className="-mt-1.5 px-1 text-xs text-sand-300">{t('profile.lockedHint')}</p>}
+
+      <AppOnPhoneCard />
 
       <Card className="!py-1.5 !px-4.5">
         <button

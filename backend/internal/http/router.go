@@ -21,6 +21,7 @@ type Handlers struct {
 	Referral             *handler.ReferralHandler
 	ReferralTemplate     *handler.ReferralTemplateHandler
 	ResidenceCertificate *handler.ResidenceCertificateHandler
+	Push                 *handler.PushHandler
 	ProtocolTemplate     *handler.ProtocolTemplateHandler
 	PetitionTemplate     *handler.PetitionTemplateHandler
 	ContractTemplate     *handler.ContractTemplateHandler
@@ -119,6 +120,11 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 
 			// Any authenticated user: their own password/email.
 			protected.GET("/users/me", h.User.GetMe)
+
+			// Any authenticated user: push notifications to their own devices.
+			protected.GET("/push/config", h.Push.Config)
+			protected.POST("/push/subscriptions", h.Push.Subscribe)
+			protected.DELETE("/push/subscriptions", h.Push.Unsubscribe)
 			protected.PATCH("/users/me/password", h.User.ChangeOwnPassword)
 			protected.PATCH("/users/me/email", h.User.ChangeOwnEmail)
 

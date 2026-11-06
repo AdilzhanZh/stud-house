@@ -11,6 +11,7 @@ import {
 } from '../../store/tokenStorage'
 import * as authApi from '../../api/authApi'
 import { getMe } from '../../api/userApi'
+import { resumePush } from '../../pwa/pwa'
 
 // On a hard page load the in-memory access token (and the store holding it)
 // is gone. If a refresh_token + cached user are still in localStorage, this
@@ -63,6 +64,8 @@ export function useAuthBootstrap(): boolean {
             useAuthStore.getState().setUser(fresh)
           })
           .catch(() => undefined)
+        // Keep this device's push subscription current (browsers rotate them).
+        void resumePush().catch(() => undefined)
       } catch {
         clearRefreshToken()
         clearStoredUser()

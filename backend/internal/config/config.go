@@ -75,6 +75,16 @@ type Config struct {
 	// (service/ai_config.go). No key disables both features: uploads are
 	// then triaged on completeness alone.
 	AIAPIKey string
+
+	// VAPID* sign Web Push messages to subscribed phones (see
+	// service.PushService). Generate the pair once (`go run ./cmd/vapidkeys`)
+	// and keep it: changing it invalidates every existing subscription. No
+	// keys disables push; notifications still go to the app and email.
+	VAPIDPublicKey  string
+	VAPIDPrivateKey string
+	// VAPIDSubject is a contact (mailto: or https:) push services may use to
+	// reach whoever runs the server.
+	VAPIDSubject string
 }
 
 func Load() (*Config, error) {
@@ -95,6 +105,9 @@ func Load() (*Config, error) {
 	cfg.FeedbackEmail = getEnv("FEEDBACK_EMAIL", cfg.SMTPFrom)
 	cfg.ReferralSignatoryName = getEnv("REFERRAL_SIGNATORY_NAME", "У.С. Ибраев")
 	cfg.AIAPIKey = strings.TrimSpace(getEnv("ALEM_API_KEY", ""))
+	cfg.VAPIDPublicKey = strings.TrimSpace(getEnv("VAPID_PUBLIC_KEY", ""))
+	cfg.VAPIDPrivateKey = strings.TrimSpace(getEnv("VAPID_PRIVATE_KEY", ""))
+	cfg.VAPIDSubject = strings.TrimSpace(getEnv("VAPID_SUBJECT", "https://korkyt.edu.kz"))
 
 	accessMinutes, err := strconv.Atoi(getEnv("ACCESS_TOKEN_TTL_MINUTES", "15"))
 	if err != nil {

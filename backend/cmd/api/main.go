@@ -73,6 +73,13 @@ func main() {
 	userService := service.NewUserService(userRepo, studentProfileRepo, mailerService)
 	dormitoryService := service.NewDormitoryService(dormitoryRepo, applicationRepo)
 	notifierService := notifier.New(notificationRepo, userRepo, mailerService)
+	pushService := service.NewPushService(
+		postgres.NewPushSubscriptionRepo(pool), cfg.VAPIDPublicKey, cfg.VAPIDPrivateKey, cfg.VAPIDSubject)
+	if pushService.Enabled() {
+		notifierService.SetPusher(pushService)
+	} else {
+		log.Println("VAPID keys not set: push notifications are disabled")
+	}
 	roomService := service.NewRoomService(roomRepo, dormitoryRepo, userRepo, studentProfileRepo, studentBenefitRepo, notifierService)
 	benefitService := service.NewBenefitService(benefitRepo, userRepo, studentBenefitRepo)
 	documentService := service.NewDocumentService(requiredDocumentRepo)
@@ -155,6 +162,7 @@ func main() {
 		Referral:             handler.NewReferralHandler(referralService, referralTemplateService),
 		ReferralTemplate:     handler.NewReferralTemplateHandler(referralTemplateService),
 		ResidenceCertificate: handler.NewResidenceCertificateHandler(residenceCertificateService),
+		Push:                 handler.NewPushHandler(pushService),
 		ProtocolTemplate:     handler.NewProtocolTemplateHandler(protocolTemplateService),
 		Contract:             handler.NewContractHandler(contractService, applicationService),
 		Feedback:             handler.NewFeedbackHandler(feedbackService),

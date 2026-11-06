@@ -1,0 +1,18 @@
+{
+  "name": "Student House — Қорқыт Ата университеті",
+  "short_name": "Student House",
+  "description": "Қорқыт Ата атындағы Қызылорда университетінің жатақханалары",
+  "lang": "kk",
+  "id": "/",
+  "start_url": "/dashboard/home",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#113060",
+  "theme_color": "#113060",
+  "icons": [
+    { "src": "/pwa/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/pwa/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/pwa/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

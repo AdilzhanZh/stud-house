@@ -8,6 +8,7 @@ import {
   clearStoredUser,
 } from '../../store/tokenStorage'
 import * as authApi from '../../api/authApi'
+import { disablePush, resumePush } from '../../pwa/pwa'
 import type { User } from '../../types'
 
 export function useAuth() {
@@ -23,6 +24,7 @@ export function useAuth() {
       setRefreshToken(result.refresh_token)
       setStoredUser(result.user)
       setSession(result.user, result.access_token)
+      void resumePush().catch(() => undefined)
       return result.user
     },
     [setSession],
@@ -35,6 +37,11 @@ export function useAuth() {
   const logout = useCallback(async () => {
     const refreshToken = getRefreshToken()
     try {
+      // While still signed in: this device must stop getting this person's
+      // notices (a shared phone). Never let it hold up logging out.
+      await Promise.race([disablePush(false), new Promise((resolve) => setTimeout(resolve, 3000))]).catch(
+        () => undefined,
+      )
       if (refreshToken) await authApi.logout(refreshToken)
     } finally {
       clearRefreshToken()

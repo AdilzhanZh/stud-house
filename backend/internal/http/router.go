@@ -62,6 +62,22 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 		// Public too, for the QR code on a certificate of residence.
 		api.GET("/residence-certificates/verify/:token", h.ResidenceCertificate.Verify)
 
+		// Public, no sign-in needed: anyone may browse the dormitories and
+		// their rooms (details, photos, free seats). None of these responses
+		// name a resident — only counts — so who lives where stays behind
+		// auth (see /rooms/:roomId/residents below).
+		api.GET("/dormitories", h.Dormitory.List)
+		api.GET("/dormitories/:id", h.Dormitory.Get)
+		api.GET("/dormitories/:id/capacity", h.Dormitory.GetCapacity)
+		api.GET("/dormitories/:id/images", h.Dormitory.ListImages)
+		api.GET("/dormitories/:id/rooms", h.Room.ListByDormitory)
+		api.GET("/dormitories/:id/rooms/availability", h.Room.ListAvailability)
+		api.GET("/rooms/:roomId", h.Room.Get)
+		api.GET("/benefits", h.Benefit.List)
+		api.GET("/benefits/:id", h.Benefit.Get)
+		api.GET("/dormitories/:id/documents", h.Dormitory.ListRequiredDocuments)
+		api.GET("/benefits/:id/documents", h.Benefit.ListRequiredDocuments)
+
 		authGroup := api.Group("/auth")
 		{
 			authGroup.POST("/register", h.Auth.Register)
@@ -97,18 +113,9 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 			// Read-only for any authenticated role.
 			protected.GET("/admin/committee-members", h.User.ListCommitteeMembers)
 
-			protected.GET("/dormitories", h.Dormitory.List)
-			protected.GET("/dormitories/:id", h.Dormitory.Get)
-			protected.GET("/dormitories/:id/capacity", h.Dormitory.GetCapacity)
-			protected.GET("/dormitories/:id/images", h.Dormitory.ListImages)
-			protected.GET("/dormitories/:id/rooms", h.Room.ListByDormitory)
-			protected.GET("/dormitories/:id/rooms/availability", h.Room.ListAvailability)
-			protected.GET("/rooms/:roomId", h.Room.Get)
+			// Who lives in a room is never public: staff, or a student
+			// living in that same room (checked inside the handler).
 			protected.GET("/rooms/:roomId/residents", h.Room.ListActiveResidents)
-			protected.GET("/benefits", h.Benefit.List)
-			protected.GET("/benefits/:id", h.Benefit.Get)
-			protected.GET("/dormitories/:id/documents", h.Dormitory.ListRequiredDocuments)
-			protected.GET("/benefits/:id/documents", h.Benefit.ListRequiredDocuments)
 			protected.GET("/students/:id/benefits", h.Benefit.ListStudentBenefits)
 
 			// Self-or-admin/manager: ownership is checked inside the handler.

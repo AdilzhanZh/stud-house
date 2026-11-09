@@ -57,8 +57,15 @@ type Room struct {
 	Floor        *int
 	Category     string
 	Restrictions RoomRestrictions
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	// Optional descriptive fields (nil / empty = not filled in).
+	AreaSqM            *float64
+	Equipment          *string
+	SanitaryConditions *string
+	IsAccessible       *bool
+	AccessibilityNotes *string
+	PhotoURLs          []string
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 // NotificationRoomResidentReleased/Transferred back the two manager-initiated

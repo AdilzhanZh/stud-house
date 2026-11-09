@@ -21,6 +21,13 @@ export interface Room {
   floor: number | null
   category: string
   restrictions: RoomRestrictions
+  // Optional descriptive fields — null / empty means not filled in.
+  area_sq_m: number | null
+  equipment: string | null
+  sanitary_conditions: string | null
+  is_accessible: boolean | null
+  accessibility_notes: string | null
+  photo_urls: string[]
   created_at: string
   updated_at: string
 }

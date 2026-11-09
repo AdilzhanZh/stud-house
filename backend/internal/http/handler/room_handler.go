@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"student-house/internal/domain"
+	"student-house/internal/http/middleware"
 	"student-house/internal/service"
 	"student-house/pkg/apperror"
 	"student-house/pkg/response"
@@ -27,6 +28,13 @@ type roomRequest struct {
 	Capacity   int    `json:"capacity" binding:"required"`
 	Floor      *int   `json:"floor"`
 	Category   string `json:"category"`
+
+	AreaSqM            *float64 `json:"area_sq_m"`
+	Equipment          *string  `json:"equipment"`
+	SanitaryConditions *string  `json:"sanitary_conditions"`
+	IsAccessible       *bool    `json:"is_accessible"`
+	AccessibilityNotes *string  `json:"accessibility_notes"`
+	PhotoURLs          []string `json:"photo_urls"`
 }
 
 func (req roomRequest) toInput() service.RoomInput {
@@ -35,6 +43,13 @@ func (req roomRequest) toInput() service.RoomInput {
 		Capacity:   req.Capacity,
 		Floor:      req.Floor,
 		Category:   req.Category,
+
+		AreaSqM:            req.AreaSqM,
+		Equipment:          req.Equipment,
+		SanitaryConditions: req.SanitaryConditions,
+		IsAccessible:       req.IsAccessible,
+		AccessibilityNotes: req.AccessibilityNotes,
+		PhotoURLs:          req.PhotoURLs,
 	}
 }
 
@@ -198,6 +213,16 @@ func (h *RoomHandler) ListActiveResidents(c *gin.Context) {
 	if err != nil {
 		response.Error(c, apperror.BadRequest("бөлме идентификаторы дұрыс емес"))
 		return
+	}
+	// Students may only see their own room's residents (their roommates);
+	// staff may see any room's.
+	if role, _ := middleware.Role(c); role == domain.RoleStudent {
+		studentID, _ := middleware.UserID(c)
+		_, room, err := h.rooms.GetActiveResidence(c.Request.Context(), studentID)
+		if err != nil || room.ID != roomID {
+			response.Error(c, apperror.Forbidden("тек өз бөлмеңіздің тұрғындарын ғана көре аласыз"))
+			return
+		}
 	}
 	residents, err := h.rooms.ListActiveResidents(c.Request.Context(), roomID)
 	if err != nil {

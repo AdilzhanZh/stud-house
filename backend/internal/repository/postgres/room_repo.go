@@ -21,13 +21,18 @@ func NewRoomRepo(db *pgxpool.Pool) *RoomRepo {
 	return &RoomRepo{db: db}
 }
 
-const roomColumns = `id, dormitory_id, room_number, capacity, floor, category, restrictions, created_at, updated_at`
+const roomColumns = `id, dormitory_id, room_number, capacity, floor, category, restrictions,
+	area_sq_m::float8, equipment, sanitary_conditions, is_accessible, accessibility_notes, photo_urls,
+	created_at, updated_at`
 
 func scanRoom(row pgx.Row) (*domain.Room, error) {
 	room := &domain.Room{}
 	err := row.Scan(
 		&room.ID, &room.DormitoryID, &room.RoomNumber, &room.Capacity, &room.Floor,
-		&room.Category, &room.Restrictions, &room.CreatedAt, &room.UpdatedAt,
+		&room.Category, &room.Restrictions,
+		&room.AreaSqM, &room.Equipment, &room.SanitaryConditions, &room.IsAccessible,
+		&room.AccessibilityNotes, &room.PhotoURLs,
+		&room.CreatedAt, &room.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -35,14 +40,25 @@ func scanRoom(row pgx.Row) (*domain.Room, error) {
 	return room, nil
 }
 
+// photoURLsOrEmpty keeps photo_urls (NOT NULL) from receiving a NULL array.
+func photoURLsOrEmpty(urls []string) []string {
+	if urls == nil {
+		return []string{}
+	}
+	return urls
+}
+
 func (r *RoomRepo) Create(ctx context.Context, room *domain.Room) error {
 	const q = `
-		INSERT INTO rooms (dormitory_id, room_number, capacity, floor, category, restrictions)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO rooms (dormitory_id, room_number, capacity, floor, category, restrictions,
+			area_sq_m, equipment, sanitary_conditions, is_accessible, accessibility_notes, photo_urls)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		RETURNING id, created_at, updated_at`
 	err := r.db.QueryRow(ctx, q,
 		room.DormitoryID, room.RoomNumber, room.Capacity, room.Floor,
 		room.Category, room.Restrictions,
+		room.AreaSqM, room.Equipment, room.SanitaryConditions, room.IsAccessible,
+		room.AccessibilityNotes, photoURLsOrEmpty(room.PhotoURLs),
 	).Scan(&room.ID, &room.CreatedAt, &room.UpdatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -88,11 +104,15 @@ func (r *RoomRepo) ListByDormitory(ctx context.Context, dormitoryID uuid.UUID) (
 func (r *RoomRepo) Update(ctx context.Context, room *domain.Room) error {
 	const q = `
 		UPDATE rooms
-		SET room_number = $2, capacity = $3, floor = $4, category = $5, updated_at = now()
+		SET room_number = $2, capacity = $3, floor = $4, category = $5,
+			area_sq_m = $6, equipment = $7, sanitary_conditions = $8, is_accessible = $9,
+			accessibility_notes = $10, photo_urls = $11, updated_at = now()
 		WHERE id = $1
 		RETURNING updated_at`
 	err := r.db.QueryRow(ctx, q,
 		room.ID, room.RoomNumber, room.Capacity, room.Floor, room.Category,
+		room.AreaSqM, room.Equipment, room.SanitaryConditions, room.IsAccessible,
+		room.AccessibilityNotes, photoURLsOrEmpty(room.PhotoURLs),
 	).Scan(&room.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -270,7 +290,10 @@ func (r *RoomRepo) ListAvailabilityByDormitory(ctx context.Context, dormitoryID 
 		avail := &domain.RoomAvailability{Room: room}
 		err := rows.Scan(
 			&room.ID, &room.DormitoryID, &room.RoomNumber, &room.Capacity, &room.Floor,
-			&room.Category, &room.Restrictions, &room.CreatedAt, &room.UpdatedAt,
+			&room.Category, &room.Restrictions,
+			&room.AreaSqM, &room.Equipment, &room.SanitaryConditions, &room.IsAccessible,
+			&room.AccessibilityNotes, &room.PhotoURLs,
+			&room.CreatedAt, &room.UpdatedAt,
 			&avail.ResidentCount, &avail.HeldCount,
 		)
 		if err != nil {

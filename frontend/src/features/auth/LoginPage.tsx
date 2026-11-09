@@ -30,7 +30,7 @@ export function LoginPage() {
       const from = (location.state as { from?: Location } | null)?.from
       // "/" (not a hardcoded student path) so RoleBasedRedirect sends
       // admin/manager to their own panel instead of the student home page.
-      navigate(from?.pathname ?? '/', { replace: true })
+      navigate(from ? `${from.pathname}${from.search ?? ''}` : '/', { replace: true })
     } catch (error) {
       setServerError(extractErrorMessage(error, t('auth.loginFailed')))
     }
@@ -73,6 +73,7 @@ export function LoginPage() {
             {t('auth.registerLink')}
           </Link>
         </p>
+
       </form>
     </div>
   )

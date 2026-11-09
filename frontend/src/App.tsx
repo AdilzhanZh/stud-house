@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router-dom'
 import { AuthLayout } from './layouts/AuthLayout'
 import { DashboardLayout } from './layouts/DashboardLayout'
 import { AdminLayout } from './layouts/AdminLayout'
+import { DormitoryBrowseLayout } from './layouts/PublicLayout'
 import { LoginPage } from './features/auth/LoginPage'
 import { RegisterPage } from './features/auth/RegisterPage'
 import { HomePage } from './features/home/HomePage'
@@ -74,6 +75,13 @@ function App() {
       <Route path="/r/:token" element={<ReferralVerifyPage />} />
       <Route path="/c/:token" element={<CertificateVerifyPage />} />
 
+      {/* Public: anyone, signed in or not, may browse the dormitories and
+          their rooms. Residents are never shown there. */}
+      <Route element={<DormitoryBrowseLayout />}>
+        <Route path="/dormitories" element={<DormitoriesPage />} />
+        <Route path="/dormitories/:id" element={<DormitoryInfoPage />} />
+      </Route>
+
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
@@ -85,8 +93,6 @@ function App() {
           <Route path="/dashboard/profile" element={<ProfilePage />} />
           <Route path="/dashboard/profile/edit" element={<EditProfilePage />} />
           <Route path="/dashboard/profile/feedback" element={<FeedbackPage />} />
-          <Route path="/dormitories" element={<DormitoriesPage />} />
-        <Route path="/dormitories/:id" element={<DormitoryInfoPage />} />
           <Route path="/applications/new" element={<NewApplicationPage />} />
           <Route path="/applications/my" element={<MyApplicationsPage />} />
           <Route path="/applications/:id" element={<ApplicationDetailPage />} />

@@ -385,6 +385,14 @@ var staticTranslations = map[string]translation{
 		"Вы можете изменять только своё изображение",
 		"You can only change your own image",
 	},
+	"тек өз бөлмеңіздің тұрғындарын ғана көре аласыз": {
+		"Вы можете просматривать только жильцов своей комнаты",
+		"You can only view the residents of your own room",
+	},
+	"аудан 0-ден үлкен болуы керек": {
+		"Площадь должна быть больше 0",
+		"The area must be greater than 0",
+	},
 	"тек өз тұрғылықты жеріңізді ғана көре аласыз": {
 		"Вы можете просматривать только своё место проживания",
 		"You can only view your own residence",

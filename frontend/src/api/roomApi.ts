@@ -26,6 +26,12 @@ export interface RoomPayload {
   capacity: number
   floor: number | null
   category: string
+  area_sq_m: number | null
+  equipment: string | null
+  sanitary_conditions: string | null
+  is_accessible: boolean | null
+  accessibility_notes: string | null
+  photo_urls: string[]
 }
 
 export async function createRoom(dormitoryId: string, payload: RoomPayload): Promise<Room> {

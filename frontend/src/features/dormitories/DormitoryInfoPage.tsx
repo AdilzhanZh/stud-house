@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ChevronLeft } from 'lucide-react'
 import { Card } from '../../components/Card'
@@ -11,6 +11,8 @@ import { dormTypeLabel, formatTenge } from '../../utils/dormitoryLabels'
 import type { Dormitory, DormitoryCapacity, DormitoryImage } from '../../types/dormitories'
 import { DormitoryImageSlideshow } from './DormitoryImageSlideshow'
 import { DormitoryMiniMap } from './DormitoryMapViewer'
+import { DormitoryRoomsSection } from './DormitoryRoomsSection'
+import { useAuthStore } from '../../store/authStore'
 
 function formatYear(value: string | null): string {
   return value ? value.slice(0, 4) : '—'
@@ -20,6 +22,8 @@ export function DormitoryInfoPage() {
   const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const [dormitory, setDormitory] = useState<Dormitory | null>(null)
   const [images, setImages] = useState<DormitoryImage[]>([])
   const [capacity, setCapacity] = useState<DormitoryCapacity | null>(null)
@@ -132,14 +136,20 @@ export function DormitoryInfoPage() {
         </div>
       </Card>
 
+      <DormitoryRoomsSection dormitoryId={dormitory.id} />
+
       {dormitory.closed_for_applications ? (
         <Alert variant="warning" message={t('dorm.closedNotice')} />
       ) : (
         <Button
           className="w-full"
-          onClick={() => navigate(`/applications/new?dormitory_id=${dormitory.id}`)}
+          onClick={() => {
+            const applyPath = { pathname: '/applications/new', search: `?dormitory_id=${dormitory.id}` }
+            if (isAuthenticated) navigate(applyPath)
+            else navigate('/login', { state: { from: { ...location, ...applyPath } } })
+          }}
         >
-          {t('dorm.applyButton')}
+          {isAuthenticated ? t('dorm.applyButton') : t('dorm.signInToApply')}
         </Button>
       )}
     </div>

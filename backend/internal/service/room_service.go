@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -46,6 +47,52 @@ type RoomInput struct {
 	Capacity   int
 	Floor      *int
 	Category   string
+	// Optional descriptive fields; nil / empty clears them.
+	AreaSqM            *float64
+	Equipment          *string
+	SanitaryConditions *string
+	IsAccessible       *bool
+	AccessibilityNotes *string
+	PhotoURLs          []string
+}
+
+// normalizedDetails checks the optional descriptive fields and returns them
+// normalized (blank text -> nil).
+func (in RoomInput) normalizedDetails() (RoomInput, error) {
+	if in.AreaSqM != nil && (*in.AreaSqM <= 0 || *in.AreaSqM >= 10000) {
+		return in, apperror.BadRequest("аудан 0-ден үлкен болуы керек")
+	}
+	in.Equipment = trimOrNil(in.Equipment)
+	in.SanitaryConditions = trimOrNil(in.SanitaryConditions)
+	in.AccessibilityNotes = trimOrNil(in.AccessibilityNotes)
+	urls := make([]string, 0, len(in.PhotoURLs))
+	for _, u := range in.PhotoURLs {
+		if u = strings.TrimSpace(u); u != "" {
+			urls = append(urls, u)
+		}
+	}
+	in.PhotoURLs = urls
+	return in, nil
+}
+
+func trimOrNil(s *string) *string {
+	if s == nil {
+		return nil
+	}
+	v := strings.TrimSpace(*s)
+	if v == "" {
+		return nil
+	}
+	return &v
+}
+
+func applyRoomDetails(room *domain.Room, in RoomInput) {
+	room.AreaSqM = in.AreaSqM
+	room.Equipment = in.Equipment
+	room.SanitaryConditions = in.SanitaryConditions
+	room.IsAccessible = in.IsAccessible
+	room.AccessibilityNotes = in.AccessibilityNotes
+	room.PhotoURLs = in.PhotoURLs
 }
 
 func (s *RoomService) Create(ctx context.Context, dormitoryID uuid.UUID, in RoomInput) (*domain.Room, error) {
@@ -57,6 +104,10 @@ func (s *RoomService) Create(ctx context.Context, dormitoryID uuid.UUID, in Room
 	}
 	if in.Floor == nil {
 		return nil, apperror.BadRequest("қабат көрсетілуі міндетті")
+	}
+	in, err := in.normalizedDetails()
+	if err != nil {
+		return nil, err
 	}
 	if _, err := s.dormitories.GetByID(ctx, dormitoryID); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -76,6 +127,7 @@ func (s *RoomService) Create(ctx context.Context, dormitoryID uuid.UUID, in Room
 		Floor:       in.Floor,
 		Category:    category,
 	}
+	applyRoomDetails(room, in)
 	if err := s.rooms.Create(ctx, room); err != nil {
 		if errors.Is(err, repository.ErrConflict) {
 			return nil, apperror.Conflict("бұл жатақханада осы нөмірлі бөлме бұрыннан бар")
@@ -129,6 +181,10 @@ func (s *RoomService) Update(ctx context.Context, id uuid.UUID, in RoomInput) (*
 	if in.Floor == nil {
 		return nil, apperror.BadRequest("қабат көрсетілуі міндетті")
 	}
+	in, err := in.normalizedDetails()
+	if err != nil {
+		return nil, err
+	}
 	category := in.Category
 	if category == "" {
 		category = "general"
@@ -140,6 +196,7 @@ func (s *RoomService) Update(ctx context.Context, id uuid.UUID, in RoomInput) (*
 		Floor:      in.Floor,
 		Category:   category,
 	}
+	applyRoomDetails(room, in)
 	if err := s.rooms.Update(ctx, room); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return nil, apperror.NotFound("бөлме табылмады")

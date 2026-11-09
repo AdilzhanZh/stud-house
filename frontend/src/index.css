@@ -271,3 +271,39 @@ input:-webkit-autofill:focus {
     transform: translateX(-100%);
   }
 }
+
+/* Login-screen dormitory marquee: each row holds two identical passes, so
+   shifting by exactly half its width loops seamlessly. Duration is set
+   inline from the number of cards. */
+.dorm-marquee-right {
+  animation: dorm-marquee-right linear infinite;
+}
+.dorm-marquee-left {
+  animation: dorm-marquee-left linear infinite;
+}
+@keyframes dorm-marquee-right {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes dorm-marquee-left {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.dorm-marquee-mask {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .dorm-marquee-right,
+  .dorm-marquee-left {
+    animation: none;
+  }
+}

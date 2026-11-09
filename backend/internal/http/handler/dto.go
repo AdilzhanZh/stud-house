@@ -231,11 +231,23 @@ type roomResponse struct {
 	Floor        *int                    `json:"floor"`
 	Category     string                  `json:"category"`
 	Restrictions domain.RoomRestrictions `json:"restrictions"`
-	CreatedAt    time.Time               `json:"created_at"`
-	UpdatedAt    time.Time               `json:"updated_at"`
+
+	AreaSqM            *float64 `json:"area_sq_m"`
+	Equipment          *string  `json:"equipment"`
+	SanitaryConditions *string  `json:"sanitary_conditions"`
+	IsAccessible       *bool    `json:"is_accessible"`
+	AccessibilityNotes *string  `json:"accessibility_notes"`
+	PhotoURLs          []string `json:"photo_urls"`
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 func roomDTO(r *domain.Room) roomResponse {
+	photoURLs := r.PhotoURLs
+	if photoURLs == nil {
+		photoURLs = []string{}
+	}
 	return roomResponse{
 		ID:           r.ID,
 		DormitoryID:  r.DormitoryID,
@@ -244,8 +256,16 @@ func roomDTO(r *domain.Room) roomResponse {
 		Floor:        r.Floor,
 		Category:     r.Category,
 		Restrictions: r.Restrictions,
-		CreatedAt:    r.CreatedAt,
-		UpdatedAt:    r.UpdatedAt,
+
+		AreaSqM:            r.AreaSqM,
+		Equipment:          r.Equipment,
+		SanitaryConditions: r.SanitaryConditions,
+		IsAccessible:       r.IsAccessible,
+		AccessibilityNotes: r.AccessibilityNotes,
+		PhotoURLs:          photoURLs,
+
+		CreatedAt: r.CreatedAt,
+		UpdatedAt: r.UpdatedAt,
 	}
 }
 

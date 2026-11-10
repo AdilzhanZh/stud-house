@@ -10,6 +10,7 @@ import { getMyResidence } from '../../api/residenceApi'
 import { getDormitory } from '../../api/dormitoryApi'
 import { listRoomResidents } from '../../api/roomApi'
 import { formatDate } from '../../utils/dateFormat'
+import { floorLabel } from '../../utils/roomLocation'
 import { ResidenceRequestsSection } from './ResidenceRequestsSection'
 import type { Residence } from '../../types/residence'
 import type { Dormitory } from '../../types/dormitories'
@@ -64,6 +65,15 @@ export function MyResidencePage() {
             <p className="mt-0.5 text-sm text-sand-300">
               {dormitory.address} · {t('residence.capacitySuffix', { count: residence.capacity })}
             </p>
+            <p className="mt-0.5 text-sm text-sand-300">
+              {floorLabel({ number: residence.floor, name: residence.floor_name }, t)}
+            </p>
+            {residence.bed_label && (
+              <p className="mt-0.5 text-sm text-sand-300">
+                {t('admin.rooms.bedLabel', { label: residence.bed_label })}
+                {residence.bed_code && <span className="font-mono text-sand-400"> · {residence.bed_code}</span>}
+              </p>
+            )}
           </div>
         </div>
 

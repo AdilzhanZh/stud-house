@@ -16,6 +16,7 @@ import (
 
 type RoomService struct {
 	rooms           repository.RoomRepository
+	floors          repository.HierarchyRepository
 	dormitories     repository.DormitoryRepository
 	users           repository.UserRepository
 	profiles        repository.StudentProfileRepository
@@ -25,6 +26,7 @@ type RoomService struct {
 
 func NewRoomService(
 	rooms repository.RoomRepository,
+	floors repository.HierarchyRepository,
 	dormitories repository.DormitoryRepository,
 	users repository.UserRepository,
 	profiles repository.StudentProfileRepository,
@@ -33,6 +35,7 @@ func NewRoomService(
 ) *RoomService {
 	return &RoomService{
 		rooms:           rooms,
+		floors:          floors,
 		dormitories:     dormitories,
 		users:           users,
 		profiles:        profiles,
@@ -45,8 +48,11 @@ func NewRoomService(
 type RoomInput struct {
 	RoomNumber string
 	Capacity   int
-	Floor      *int
-	Category   string
+	// FloorID places the room. Floor (a number) is the older way: the
+	// dormitory's floor with this number is used, created if missing.
+	FloorID  *uuid.UUID
+	Floor    *int
+	Category string
 	// Optional descriptive fields; nil / empty clears them.
 	AreaSqM            *float64
 	Equipment          *string
@@ -102,9 +108,6 @@ func (s *RoomService) Create(ctx context.Context, dormitoryID uuid.UUID, in Room
 	if in.Capacity <= 0 {
 		return nil, apperror.BadRequest("сыйымдылық оң сан болуы керек")
 	}
-	if in.Floor == nil {
-		return nil, apperror.BadRequest("қабат көрсетілуі міндетті")
-	}
 	in, err := in.normalizedDetails()
 	if err != nil {
 		return nil, err
@@ -116,25 +119,74 @@ func (s *RoomService) Create(ctx context.Context, dormitoryID uuid.UUID, in Room
 		return nil, err
 	}
 
+	floor, err := s.resolveFloor(ctx, dormitoryID, in)
+	if err != nil {
+		return nil, err
+	}
+
 	category := in.Category
 	if category == "" {
 		category = "general"
 	}
 	room := &domain.Room{
 		DormitoryID: dormitoryID,
+		FloorID:     floor.ID,
 		RoomNumber:  in.RoomNumber,
 		Capacity:    in.Capacity,
-		Floor:       in.Floor,
 		Category:    category,
 	}
 	applyRoomDetails(room, in)
 	if err := s.rooms.Create(ctx, room); err != nil {
 		if errors.Is(err, repository.ErrConflict) {
-			return nil, apperror.Conflict("бұл жатақханада осы нөмірлі бөлме бұрыннан бар")
+			return nil, apperror.Conflict(roomNumberTakenMessage)
 		}
 		return nil, err
 	}
-	return room, nil
+	return s.GetByID(ctx, room.ID)
+}
+
+const roomNumberTakenMessage = "бұл жатақханада осы нөмірлі бөлме бұрыннан бар"
+
+// resolveFloor finds the floor a room create/update puts the room on and
+// checks it is an active floor of dormitoryID — a room can move between
+// floors of its building, never to another building.
+func (s *RoomService) resolveFloor(ctx context.Context, dormitoryID uuid.UUID, in RoomInput) (*domain.Floor, error) {
+	if in.FloorID == nil {
+		if in.Floor == nil {
+			return nil, apperror.BadRequest("қабат көрсетілуі міндетті")
+		}
+		floor, err := s.floors.FindActiveFloor(ctx, dormitoryID, in.Floor)
+		if err == nil {
+			return floor, nil
+		}
+		if !errors.Is(err, repository.ErrNotFound) {
+			return nil, err
+		}
+		floor = &domain.Floor{DormitoryID: dormitoryID, Number: in.Floor}
+		if err := s.floors.CreateFloor(ctx, floor); err != nil {
+			if errors.Is(err, repository.ErrConflict) {
+				// Created concurrently by someone else: use theirs.
+				return s.floors.FindActiveFloor(ctx, dormitoryID, in.Floor)
+			}
+			return nil, err
+		}
+		return floor, nil
+	}
+
+	floor, err := s.floors.GetFloor(ctx, *in.FloorID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, apperror.BadRequest("қабат табылмады")
+	}
+	if err != nil {
+		return nil, err
+	}
+	if floor.DormitoryID != dormitoryID {
+		return nil, apperror.BadRequest("қабат басқа жатақханаға жатады")
+	}
+	if floor.RetiredAt != nil {
+		return nil, apperror.Conflict("бұл қабат алынып тасталған")
+	}
+	return floor, nil
 }
 
 func (s *RoomService) GetByID(ctx context.Context, id uuid.UUID) (*domain.Room, error) {
@@ -178,10 +230,15 @@ func (s *RoomService) Update(ctx context.Context, id uuid.UUID, in RoomInput) (*
 	if in.Capacity <= 0 {
 		return nil, apperror.BadRequest("сыйымдылық оң сан болуы керек")
 	}
-	if in.Floor == nil {
-		return nil, apperror.BadRequest("қабат көрсетілуі міндетті")
-	}
 	in, err := in.normalizedDetails()
+	if err != nil {
+		return nil, err
+	}
+	existing, err := s.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	floor, err := s.resolveFloor(ctx, existing.DormitoryID, in)
 	if err != nil {
 		return nil, err
 	}
@@ -191,15 +248,22 @@ func (s *RoomService) Update(ctx context.Context, id uuid.UUID, in RoomInput) (*
 	}
 	room := &domain.Room{
 		ID:         id,
+		FloorID:    floor.ID,
 		RoomNumber: in.RoomNumber,
 		Capacity:   in.Capacity,
-		Floor:      in.Floor,
 		Category:   category,
 	}
 	applyRoomDetails(room, in)
+	// The repository adds or retires bed places to match the new capacity;
+	// existing beds keep their ids.
 	if err := s.rooms.Update(ctx, room); err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
+		switch {
+		case errors.Is(err, repository.ErrNotFound):
 			return nil, apperror.NotFound("бөлме табылмады")
+		case errors.Is(err, repository.ErrConflict):
+			return nil, apperror.Conflict(roomNumberTakenMessage)
+		case errors.Is(err, repository.ErrBedOccupied):
+			return nil, apperror.Conflict("сыйымдылықты азайту үшін бос төсек-орын жеткіліксіз — алдымен тұрғындарды басқа орынға ауыстырыңыз")
 		}
 		return nil, err
 	}
@@ -395,17 +459,35 @@ func (s *RoomService) ValidateAssignable(ctx context.Context, roomID, studentID 
 }
 
 // AddResident assigns a student to a room, claiming the seat immediately
-// (see ValidateAssignable for the checks it runs first).
-func (s *RoomService) AddResident(ctx context.Context, roomID, studentID uuid.UUID) (*domain.RoomResident, error) {
+// (see ValidateAssignable for the checks it runs first). bedID picks the
+// bed place; nil takes the room's first free bed.
+func (s *RoomService) AddResident(ctx context.Context, roomID, studentID uuid.UUID, bedID *uuid.UUID) (*domain.RoomResident, error) {
 	if _, err := s.ValidateAssignable(ctx, roomID, studentID); err != nil {
 		return nil, err
 	}
 
-	rr := &domain.RoomResident{RoomID: roomID, StudentID: studentID}
+	rr := &domain.RoomResident{RoomID: roomID, StudentID: studentID, BedID: bedID}
 	if err := s.rooms.AddResident(ctx, rr); err != nil {
-		return nil, err
+		return nil, bedPlacementError(err)
 	}
 	return rr, nil
+}
+
+// bedPlacementError maps RoomRepository.AddResident's bed errors to API errors.
+func bedPlacementError(err error) error {
+	switch {
+	case errors.Is(err, repository.ErrNotFound):
+		return apperror.NotFound("бұл бөлмеде мұндай төсек-орын табылмады")
+	case errors.Is(err, repository.ErrBedRetired):
+		return apperror.Conflict("бұл төсек-орын алынып тасталған")
+	case errors.Is(err, repository.ErrBedOccupied):
+		return apperror.Conflict("бұл төсек-орын бос емес")
+	case errors.Is(err, repository.ErrNoFreeBed):
+		return apperror.Conflict("бөлмеде бос төсек-орын жоқ")
+	case errors.Is(err, repository.ErrConflict):
+		return apperror.Conflict("студент бұрыннан бір бөлмеге орналастырылған")
+	}
+	return err
 }
 
 // MoveOutResident is the admin/manager-facing "release from room" action: it
@@ -437,16 +519,22 @@ func (s *RoomService) MoveOutResident(ctx context.Context, residentRowID uuid.UU
 }
 
 // TransferResident is the admin/manager-facing "move this resident to a
-// different room" action. Unlike TransferRequestService.Decide's approval
-// step (which vacates the old room before checking the new one, and accepts
-// the narrow risk of leaving the student roomless if that check fails —
-// acceptable there since a request only reaches approval after a manager
-// already looked at it), this direct action validates the target room's
-// capacity/gender/course/benefit fit up front, before touching the old
-// room_residents row: a manager picking an invalid destination room is the
+// different bed" action: another room, or another bed in the same room.
+// newBedID picks the bed; nil takes the target room's first free bed (only
+// allowed when changing rooms). Bed places themselves never change — only
+// which bed the student's stay points to — so every bed keeps its permanent
+// id and history.
+//
+// Unlike TransferRequestService.Decide's approval step (which vacates the
+// old room before checking the new one, and accepts the narrow risk of
+// leaving the student roomless if that check fails — acceptable there since
+// a request only reaches approval after a manager already looked at it),
+// this direct action validates the target room's capacity/gender/course/
+// benefit fit and the target bed up front, before touching the old
+// room_residents row: a manager picking an invalid destination is the
 // common case here, not an edge case, so it must never strand the student
 // with no active room at all.
-func (s *RoomService) TransferResident(ctx context.Context, residentRowID, newRoomID uuid.UUID) (*domain.RoomResident, error) {
+func (s *RoomService) TransferResident(ctx context.Context, residentRowID, newRoomID uuid.UUID, newBedID *uuid.UUID) (*domain.RoomResident, error) {
 	resident, err := s.rooms.GetResidentByID(ctx, residentRowID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -457,7 +545,8 @@ func (s *RoomService) TransferResident(ctx context.Context, residentRowID, newRo
 	if resident.MovedOutAt != nil {
 		return nil, apperror.Conflict("тұрғын бұрын осы бөлмеден шыққан")
 	}
-	if resident.RoomID == newRoomID {
+	sameRoom := resident.RoomID == newRoomID
+	if sameRoom && newBedID == nil {
 		return nil, apperror.Conflict("студент бұрыннан осы бөлмеде тұрады")
 	}
 
@@ -465,15 +554,35 @@ func (s *RoomService) TransferResident(ctx context.Context, residentRowID, newRo
 	if err != nil {
 		return nil, err
 	}
-	newRoomResidents, err := s.rooms.ListActiveResidents(ctx, newRoomID)
-	if err != nil {
-		return nil, err
+	if newBedID != nil {
+		if resident.BedID != nil && *resident.BedID == *newBedID {
+			return nil, apperror.Conflict("студент бұрыннан осы төсек-орында тұрады")
+		}
+		bed, err := s.rooms.GetBedByID(ctx, *newBedID)
+		if err != nil && !errors.Is(err, repository.ErrNotFound) {
+			return nil, err
+		}
+		if err != nil || bed.RoomID != newRoomID {
+			return nil, apperror.NotFound("бұл бөлмеде мұндай төсек-орын табылмады")
+		}
+		if bed.RetiredAt != nil {
+			return nil, apperror.Conflict("бұл төсек-орын алынып тасталған")
+		}
+		if bed.ResidentID != nil {
+			return nil, apperror.Conflict("бұл төсек-орын бос емес")
+		}
 	}
-	if len(newRoomResidents) >= newRoom.Capacity {
-		return nil, apperror.Conflict("бөлме толығымен толған")
-	}
-	if err := s.checkStudentAgainstRestrictions(ctx, resident.StudentID, newRoom.Restrictions); err != nil {
-		return nil, err
+	if !sameRoom {
+		newRoomResidents, err := s.rooms.ListActiveResidents(ctx, newRoomID)
+		if err != nil {
+			return nil, err
+		}
+		if len(newRoomResidents) >= newRoom.Capacity {
+			return nil, apperror.Conflict("бөлме толығымен толған")
+		}
+		if err := s.checkStudentAgainstRestrictions(ctx, resident.StudentID, newRoom.Restrictions); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := s.rooms.MoveOutResident(ctx, residentRowID); err != nil {
@@ -483,18 +592,22 @@ func (s *RoomService) TransferResident(ctx context.Context, residentRowID, newRo
 		return nil, err
 	}
 
-	// The capacity/restriction checks above were already satisfied, so this
-	// should succeed barring a concurrent write to newRoomID in between —
-	// the same narrow check-then-act race already accepted throughout this
-	// codebase (no cross-repository transactions exist anywhere in it).
-	newResident, err := s.AddResident(ctx, newRoomID, resident.StudentID)
+	// The checks above were already satisfied, so this should succeed
+	// barring a concurrent write to the target room in between — the same
+	// narrow check-then-act race already accepted throughout this codebase
+	// (no cross-repository transactions exist anywhere in it).
+	newResident, err := s.AddResident(ctx, newRoomID, resident.StudentID, newBedID)
 	if err != nil {
 		return nil, err
 	}
 
+	bedLabel := ""
+	if newResident.BedLabel != nil {
+		bedLabel = *newResident.BedLabel
+	}
 	_ = s.notifier.Notify(ctx, resident.StudentID, domain.NotificationRoomResidentTransferred,
 		"Бөлме ауыстырылды",
-		fmt.Sprintf("Сіз жаңа бөлмеге (№%s) ауыстырылдыңыз.", newRoom.RoomNumber), nil)
+		fmt.Sprintf("Сіз жаңа орынға (бөлме №%s, төсек-орын %s) ауыстырылдыңыз.", newRoom.RoomNumber, bedLabel), nil)
 
 	return newResident, nil
 }
@@ -541,4 +654,97 @@ func (s *RoomService) CheckHoldable(ctx context.Context, roomID uuid.UUID, exclu
 // current resident and hold counts, for the student-facing room picker.
 func (s *RoomService) ListAvailabilityByDormitory(ctx context.Context, dormitoryID uuid.UUID) ([]*domain.RoomAvailability, error) {
 	return s.rooms.ListAvailabilityByDormitory(ctx, dormitoryID)
+}
+
+// ListBeds returns a room's bed places with who is on each; retired beds
+// are included (listed last) when includeRetired is set.
+func (s *RoomService) ListBeds(ctx context.Context, roomID uuid.UUID, includeRetired bool) ([]*domain.Bed, error) {
+	if _, err := s.GetByID(ctx, roomID); err != nil {
+		return nil, err
+	}
+	return s.rooms.ListBeds(ctx, roomID, includeRetired)
+}
+
+// maxBedsPerAdd caps one "add beds" action, so a typo can't create hundreds.
+const maxBedsPerAdd = 20
+
+// AddBeds creates count new bed places in the room, each with a new
+// permanent id (ids of retired beds are never reused), and raises the
+// room's capacity to match.
+func (s *RoomService) AddBeds(ctx context.Context, roomID uuid.UUID, count int) ([]*domain.Bed, error) {
+	if count < 1 || count > maxBedsPerAdd {
+		return nil, apperror.BadRequest(fmt.Sprintf("төсек-орын саны 1 мен %d аралығында болуы керек", maxBedsPerAdd))
+	}
+	beds, err := s.rooms.AddBeds(ctx, roomID, count)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, apperror.NotFound("бөлме табылмады")
+		}
+		return nil, err
+	}
+	return beds, nil
+}
+
+// RetireBed records that a bed was physically removed from its room. The
+// bed place keeps its id and history; it just stops counting toward the
+// room's capacity. A bed someone is on must be freed first.
+func (s *RoomService) RetireBed(ctx context.Context, bedID uuid.UUID) error {
+	err := s.rooms.RetireBed(ctx, bedID)
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, repository.ErrNotFound):
+		return apperror.NotFound("төсек-орын табылмады")
+	case errors.Is(err, repository.ErrBedRetired):
+		return apperror.Conflict("бұл төсек-орын бұрын алынып тасталған")
+	case errors.Is(err, repository.ErrBedOccupied):
+		return apperror.Conflict("төсек-орында тұрғын бар — алдымен оны басқа орынға ауыстырыңыз")
+	case errors.Is(err, repository.ErrLastBed):
+		return apperror.Conflict("бөлмеде кемінде бір төсек-орын қалуы керек")
+	}
+	return err
+}
+
+// maxBedLabelLen matches beds.label VARCHAR(50).
+const maxBedLabelLen = 50
+
+// RenameBed changes a bed's label (its position name in the room); the
+// bed's id and inventory number stay the same.
+func (s *RoomService) RenameBed(ctx context.Context, bedID uuid.UUID, label string) (*domain.Bed, error) {
+	label = strings.TrimSpace(label)
+	if label == "" {
+		return nil, apperror.BadRequest("төсек-орын белгісі міндетті")
+	}
+	if len([]rune(label)) > maxBedLabelLen {
+		return nil, apperror.BadRequest(fmt.Sprintf("төсек-орын белгісі %d таңбадан аспауы керек", maxBedLabelLen))
+	}
+	err := s.rooms.RenameBed(ctx, bedID, label)
+	switch {
+	case err == nil:
+	case errors.Is(err, repository.ErrNotFound):
+		return nil, apperror.NotFound("төсек-орын табылмады")
+	case errors.Is(err, repository.ErrBedRetired):
+		return nil, apperror.Conflict("алынып тасталған төсек-орынның белгісін өзгертуге болмайды")
+	case errors.Is(err, repository.ErrConflict):
+		return nil, apperror.Conflict("бұл бөлмеде осындай белгісі бар төсек-орын бұрыннан бар")
+	default:
+		return nil, err
+	}
+	return s.rooms.GetBedByID(ctx, bedID)
+}
+
+// BedHistory returns the bed and every stay on it, newest first.
+func (s *RoomService) BedHistory(ctx context.Context, bedID uuid.UUID) (*domain.Bed, []*domain.RoomResident, error) {
+	bed, err := s.rooms.GetBedByID(ctx, bedID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, nil, apperror.NotFound("төсек-орын табылмады")
+		}
+		return nil, nil, err
+	}
+	stays, err := s.rooms.ListBedHistory(ctx, bedID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return bed, stays, nil
 }

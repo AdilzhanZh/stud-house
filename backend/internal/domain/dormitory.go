@@ -33,7 +33,12 @@ type Dormitory struct {
 	YearlyPaymentDoctorate  *float64
 	BuiltYear               *time.Time
 	CommissionedYear        *time.Time
-	OwnershipForm           *string
+	// ObjectID is the object (the dormitory as an organisation, see
+	// DormObject) this building belongs to. ObjectName and OwnershipForm
+	// are read from it.
+	ObjectID      uuid.UUID
+	ObjectName    string
+	OwnershipForm *string
 	// ClosedForApplications hides this dormitory from the student-facing
 	// browse/apply list and blocks new applications to it, without
 	// affecting existing residents, applications, or admin management.

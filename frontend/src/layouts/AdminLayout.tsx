@@ -14,6 +14,8 @@ import {
   LayoutDashboard,
   Megaphone,
   Menu,
+  Landmark,
+  Network,
   UserCheck,
   UserCog,
   UserPlus,
@@ -169,9 +171,17 @@ export function AdminLayout() {
                 <CountBadge count={pendingApplicationsCount} />
               </NavLink>
             )}
+            <NavLink to="/admin/objects" className={navLinkClass}>
+              <Landmark className="h-4.5 w-4.5 shrink-0" />
+              {t('admin.objects.title')}
+            </NavLink>
             <NavLink to="/admin/dormitories" className={navLinkClass}>
               <Building2 className="h-4.5 w-4.5 shrink-0" />
               {t('admin.layout.dormitories')}
+            </NavLink>
+            <NavLink to="/admin/registry" className={navLinkClass}>
+              <Network className="h-4.5 w-4.5 shrink-0" />
+              {t('admin.rooms.registry')}
             </NavLink>
             {isManager && (
               <>

@@ -23,6 +23,7 @@ import { useAuth } from '../auth/useAuth'
 import type { ApplicationDetail, MissingDocument } from '../../types/applications'
 import type { Room } from '../../types/rooms'
 import type { Gender } from '../../types'
+import { roomLabel } from '../../utils/roomLocation'
 
 export function ApplicationDetailPage() {
   const { t, i18n } = useTranslation()
@@ -209,7 +210,7 @@ export function ApplicationDetailPage() {
           <p className="text-[22px] font-bold text-sand-100">{dormitoryName ?? '...'}</p>
           {preferredRoom && (
             <p className="mt-0.5 text-sm text-sand-300">
-              {t('appDetail.preferredRoomLabel', { room: preferredRoom.room_number })}
+              {t('appDetail.preferredRoomLabel', { room: roomLabel(preferredRoom) })}
             </p>
           )}
         </div>

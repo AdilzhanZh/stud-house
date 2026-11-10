@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Card } from '../../../components/Card'
 import { Input } from '../../../components/Input'
@@ -11,6 +11,9 @@ import { ImageLightbox } from '../../../components/ImageLightbox'
 import { extractErrorMessage } from '../../../api/client'
 import { uploadFile } from '../../../api/uploadApi'
 import { getRoom, createRoom, updateRoom, updateRoomRestrictions } from '../../../api/roomApi'
+import { createFloor, listDormitoryFloors } from '../../../api/hierarchyApi'
+import { floorLabel } from '../../../utils/roomLocation'
+import type { Floor } from '../../../types/hierarchy'
 import type { AcademicDegree, Gender } from '../../../types/rooms'
 
 const ALL_COURSES = [1, 2, 3, 4, 5, 6]
@@ -58,7 +61,13 @@ export function RoomFormPage() {
   const navigate = useNavigate()
 
   const [roomNumber, setRoomNumber] = useState('')
-  const [floor, setFloor] = useState('')
+  const [searchParams] = useSearchParams()
+  // ?floor=<floorId> preselects the floor the manager came from.
+  const [floorId, setFloorId] = useState(searchParams.get('floor') ?? '')
+  const [floors, setFloors] = useState<Floor[]>([])
+  const [newFloorNumber, setNewFloorNumber] = useState('')
+  const [newFloorError, setNewFloorError] = useState<string | null>(null)
+  const [isAddingFloor, setIsAddingFloor] = useState(false)
   const [capacity, setCapacity] = useState('')
   const [gender, setGender] = useState<Gender | 'shared' | ''>('')
   const [courses, setCourses] = useState<number[]>([])
@@ -83,7 +92,7 @@ export function RoomFormPage() {
     getRoom(roomId)
       .then((room) => {
         setRoomNumber(room.room_number)
-        setFloor(room.floor != null ? String(room.floor) : '')
+        setFloorId(room.floor_id)
         setCapacity(String(room.capacity))
         setGender(room.restrictions.gender ?? 'shared')
         setCourses(room.restrictions.courses ?? [])
@@ -98,6 +107,33 @@ export function RoomFormPage() {
       })
       .catch((err) => setLoadError(extractErrorMessage(err, t('admin.common.loadError'))))
   }, [roomId])
+
+  function loadFloors(dormId: string) {
+    listDormitoryFloors(dormId)
+      .then(setFloors)
+      .catch((err) => setLoadError(extractErrorMessage(err, t('admin.common.loadError'))))
+  }
+
+  useEffect(() => {
+    if (ownerDormitoryId) loadFloors(ownerDormitoryId)
+  }, [ownerDormitoryId])
+
+  async function handleAddFloor() {
+    const number = Number(newFloorNumber)
+    if (!ownerDormitoryId || newFloorNumber.trim() === '' || !Number.isInteger(number)) return
+    setNewFloorError(null)
+    setIsAddingFloor(true)
+    try {
+      const created = await createFloor(ownerDormitoryId, { number, name: null })
+      setFloors((prev) => [...prev, created])
+      setFloorId(created.id)
+      setNewFloorNumber('')
+    } catch (err) {
+      setNewFloorError(extractErrorMessage(err, t('admin.rooms.saveFailedGeneric')))
+    } finally {
+      setIsAddingFloor(false)
+    }
+  }
 
   function toggleCourse(course: number) {
     setCourses((prev) =>
@@ -145,7 +181,7 @@ export function RoomFormPage() {
     const payload = {
       room_number: roomNumber,
       capacity: capacityNum,
-      floor: floor ? Number(floor) : null,
+      floor_id: floorId,
       category: 'general',
       area_sq_m: areaNum,
       equipment: equipment.trim() || null,
@@ -199,14 +235,44 @@ export function RoomFormPage() {
           onChange={(e) => setCapacity(e.target.value)}
           required
         />
-        <Input
+        <Select
           label={t('admin.rooms.floorLabel')}
-          type="number"
-          min={0}
-          value={floor}
-          onChange={(e) => setFloor(e.target.value)}
+          value={floorId}
+          onChange={(e) => setFloorId(e.target.value)}
           required
-        />
+        >
+          <option value="" disabled>
+            {t('admin.common.select')}
+          </option>
+          {floors.map((f) => (
+            <option key={f.id} value={f.id}>
+              {floorLabel(f, t)}
+            </option>
+          ))}
+        </Select>
+        <div className="-mt-1 flex flex-col gap-2 rounded-lg bg-navy-950/40 p-3">
+          <span className="text-xs font-medium text-sand-300">{t('admin.rooms.newFloorInline')}</span>
+          {newFloorError && <Alert variant="error" message={newFloorError} />}
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="w-32">
+              <Input
+                label={t('admin.rooms.floorNumber')}
+                type="number"
+                value={newFloorNumber}
+                onChange={(e) => setNewFloorNumber(e.target.value)}
+              />
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleAddFloor}
+              isLoading={isAddingFloor}
+              disabled={newFloorNumber.trim() === '' || !ownerDormitoryId}
+            >
+              {t('admin.rooms.addFloor')}
+            </Button>
+          </div>
+        </div>
         <Select
           label={t('admin.rooms.genderRestriction')}
           value={gender}

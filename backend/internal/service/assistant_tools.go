@@ -173,7 +173,7 @@ var assistantToolList = []assistantTool{
 - stats_applications(dormitory_name, stage, submitted_on date, gender 'male'|'female'|null, course smallint, academic_degree 'bachelor'|'master'|'doctorate'|null, has_benefit bool, applications int)
 - stats_application_benefits(dormitory_name, benefit_name_kk, benefit_name_ru, submitted_on date, application_status, applications int) — an applicant with two benefits counts under each
 - stats_application_stages(dormitory_id, dormitory_name, stage, submitted_on date, applications int)
-- stats_residents(dormitory_name, floor, gender, course, academic_degree, has_benefit, residents int) — current residents
+- stats_residents(dormitory_name, floor, gender, course, academic_degree, has_benefit, residents int, object_name) — current residents (object_name = the object the dormitory building belongs to)
 - stats_dormitory_seats(dormitory_id, dormitory_name, total_capacity, room_beds, residents, held, free_beds)
 - stats_contracts(dormitory_name, status 'sent'|'awaiting_manager_decision'|'accepted'|'declined'|'expired', overdue bool, sent_on date, contracts int)
 - stats_resident_requests(kind 'move_out'|'room_transfer', status 'pending'|'approved'|'rejected', created_on date, requests int)

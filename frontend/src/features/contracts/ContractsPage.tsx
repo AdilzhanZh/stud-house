@@ -23,6 +23,7 @@ import { useAuth } from '../auth/useAuth'
 import type { ContractLanguage } from '../../api/contractTemplateApi'
 import type { Contract } from '../../types/contracts'
 import type { Dormitory } from '../../types/dormitories'
+import { roomLabel } from '../../utils/roomLocation'
 
 type PendingAction = { contractId: string; action: 'accept' | 'decline' } | null
 type PagesByLanguage = Record<ContractLanguage, FilledDocument>
@@ -93,7 +94,7 @@ export function ContractsPage() {
               student_iin: user.iin ?? '',
               student_phone: user.phone,
               study_group: e.app.study_group,
-              room_number: e.room?.room_number ?? '',
+              room_number: e.room ? roomLabel(e.room) : '',
               dormitory_name: e.dormitory.name,
               dormitory_address: e.dormitory.address,
               monthly_payment_bachelor: formatTenge(e.dormitory.monthly_payment_bachelor),
@@ -133,7 +134,7 @@ export function ContractsPage() {
           student_iin: user.iin ?? '',
           student_phone: user.phone,
           study_group: app.study_group,
-          room_number: room?.room_number ?? '',
+          room_number: room ? roomLabel(room) : '',
           dormitory_name: dormitory?.name ?? '',
           dormitory_address: dormitory?.address ?? '',
           monthly_payment_bachelor: formatTenge(dormitory?.monthly_payment_bachelor),

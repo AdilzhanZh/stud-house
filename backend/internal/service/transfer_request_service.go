@@ -125,7 +125,7 @@ func (s *TransferRequestService) Decide(ctx context.Context, actorID, transferRe
 			// DB transaction — same documented cross-repository trade-off
 			// as earlier phases). The transfer_request itself still rolls
 			// back to 'pending' since we haven't called SetDecision yet.
-			if _, err := s.roomService.AddResident(ctx, *roomID, tr.StudentID); err != nil {
+			if _, err := s.roomService.AddResident(ctx, *roomID, tr.StudentID, nil); err != nil {
 				return err
 			}
 			return tx.SetDecision(ctx, transferRequestID, domain.TransferRequestApproved, actorID, comment)

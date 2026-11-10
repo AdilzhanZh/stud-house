@@ -13,6 +13,7 @@ type Handlers struct {
 	User                 *handler.UserHandler
 	Dormitory            *handler.DormitoryHandler
 	Room                 *handler.RoomHandler
+	Hierarchy            *handler.HierarchyHandler
 	Benefit              *handler.BenefitHandler
 	Document             *handler.DocumentHandler
 	Application          *handler.ApplicationHandler
@@ -188,6 +189,14 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 			staffGroup.Use(staff)
 			{
 				staffGroup.GET("/admin/users", h.User.List)
+				// Bed places of a room and one bed's stay history.
+				staffGroup.GET("/rooms/:roomId/beds", h.Room.ListBeds)
+				staffGroup.GET("/beds/:bedId/history", h.Room.BedHistory)
+				// Registry: object → building (dormitory) → floor → room → bed.
+				staffGroup.GET("/registry", h.Hierarchy.Registry)
+				staffGroup.GET("/dorm-objects", h.Hierarchy.ListObjects)
+				staffGroup.GET("/dorm-objects/:objectId", h.Hierarchy.GetObject)
+				staffGroup.GET("/dormitories/:id/floors", h.Hierarchy.ListFloors)
 			}
 
 			// Manager or committee member: committee members who don't hold
@@ -245,6 +254,16 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 				mgmt.POST("/rooms/:roomId/residents", h.Room.AddResident)
 				mgmt.DELETE("/room-residents/:residentId", h.Room.MoveOutResident)
 				mgmt.POST("/room-residents/:residentId/transfer", h.Room.TransferResident)
+				mgmt.POST("/rooms/:roomId/beds", h.Room.AddBeds)
+				mgmt.PATCH("/beds/:bedId", h.Room.RenameBed)
+				mgmt.DELETE("/beds/:bedId", h.Room.RetireBed)
+				mgmt.POST("/dorm-objects", h.Hierarchy.CreateObject)
+				mgmt.PATCH("/dorm-objects/:objectId", h.Hierarchy.UpdateObject)
+				mgmt.DELETE("/dorm-objects/:objectId", h.Hierarchy.DeleteObject)
+				mgmt.POST("/dorm-objects/:objectId/dormitories", h.Hierarchy.MoveDormitories)
+				mgmt.POST("/dormitories/:id/floors", h.Hierarchy.CreateFloor)
+				mgmt.PATCH("/floors/:floorId", h.Hierarchy.UpdateFloor)
+				mgmt.DELETE("/floors/:floorId", h.Hierarchy.RetireFloor)
 
 				mgmt.POST("/benefits", h.Benefit.Create)
 				mgmt.PATCH("/benefits/:id", h.Benefit.Update)

@@ -2,6 +2,7 @@ package domain
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -49,9 +50,15 @@ func (r RoomRestrictions) MarshalJSON() ([]byte, error) {
 	return json.Marshal(alias{Gender: r.Gender, Courses: courses, Degrees: degrees, BenefitIDs: benefitIDs})
 }
 
+// Room sits on a floor of a dormitory building. FloorID is the source of
+// truth: DormitoryID and Floor (the floor's number) are kept in sync with
+// it by the database (trigger rooms_sync_location). FloorName is read-only,
+// filled in by queries.
 type Room struct {
 	ID           uuid.UUID
 	DormitoryID  uuid.UUID
+	FloorID      uuid.UUID
+	FloorName    *string
 	RoomNumber   string
 	Capacity     int
 	Floor        *int
@@ -78,12 +85,44 @@ const NotificationRoomResidentTransferred NotificationType = "room_resident_tran
 
 // RoomResident represents one stay of a student in a room. MovedOutAt is nil
 // while the student currently lives there.
+//
+// BedID is the bed place the stay is on. It is nil only for stays that had
+// already ended before beds existed (migration 000098). BedLabel and
+// BedInventoryNo are read-only copies of that bed's fields, filled in by
+// queries that join beds.
 type RoomResident struct {
-	ID         uuid.UUID
-	RoomID     uuid.UUID
-	StudentID  uuid.UUID
-	MovedInAt  time.Time
-	MovedOutAt *time.Time
+	ID             uuid.UUID
+	RoomID         uuid.UUID
+	StudentID      uuid.UUID
+	BedID          *uuid.UUID
+	BedLabel       *string
+	BedInventoryNo *int64
+	MovedInAt      time.Time
+	MovedOutAt     *time.Time
+}
+
+// Bed is one bed place (койко-место) in a room. ID and InventoryNo are
+// permanent: a bed place is never deleted or renumbered, only retired
+// (RetiredAt set) when the dormitory physically removes the bed. A
+// relocation only changes which bed a stay points to. Label is the
+// editable position inside the room.
+//
+// ResidentID/StudentID describe the current stay on this bed, nil when free.
+type Bed struct {
+	ID          uuid.UUID
+	InventoryNo int64
+	RoomID      uuid.UUID
+	Label       string
+	CreatedAt   time.Time
+	RetiredAt   *time.Time
+	ResidentID  *uuid.UUID
+	StudentID   *uuid.UUID
+}
+
+// BedCode formats a bed's permanent inventory number the way people see
+// it, e.g. 412 -> "B-000412".
+func BedCode(inventoryNo int64) string {
+	return fmt.Sprintf("B-%06d", inventoryNo)
 }
 
 // RoomAvailability is a Room plus how many seats are already spoken for —

@@ -48,6 +48,7 @@ import type { ContractFieldValues } from '../../utils/contractPdf'
 import type { DormitoryRequiredDocument } from '../../types/dormitories'
 import type { Benefit, BenefitRequiredDocument } from '../../types/benefits'
 import type { AcademicDegree, Gender } from '../../types'
+import { roomLabel } from '../../utils/roomLocation'
 
 type WizardStep = 1 | 2 | 3 | 4
 
@@ -259,7 +260,7 @@ export function NewApplicationPage() {
         student_iin: student.iin ?? '',
         student_phone: student.phone,
         study_group: studyGroup.trim(),
-        room_number: room.room_number,
+        room_number: roomLabel(room),
         dormitory_name: dormitory.name,
         dormitory_address: dormitory.address,
         monthly_payment_bachelor: formatTenge(dormitory.monthly_payment_bachelor),

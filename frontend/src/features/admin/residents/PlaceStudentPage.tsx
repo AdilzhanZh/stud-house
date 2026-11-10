@@ -20,6 +20,7 @@ import type { User } from '../../../types'
 import type { DormitoryCardData } from '../../dormitories/useDormitoriesWithMeta'
 import type { Room, RoomAvailability } from '../../../types/rooms'
 import type { StudentProfile } from '../../../types'
+import { groupRoomsByFloor, roomLabel } from '../../../utils/roomLocation'
 
 // Mirrors RoomService.checkStudentAgainstRestrictions on the backend: a room
 // is only selectable if it still has a free bed and the student satisfies
@@ -198,7 +199,7 @@ export function PlaceStudentPage() {
       if (room.restrictions.gender != null && selectedProfile?.gender !== room.restrictions.gender) {
         setRestrictionsRoom(room)
       } else {
-        setBlockedNotice(t('admin.placeStudent.roomRestrictionBlocked', { room: room.room_number, reason }))
+        setBlockedNotice(t('admin.placeStudent.roomRestrictionBlocked', { room: roomLabel(room), reason }))
       }
       return
     }
@@ -220,7 +221,7 @@ export function PlaceStudentPage() {
       setSuccessMessage(
         t('admin.placeStudent.successMessage', {
           name: selected.full_name,
-          room: room?.room_number ?? '',
+          room: room ? roomLabel(room) : '',
         }),
       )
       setSelected(null)
@@ -235,16 +236,11 @@ export function PlaceStudentPage() {
     }
   }
 
-  const roomsByFloor = Object.entries(
-    rooms.reduce<Record<number, RoomAvailability[]>>((byFloor, room) => {
-      const floor = room.floor ?? 0
-      byFloor[floor] = [...(byFloor[floor] ?? []), room]
-      return byFloor
-    }, {}),
-  ).sort(([a], [b]) => Number(a) - Number(b))
+  // Floor tabs; with several buildings each tab is one building's floor.
+  const roomsByFloor = groupRoomsByFloor(rooms, t)
   const activeFloor =
-    selectedFloor && roomsByFloor.some(([floor]) => floor === selectedFloor) ? selectedFloor : roomsByFloor[0]?.[0]
-  const activeFloorRooms = roomsByFloor.find(([floor]) => floor === activeFloor)?.[1] ?? []
+    selectedFloor && roomsByFloor.some((g) => g.key === selectedFloor) ? selectedFloor : roomsByFloor[0]?.key
+  const activeFloorRooms = roomsByFloor.find((g) => g.key === activeFloor)?.rooms ?? []
   const selectedDormitory = dormitories?.find((d) => d.id === dormitoryId) ?? null
   const selectedRoom = rooms.find((r) => r.id === roomId) ?? null
 
@@ -302,18 +298,18 @@ export function PlaceStudentPage() {
               <div className="flex flex-col gap-3">
                 {roomsByFloor.length > 1 && (
                   <div className="flex flex-wrap gap-2">
-                    {roomsByFloor.map(([floor]) => (
+                    {roomsByFloor.map((group) => (
                       <button
-                        key={floor}
+                        key={group.key}
                         type="button"
-                        onClick={() => setSelectedFloor(floor)}
+                        onClick={() => setSelectedFloor(group.key)}
                         className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                          floor === activeFloor
+                          group.key === activeFloor
                             ? 'bg-turquoise-500 text-on-accent'
                             : 'bg-navy-800 text-sand-300 hover:bg-navy-700'
                         }`}
                       >
-                        {t('admin.dormitories.floorLabel', { floor })}
+                        {group.label}
                       </button>
                     ))}
                   </div>
@@ -334,7 +330,7 @@ export function PlaceStudentPage() {
                   <p className="text-xs font-medium text-clay-400">{blockedNotice}</p>
                 ) : selectedRoom ? (
                   <p className="text-xs text-sand-300">
-                    {t('admin.applications.roomSelected', { room: selectedRoom.room_number })}
+                    {t('admin.applications.roomSelected', { room: roomLabel(selectedRoom) })}
                   </p>
                 ) : null}
               </div>

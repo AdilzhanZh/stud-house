@@ -40,6 +40,7 @@ func main() {
 	studentProfileRepo := postgres.NewStudentProfileRepo(pool)
 	dormitoryRepo := postgres.NewDormitoryRepo(pool)
 	roomRepo := postgres.NewRoomRepo(pool)
+	hierarchyRepo := postgres.NewHierarchyRepo(pool)
 	benefitRepo := postgres.NewBenefitRepo(pool)
 	requiredDocumentRepo := postgres.NewRequiredDocumentRepo(pool)
 	studentBenefitRepo := postgres.NewStudentBenefitRepo(pool)
@@ -80,7 +81,7 @@ func main() {
 	} else {
 		log.Println("VAPID keys not set: push notifications are disabled")
 	}
-	roomService := service.NewRoomService(roomRepo, dormitoryRepo, userRepo, studentProfileRepo, studentBenefitRepo, notifierService)
+	roomService := service.NewRoomService(roomRepo, hierarchyRepo, dormitoryRepo, userRepo, studentProfileRepo, studentBenefitRepo, notifierService)
 	benefitService := service.NewBenefitService(benefitRepo, userRepo, studentBenefitRepo)
 	documentService := service.NewDocumentService(requiredDocumentRepo)
 	applicationService := service.NewApplicationService(applicationRepo, applicationDocumentRepo, dormitoryRepo, roomRepo, roomService, userRepo, notifierService)
@@ -154,6 +155,7 @@ func main() {
 		User:                 handler.NewUserHandler(userService),
 		Dormitory:            handler.NewDormitoryHandler(dormitoryService),
 		Room:                 handler.NewRoomHandler(roomService),
+		Hierarchy:            handler.NewHierarchyHandler(service.NewHierarchyService(hierarchyRepo)),
 		Benefit:              handler.NewBenefitHandler(benefitService),
 		Document:             handler.NewDocumentHandler(documentService),
 		Application:          handler.NewApplicationHandler(applicationService, triageService),

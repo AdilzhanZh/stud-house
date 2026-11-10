@@ -39,10 +39,12 @@ type DormitoryInput struct {
 	YearlyPaymentDoctorate  *float64
 	BuiltYear               *time.Time
 	CommissionedYear        *time.Time
-	OwnershipForm           *string
-	ClosedForApplications   bool
-	Latitude                *float64
-	Longitude               *float64
+	// ObjectID puts the building into an object. Empty on create: a new
+	// object named after the building is made. Empty on update: unchanged.
+	ObjectID              *uuid.UUID
+	ClosedForApplications bool
+	Latitude              *float64
+	Longitude             *float64
 }
 
 func validateDormitoryInput(in DormitoryInput) error {
@@ -72,7 +74,7 @@ func validateDormitoryInput(in DormitoryInput) error {
 }
 
 func dormitoryFromInput(in DormitoryInput) *domain.Dormitory {
-	return &domain.Dormitory{
+	d := &domain.Dormitory{
 		Name:                    in.Name,
 		Address:                 in.Address,
 		Phone:                   in.Phone,
@@ -88,12 +90,17 @@ func dormitoryFromInput(in DormitoryInput) *domain.Dormitory {
 		YearlyPaymentDoctorate:  in.YearlyPaymentDoctorate,
 		BuiltYear:               in.BuiltYear,
 		CommissionedYear:        in.CommissionedYear,
-		OwnershipForm:           in.OwnershipForm,
 		ClosedForApplications:   in.ClosedForApplications,
 		Latitude:                in.Latitude,
 		Longitude:               in.Longitude,
 	}
+	if in.ObjectID != nil {
+		d.ObjectID = *in.ObjectID
+	}
+	return d
 }
+
+var errObjectNotFound = apperror.BadRequest("объект табылмады")
 
 func (s *DormitoryService) Create(ctx context.Context, in DormitoryInput, createdBy uuid.UUID) (*domain.Dormitory, error) {
 	if err := validateDormitoryInput(in); err != nil {
@@ -102,9 +109,12 @@ func (s *DormitoryService) Create(ctx context.Context, in DormitoryInput, create
 	d := dormitoryFromInput(in)
 	d.CreatedBy = createdBy
 	if err := s.dormitories.Create(ctx, d); err != nil {
+		if errors.Is(err, repository.ErrObjectNotFound) {
+			return nil, errObjectNotFound
+		}
 		return nil, err
 	}
-	return d, nil
+	return s.GetByID(ctx, d.ID)
 }
 
 func (s *DormitoryService) GetByID(ctx context.Context, id uuid.UUID) (*domain.Dormitory, error) {
@@ -129,6 +139,9 @@ func (s *DormitoryService) Update(ctx context.Context, id uuid.UUID, in Dormitor
 	d := dormitoryFromInput(in)
 	d.ID = id
 	if err := s.dormitories.Update(ctx, d); err != nil {
+		if errors.Is(err, repository.ErrObjectNotFound) {
+			return nil, errObjectNotFound
+		}
 		if errors.Is(err, repository.ErrNotFound) {
 			return nil, apperror.NotFound("жатақхана табылмады")
 		}

@@ -5,6 +5,7 @@ import { Select } from '../../../components/Select'
 import { extractErrorMessage } from '../../../api/client'
 import { updateRoomRestrictions } from '../../../api/roomApi'
 import type { Gender, Room } from '../../../types/rooms'
+import { roomLabel } from '../../../utils/roomLocation'
 
 interface RoomRestrictionsDialogProps {
   room: Room | null
@@ -52,7 +53,7 @@ export function RoomRestrictionsDialog({ room, onClose, onSaved }: RoomRestricti
   return (
     <ConfirmDialog
       open={room != null}
-      title={t('admin.rooms.editRestrictionsTitle', { room: room?.room_number })}
+      title={t('admin.rooms.editRestrictionsTitle', { room: room ? roomLabel(room) : '' })}
       message={t('admin.rooms.genderMismatchDialogHint')}
       confirmLabel={t('admin.common.save')}
       isLoading={isSaving}

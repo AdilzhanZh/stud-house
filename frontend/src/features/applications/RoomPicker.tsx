@@ -4,6 +4,7 @@ import { FloorCorridorMap } from '../../components/FloorCorridorMap'
 import { listRoomAvailability } from '../../api/roomApi'
 import type { RoomAvailability } from '../../types/rooms'
 import type { Gender } from '../../types'
+import { groupRoomsByFloor, roomLabel } from '../../utils/roomLocation'
 
 interface RoomPickerProps {
   dormitoryId: string
@@ -51,18 +52,11 @@ export function RoomPicker({ dormitoryId, studentGender, roomId, onSelectRoom }:
   // rendered as blocked/unselectable in FloorCorridorMap.
   const isEligible = (r: RoomAvailability) =>
     r.restrictions.gender === null || r.restrictions.gender === studentGender
-  const floorGroups = Object.entries(
-    rooms.reduce<Record<number, RoomAvailability[]>>((byFloor, room) => {
-      const floor = room.floor ?? 0
-      byFloor[floor] = [...(byFloor[floor] ?? []), room]
-      return byFloor
-    }, {}),
-  ).sort(([a], [b]) => Number(a) - Number(b))
+  // Floor tabs; with several buildings each tab is one building's floor.
+  const floorGroups = groupRoomsByFloor(rooms, t)
   const activeFloor =
-    selectedFloor && floorGroups.some(([floor]) => floor === selectedFloor)
-      ? selectedFloor
-      : floorGroups[0]?.[0]
-  const activeFloorRooms = floorGroups.find(([floor]) => floor === activeFloor)?.[1] ?? []
+    selectedFloor && floorGroups.some((g) => g.key === selectedFloor) ? selectedFloor : floorGroups[0]?.key
+  const activeFloorRooms = floorGroups.find((g) => g.key === activeFloor)?.rooms ?? []
   const selectedRoom = rooms.find((r) => r.id === roomId && isEligible(r)) ?? null
 
   if (!dormitoryId || floorGroups.length === 0) return null
@@ -72,18 +66,18 @@ export function RoomPicker({ dormitoryId, studentGender, roomId, onSelectRoom }:
       <label className="text-sm font-medium text-sand-200">{t('wizard.roomLabel')}</label>
       {floorGroups.length > 1 && (
         <div className="flex flex-wrap gap-2">
-          {floorGroups.map(([floor]) => (
+          {floorGroups.map((group) => (
             <button
-              key={floor}
+              key={group.key}
               type="button"
-              onClick={() => setSelectedFloor(floor)}
+              onClick={() => setSelectedFloor(group.key)}
               className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                floor === activeFloor
+                group.key === activeFloor
                   ? 'bg-turquoise-500 text-on-accent'
                   : 'bg-navy-800 text-sand-300 hover:bg-navy-700'
               }`}
             >
-              {floor === '0' ? t('wizard.floorNotSpecified') : t('wizard.floorLabel', { floor })}
+              {group.label}
             </button>
           ))}
         </div>
@@ -109,7 +103,7 @@ export function RoomPicker({ dormitoryId, studentGender, roomId, onSelectRoom }:
         <p className="text-xs text-sand-300">
           {selectedRoom
             ? t('wizard.roomSelected', {
-                room: selectedRoom.room_number,
+                room: roomLabel(selectedRoom),
                 occupied: selectedRoom.resident_count + selectedRoom.held_count,
                 capacity: selectedRoom.capacity,
               })

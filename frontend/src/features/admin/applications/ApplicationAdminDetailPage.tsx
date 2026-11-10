@@ -30,6 +30,7 @@ import type { Benefit } from '../../../types/benefits'
 import type { Gender, Room } from '../../../types/rooms'
 import type { User } from '../../../types'
 import type { JourneyStep } from '../../../components/ApplicationJourneyStepper'
+import { groupRoomsByFloor, roomLabel } from '../../../utils/roomLocation'
 
 interface RoomWithOccupancy extends Room {
   residentCount: number
@@ -208,16 +209,11 @@ export function ApplicationAdminDetailPage() {
   // Grouped by floor so a large dormitory's rooms don't all render at once
   // in one long flat grid — matches the floor-tab pattern already used by
   // the student wizard's and the dormitory-management page's room maps.
-  const roomsByFloor = Object.entries(
-    rooms.reduce<Record<number, RoomWithOccupancy[]>>((byFloor, room) => {
-      const floor = room.floor ?? 0
-      byFloor[floor] = [...(byFloor[floor] ?? []), room]
-      return byFloor
-    }, {}),
-  ).sort(([a], [b]) => Number(a) - Number(b))
+  // Floor tabs; with several buildings each tab is one building's floor.
+  const roomsByFloor = groupRoomsByFloor(rooms, t)
   const activeFloor =
-    selectedFloor && roomsByFloor.some(([floor]) => floor === selectedFloor) ? selectedFloor : roomsByFloor[0]?.[0]
-  const activeFloorRooms = roomsByFloor.find(([floor]) => floor === activeFloor)?.[1] ?? []
+    selectedFloor && roomsByFloor.some((g) => g.key === selectedFloor) ? selectedFloor : roomsByFloor[0]?.key
+  const activeFloorRooms = roomsByFloor.find((g) => g.key === activeFloor)?.rooms ?? []
 
   return (
     <div className="flex flex-col gap-4">
@@ -344,18 +340,18 @@ export function ApplicationAdminDetailPage() {
                 <div className="flex flex-col gap-3">
                   {roomsByFloor.length > 1 && (
                     <div className="flex flex-wrap gap-2">
-                      {roomsByFloor.map(([floor]) => (
+                      {roomsByFloor.map((group) => (
                         <button
-                          key={floor}
+                          key={group.key}
                           type="button"
-                          onClick={() => setSelectedFloor(floor)}
+                          onClick={() => setSelectedFloor(group.key)}
                           className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                            floor === activeFloor
+                            group.key === activeFloor
                               ? 'bg-turquoise-500 text-on-accent'
                               : 'bg-navy-800 text-sand-300 hover:bg-navy-700'
                           }`}
                         >
-                          {t('admin.dormitories.floorLabel', { floor })}
+                          {group.label}
                         </button>
                       ))}
                     </div>
@@ -376,7 +372,7 @@ export function ApplicationAdminDetailPage() {
                   {selectedRoomId && (
                     <p className="text-xs text-sand-300">
                       {t('admin.applications.roomSelected', {
-                        room: rooms.find((r) => r.id === selectedRoomId)?.room_number,
+                        room: (() => { const r = rooms.find((x) => x.id === selectedRoomId); return r ? roomLabel(r) : '' })(),
                       })}
                       {application.preferred_room_id === selectedRoomId && ` ★ ${t('admin.applications.studentPreferred')}`}
                     </p>

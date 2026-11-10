@@ -12,7 +12,45 @@ import (
 var (
 	ErrNotFound = errors.New("resource not found")
 	ErrConflict = errors.New("resource already exists")
+
+	// Bed place errors (see RoomRepository).
+	ErrBedOccupied = errors.New("bed is occupied")
+	ErrNoFreeBed   = errors.New("room has no free bed")
+	ErrBedRetired  = errors.New("bed is retired")
+	ErrLastBed     = errors.New("room must keep at least one bed")
+
+	// Object/floor errors (see HierarchyRepository).
+	ErrNotEmpty       = errors.New("still has rooms or buildings")
+	ErrObjectNotFound = errors.New("object not found")
 )
+
+// HierarchyRepository stores the registry levels around a dormitory
+// (корпус): the object above it (domain.DormObject) and the floors below it
+// (domain.Floor). Floors are never deleted, only retired once empty; Get*
+// return retired floors too. Duplicate object names / active floor numbers
+// return ErrConflict.
+type HierarchyRepository interface {
+	ListObjects(ctx context.Context) ([]*domain.DormObject, error)
+	GetObject(ctx context.Context, id uuid.UUID) (*domain.DormObject, error)
+	CreateObject(ctx context.Context, o *domain.DormObject) error
+	UpdateObject(ctx context.Context, o *domain.DormObject) error
+	// DeleteObject: ErrNotEmpty while buildings belong to it.
+	DeleteObject(ctx context.Context, id uuid.UUID) error
+	// MoveDormitories puts the buildings into the object (merging objects);
+	// objects left without buildings are removed. ErrNotFound if the object
+	// or any building is missing.
+	MoveDormitories(ctx context.Context, objectID uuid.UUID, dormitoryIDs []uuid.UUID) error
+
+	ListFloors(ctx context.Context, dormitoryID uuid.UUID, includeRetired bool) ([]*domain.Floor, error)
+	GetFloor(ctx context.Context, id uuid.UUID) (*domain.Floor, error)
+	FindActiveFloor(ctx context.Context, dormitoryID uuid.UUID, number *int) (*domain.Floor, error)
+	CreateFloor(ctx context.Context, f *domain.Floor) error
+	UpdateFloor(ctx context.Context, f *domain.Floor) error
+	// RetireFloor: ErrNotEmpty while rooms are on it.
+	RetireFloor(ctx context.Context, id uuid.UUID) error
+
+	Registry(ctx context.Context, objectID, dormitoryID *uuid.UUID) ([]*domain.RegistryRow, error)
+}
 
 type UserRepository interface {
 	Create(ctx context.Context, u *domain.User) error
@@ -86,6 +124,10 @@ type RoomRepository interface {
 	UpdateRestrictions(ctx context.Context, id uuid.UUID, restrictions domain.RoomRestrictions) error
 	Delete(ctx context.Context, id uuid.UUID) error
 	ListActiveResidents(ctx context.Context, roomID uuid.UUID) ([]*domain.RoomResident, error)
+	// AddResident puts the stay on rr.BedID, or on the room's first free
+	// bed when rr.BedID is nil, and fills rr's bed fields. Errors:
+	// ErrNotFound (bed not in this room), ErrBedRetired, ErrBedOccupied,
+	// ErrNoFreeBed, ErrConflict (student already has an active stay).
 	AddResident(ctx context.Context, rr *domain.RoomResident) error
 	MoveOutResident(ctx context.Context, residentRowID uuid.UUID) error
 	GetActiveResidentByStudent(ctx context.Context, studentID uuid.UUID) (*domain.RoomResident, error)
@@ -105,6 +147,23 @@ type RoomRepository interface {
 	// ListAvailabilityByDormitory returns every room of a dormitory with its
 	// resident and hold counts, for the room-picker UI.
 	ListAvailabilityByDormitory(ctx context.Context, dormitoryID uuid.UUID) ([]*domain.RoomAvailability, error)
+
+	// Bed places. Create makes Capacity beds for a new room and Update
+	// adds/retires beds so the active count matches the new Capacity
+	// (ErrBedOccupied when too few beds are free to retire). AddBeds and
+	// RetireBed change one room's beds directly and keep rooms.capacity
+	// equal to the active bed count.
+	ListBeds(ctx context.Context, roomID uuid.UUID, includeRetired bool) ([]*domain.Bed, error)
+	GetBedByID(ctx context.Context, id uuid.UUID) (*domain.Bed, error)
+	AddBeds(ctx context.Context, roomID uuid.UUID, count int) ([]*domain.Bed, error)
+	// RetireBed returns ErrBedOccupied if a student is on it, ErrBedRetired
+	// if already retired, ErrLastBed if it is the room's only active bed.
+	RetireBed(ctx context.Context, bedID uuid.UUID) error
+	// RenameBed returns ErrConflict if another active bed of the room has
+	// that label, ErrBedRetired if the bed is retired.
+	RenameBed(ctx context.Context, bedID uuid.UUID, label string) error
+	// ListBedHistory returns every stay on the bed, newest first.
+	ListBedHistory(ctx context.Context, bedID uuid.UUID) ([]*domain.RoomResident, error)
 }
 
 type RequiredDocumentRepository interface {

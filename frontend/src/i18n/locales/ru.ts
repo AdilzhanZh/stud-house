@@ -247,6 +247,7 @@ export const ru: typeof kk = {
   dorm: {
     signInToApply: 'Войдите, чтобы подать заявку',
     rooms: {
+      openDetails: 'Подробнее о комнате {{room}}',
       floorTabs: 'Этажи',
       floorSummary: 'Комнат: {{rooms}} · свободно: {{free}}',
       title: 'Комнаты',

@@ -246,6 +246,7 @@ export const en: typeof kk = {
   dorm: {
     signInToApply: 'Sign in to apply',
     rooms: {
+      openDetails: 'Room {{room}} details',
       floorTabs: 'Floors',
       floorSummary: '{{rooms}} rooms · {{free}} free',
       title: 'Rooms',

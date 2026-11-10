@@ -244,6 +244,7 @@ export const kk = {
   dorm: {
     signInToApply: 'Өтініш беру үшін кіріңіз',
     rooms: {
+      openDetails: '{{room}} бөлме туралы толығырақ',
       floorTabs: 'Қабаттар',
       floorSummary: '{{rooms}} бөлме · {{free}} бос орын',
       title: 'Бөлмелер',

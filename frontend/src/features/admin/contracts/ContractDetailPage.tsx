@@ -21,6 +21,7 @@ import { adminPageHeading } from '../adminTable'
 import type { ContractFieldValues } from '../../../utils/contractPdf'
 import type { ContractLanguage } from '../../../api/contractTemplateApi'
 import type { Contract } from '../../../types/contracts'
+import { roomLabel } from '../../../utils/roomLocation'
 
 const LANGUAGES: ContractLanguage[] = ['kk', 'ru']
 
@@ -68,7 +69,7 @@ export function ContractDetailPage() {
           student_iin: student?.iin ?? '',
           student_phone: student?.phone ?? '',
           study_group: app.study_group,
-          room_number: room?.room_number ?? '',
+          room_number: room ? roomLabel(room) : '',
           dormitory_name: dormitory.name,
           dormitory_address: dormitory.address,
           monthly_payment_bachelor: formatTenge(dormitory.monthly_payment_bachelor),

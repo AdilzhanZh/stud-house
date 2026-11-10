@@ -118,7 +118,7 @@ func (s *ContractService) settleAgreedApplication(ctx context.Context, app *doma
 		return err
 	}
 	if app.AssignedRoomID != nil {
-		if _, err := s.rooms.AddResident(ctx, *app.AssignedRoomID, app.StudentID); err != nil {
+		if _, err := s.rooms.AddResident(ctx, *app.AssignedRoomID, app.StudentID, nil); err != nil {
 			return err
 		}
 	}
@@ -188,7 +188,7 @@ func (s *ContractService) Respond(ctx context.Context, actorStudentID, contractI
 		switch action {
 		case "accept":
 			if app.AssignedRoomID != nil {
-				if _, err := s.rooms.AddResident(ctx, *app.AssignedRoomID, actorStudentID); err != nil {
+				if _, err := s.rooms.AddResident(ctx, *app.AssignedRoomID, actorStudentID, nil); err != nil {
 					return err
 				}
 			}

@@ -26,8 +26,10 @@ func NewRoomHandler(rooms *service.RoomService) *RoomHandler {
 type roomRequest struct {
 	RoomNumber string `json:"room_number" binding:"required"`
 	Capacity   int    `json:"capacity" binding:"required"`
-	Floor      *int   `json:"floor"`
-	Category   string `json:"category"`
+	// FloorID places the room; Floor (a number) still works too.
+	FloorID  *uuid.UUID `json:"floor_id"`
+	Floor    *int       `json:"floor"`
+	Category string     `json:"category"`
 
 	AreaSqM            *float64 `json:"area_sq_m"`
 	Equipment          *string  `json:"equipment"`
@@ -41,6 +43,7 @@ func (req roomRequest) toInput() service.RoomInput {
 	return service.RoomInput{
 		RoomNumber: req.RoomNumber,
 		Capacity:   req.Capacity,
+		FloorID:    req.FloorID,
 		Floor:      req.Floor,
 		Category:   req.Category,
 
@@ -187,6 +190,8 @@ func (h *RoomHandler) UpdateRestrictions(c *gin.Context) {
 
 type addResidentRequest struct {
 	StudentID uuid.UUID `json:"student_id" binding:"required"`
+	// BedID picks the bed place; omitted = the room's first free bed.
+	BedID *uuid.UUID `json:"bed_id"`
 }
 
 func (h *RoomHandler) AddResident(c *gin.Context) {
@@ -200,7 +205,7 @@ func (h *RoomHandler) AddResident(c *gin.Context) {
 		response.Error(c, apperror.BadRequest(err.Error()))
 		return
 	}
-	resident, err := h.rooms.AddResident(c.Request.Context(), roomID, req.StudentID)
+	resident, err := h.rooms.AddResident(c.Request.Context(), roomID, req.StudentID, req.BedID)
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -233,11 +238,16 @@ func (h *RoomHandler) ListActiveResidents(c *gin.Context) {
 }
 
 type residenceResponse struct {
-	RoomID      uuid.UUID `json:"room_id"`
-	DormitoryID uuid.UUID `json:"dormitory_id"`
-	RoomNumber  string    `json:"room_number"`
-	Capacity    int       `json:"capacity"`
-	MovedInAt   time.Time `json:"moved_in_at"`
+	RoomID      uuid.UUID  `json:"room_id"`
+	DormitoryID uuid.UUID  `json:"dormitory_id"`
+	RoomNumber  string     `json:"room_number"`
+	Floor       *int       `json:"floor"`
+	FloorName   *string    `json:"floor_name"`
+	Capacity    int        `json:"capacity"`
+	BedID       *uuid.UUID `json:"bed_id"`
+	BedLabel    *string    `json:"bed_label"`
+	BedCode     *string    `json:"bed_code"`
+	MovedInAt   time.Time  `json:"moved_in_at"`
 }
 
 // GetMyResidence is available to the owning student or staff
@@ -262,7 +272,12 @@ func (h *RoomHandler) GetMyResidence(c *gin.Context) {
 		RoomID:      room.ID,
 		DormitoryID: room.DormitoryID,
 		RoomNumber:  room.RoomNumber,
+		Floor:       room.Floor,
+		FloorName:   room.FloorName,
 		Capacity:    room.Capacity,
+		BedID:       resident.BedID,
+		BedLabel:    resident.BedLabel,
+		BedCode:     bedCodePtr(resident.BedInventoryNo),
 		MovedInAt:   resident.MovedInAt,
 	})
 }
@@ -282,6 +297,9 @@ func (h *RoomHandler) MoveOutResident(c *gin.Context) {
 
 type transferResidentRequest struct {
 	RoomID uuid.UUID `json:"room_id" binding:"required"`
+	// BedID picks the bed place in RoomID; omitted = its first free bed.
+	// Required to move a student to another bed of the same room.
+	BedID *uuid.UUID `json:"bed_id"`
 }
 
 func (h *RoomHandler) TransferResident(c *gin.Context) {
@@ -295,10 +313,106 @@ func (h *RoomHandler) TransferResident(c *gin.Context) {
 		response.Error(c, apperror.BadRequest(err.Error()))
 		return
 	}
-	resident, err := h.rooms.TransferResident(c.Request.Context(), residentRowID, req.RoomID)
+	resident, err := h.rooms.TransferResident(c.Request.Context(), residentRowID, req.RoomID, req.BedID)
 	if err != nil {
 		response.Error(c, err)
 		return
 	}
 	response.OK(c, roomResidentDTO(resident))
+}
+
+func parseBedID(c *gin.Context) (uuid.UUID, bool) {
+	id, err := uuid.Parse(c.Param("bedId"))
+	if err != nil {
+		response.Error(c, apperror.BadRequest("төсек-орын идентификаторы дұрыс емес"))
+		return uuid.Nil, false
+	}
+	return id, true
+}
+
+// ListBeds is staff-only: GET /rooms/:roomId/beds?include_retired=true.
+func (h *RoomHandler) ListBeds(c *gin.Context) {
+	roomID, err := uuid.Parse(c.Param("roomId"))
+	if err != nil {
+		response.Error(c, apperror.BadRequest("бөлме идентификаторы дұрыс емес"))
+		return
+	}
+	beds, err := h.rooms.ListBeds(c.Request.Context(), roomID, c.Query("include_retired") == "true")
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, bedsDTO(beds))
+}
+
+type addBedsRequest struct {
+	Count int `json:"count" binding:"required"`
+}
+
+func (h *RoomHandler) AddBeds(c *gin.Context) {
+	roomID, err := uuid.Parse(c.Param("roomId"))
+	if err != nil {
+		response.Error(c, apperror.BadRequest("бөлме идентификаторы дұрыс емес"))
+		return
+	}
+	var req addBedsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.BadRequest(err.Error()))
+		return
+	}
+	beds, err := h.rooms.AddBeds(c.Request.Context(), roomID, req.Count)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.Created(c, bedsDTO(beds))
+}
+
+type renameBedRequest struct {
+	Label string `json:"label" binding:"required"`
+}
+
+func (h *RoomHandler) RenameBed(c *gin.Context) {
+	bedID, ok := parseBedID(c)
+	if !ok {
+		return
+	}
+	var req renameBedRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.BadRequest(err.Error()))
+		return
+	}
+	bed, err := h.rooms.RenameBed(c.Request.Context(), bedID, req.Label)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, bedDTO(bed))
+}
+
+// RetireBed (DELETE /beds/:bedId) never deletes the record: the bed place
+// is marked retired and keeps its id and history.
+func (h *RoomHandler) RetireBed(c *gin.Context) {
+	bedID, ok := parseBedID(c)
+	if !ok {
+		return
+	}
+	if err := h.rooms.RetireBed(c.Request.Context(), bedID); err != nil {
+		response.Error(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *RoomHandler) BedHistory(c *gin.Context) {
+	bedID, ok := parseBedID(c)
+	if !ok {
+		return
+	}
+	bed, stays, err := h.rooms.BedHistory(c.Request.Context(), bedID)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, bedHistoryResponse{Bed: bedDTO(bed), Stays: roomResidentsDTO(stays)})
 }

@@ -21,14 +21,22 @@ func NewRoomRepo(db *pgxpool.Pool) *RoomRepo {
 	return &RoomRepo{db: db}
 }
 
-const roomColumns = `id, dormitory_id, room_number, capacity, floor, category, restrictions,
+// roomColumns must be selected FROM rooms without an alias (the floor name
+// is correlated on rooms.floor_id).
+const roomColumns = `id, dormitory_id, floor_id,
+	(SELECT name FROM floors WHERE floors.id = rooms.floor_id),
+	room_number, capacity, floor, category, restrictions,
 	area_sq_m::float8, equipment, sanitary_conditions, is_accessible, accessibility_notes, photo_urls,
 	created_at, updated_at`
+
+// roomOrder lists rooms floor by floor.
+const roomOrder = `floor NULLS LAST, room_number`
 
 func scanRoom(row pgx.Row) (*domain.Room, error) {
 	room := &domain.Room{}
 	err := row.Scan(
-		&room.ID, &room.DormitoryID, &room.RoomNumber, &room.Capacity, &room.Floor,
+		&room.ID, &room.DormitoryID, &room.FloorID, &room.FloorName,
+		&room.RoomNumber, &room.Capacity, &room.Floor,
 		&room.Category, &room.Restrictions,
 		&room.AreaSqM, &room.Equipment, &room.SanitaryConditions, &room.IsAccessible,
 		&room.AccessibilityNotes, &room.PhotoURLs,
@@ -48,18 +56,26 @@ func photoURLsOrEmpty(urls []string) []string {
 	return urls
 }
 
+// Create inserts the room and its Capacity bed places (labels 1..N) in one
+// transaction.
 func (r *RoomRepo) Create(ctx context.Context, room *domain.Room) error {
 	const q = `
-		INSERT INTO rooms (dormitory_id, room_number, capacity, floor, category, restrictions,
+		INSERT INTO rooms (dormitory_id, floor_id, room_number, capacity, category, restrictions,
 			area_sq_m, equipment, sanitary_conditions, is_accessible, accessibility_notes, photo_urls)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-		RETURNING id, created_at, updated_at`
-	err := r.db.QueryRow(ctx, q,
-		room.DormitoryID, room.RoomNumber, room.Capacity, room.Floor,
+		RETURNING id, floor, created_at, updated_at`
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	err = tx.QueryRow(ctx, q,
+		room.DormitoryID, room.FloorID, room.RoomNumber, room.Capacity,
 		room.Category, room.Restrictions,
 		room.AreaSqM, room.Equipment, room.SanitaryConditions, room.IsAccessible,
 		room.AccessibilityNotes, photoURLsOrEmpty(room.PhotoURLs),
-	).Scan(&room.ID, &room.CreatedAt, &room.UpdatedAt)
+	).Scan(&room.ID, &room.Floor, &room.CreatedAt, &room.UpdatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -67,7 +83,10 @@ func (r *RoomRepo) Create(ctx context.Context, room *domain.Room) error {
 		}
 		return err
 	}
-	return nil
+	if _, err := addBedsTx(ctx, tx, room.ID, room.Capacity); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (r *RoomRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Room, error) {
@@ -83,7 +102,7 @@ func (r *RoomRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Room, err
 }
 
 func (r *RoomRepo) ListByDormitory(ctx context.Context, dormitoryID uuid.UUID) ([]*domain.Room, error) {
-	q := `SELECT ` + roomColumns + ` FROM rooms WHERE dormitory_id = $1 ORDER BY room_number`
+	q := `SELECT ` + roomColumns + ` FROM rooms WHERE dormitory_id = $1 ORDER BY ` + roomOrder
 	rows, err := r.db.Query(ctx, q, dormitoryID)
 	if err != nil {
 		return nil, err
@@ -101,16 +120,31 @@ func (r *RoomRepo) ListByDormitory(ctx context.Context, dormitoryID uuid.UUID) (
 	return out, rows.Err()
 }
 
+// Update saves the room's fields and, in the same transaction, adds or
+// retires bed places so the room's active bed count equals room.Capacity.
+// Lowering the capacity retires free beds from the end of the room's bed
+// order (highest label first); if too few beds are free it returns
+// ErrBedOccupied and nothing is saved. Existing beds are never recreated,
+// so their ids survive any capacity change.
 func (r *RoomRepo) Update(ctx context.Context, room *domain.Room) error {
 	const q = `
 		UPDATE rooms
-		SET room_number = $2, capacity = $3, floor = $4, category = $5,
-			area_sq_m = $6, equipment = $7, sanitary_conditions = $8, is_accessible = $9,
-			accessibility_notes = $10, photo_urls = $11, updated_at = now()
+		SET room_number = $2, floor_id = $3, category = $4,
+			area_sq_m = $5, equipment = $6, sanitary_conditions = $7, is_accessible = $8,
+			accessibility_notes = $9, photo_urls = $10, updated_at = now()
 		WHERE id = $1
 		RETURNING updated_at`
-	err := r.db.QueryRow(ctx, q,
-		room.ID, room.RoomNumber, room.Capacity, room.Floor, room.Category,
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	if err := lockRoomTx(ctx, tx, room.ID); err != nil {
+		return err
+	}
+	err = tx.QueryRow(ctx, q,
+		room.ID, room.RoomNumber, room.FloorID, room.Category,
 		room.AreaSqM, room.Equipment, room.SanitaryConditions, room.IsAccessible,
 		room.AccessibilityNotes, photoURLsOrEmpty(room.PhotoURLs),
 	).Scan(&room.UpdatedAt)
@@ -118,9 +152,54 @@ func (r *RoomRepo) Update(ctx context.Context, room *domain.Room) error {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return repository.ErrNotFound
 		}
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return repository.ErrConflict
+		}
 		return err
 	}
-	return nil
+
+	var active int
+	if err := tx.QueryRow(ctx,
+		`SELECT count(*) FROM beds WHERE room_id = $1 AND retired_at IS NULL`, room.ID,
+	).Scan(&active); err != nil {
+		return err
+	}
+	switch {
+	case room.Capacity > active:
+		if _, err := addBedsTx(ctx, tx, room.ID, room.Capacity-active); err != nil {
+			return err
+		}
+	case room.Capacity < active:
+		toRetire := active - room.Capacity
+		q := `
+			SELECT b.id FROM beds b
+			WHERE b.room_id = $1 AND b.retired_at IS NULL
+			  AND NOT EXISTS (SELECT 1 FROM room_residents rr
+			                  WHERE rr.bed_id = b.id AND rr.moved_out_at IS NULL)
+			ORDER BY ` + bedOrderDesc + `
+			LIMIT $2`
+		rows, err := tx.Query(ctx, q, room.ID, toRetire)
+		if err != nil {
+			return err
+		}
+		ids, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+		if err != nil {
+			return err
+		}
+		if len(ids) < toRetire {
+			return repository.ErrBedOccupied
+		}
+		if _, err := tx.Exec(ctx,
+			`UPDATE beds SET retired_at = now() WHERE id = ANY($1)`, ids,
+		); err != nil {
+			return err
+		}
+		if err := syncCapacityTx(ctx, tx, room.ID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
 }
 
 func (r *RoomRepo) UpdateRestrictions(ctx context.Context, id uuid.UUID, restrictions domain.RoomRestrictions) error {
@@ -155,20 +234,30 @@ func (r *RoomRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-func (r *RoomRepo) ListActiveResidents(ctx context.Context, roomID uuid.UUID) ([]*domain.RoomResident, error) {
-	const q = `
-		SELECT id, room_id, student_id, moved_in_at, moved_out_at
-		FROM room_residents WHERE room_id = $1 AND moved_out_at IS NULL`
-	rows, err := r.db.Query(ctx, q, roomID)
+// residentSelect reads room_residents rows together with their bed's
+// label and inventory number; scan with scanResident.
+const residentSelect = `
+	SELECT rr.id, rr.room_id, rr.student_id, rr.bed_id, b.label, b.inventory_no,
+		rr.moved_in_at, rr.moved_out_at
+	FROM room_residents rr
+	LEFT JOIN beds b ON b.id = rr.bed_id`
+
+func scanResident(row pgx.Row) (*domain.RoomResident, error) {
+	rr := &domain.RoomResident{}
+	err := row.Scan(&rr.ID, &rr.RoomID, &rr.StudentID, &rr.BedID, &rr.BedLabel, &rr.BedInventoryNo,
+		&rr.MovedInAt, &rr.MovedOutAt)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	return rr, nil
+}
 
+func collectResidents(rows pgx.Rows) ([]*domain.RoomResident, error) {
+	defer rows.Close()
 	var out []*domain.RoomResident
 	for rows.Next() {
-		rr := &domain.RoomResident{}
-		if err := rows.Scan(&rr.ID, &rr.RoomID, &rr.StudentID, &rr.MovedInAt, &rr.MovedOutAt); err != nil {
+		rr, err := scanResident(rows)
+		if err != nil {
 			return nil, err
 		}
 		out = append(out, rr)
@@ -176,12 +265,69 @@ func (r *RoomRepo) ListActiveResidents(ctx context.Context, roomID uuid.UUID) ([
 	return out, rows.Err()
 }
 
+func (r *RoomRepo) ListActiveResidents(ctx context.Context, roomID uuid.UUID) ([]*domain.RoomResident, error) {
+	q := residentSelect + `
+		WHERE rr.room_id = $1 AND rr.moved_out_at IS NULL
+		ORDER BY ` + bedOrderAsc
+	rows, err := r.db.Query(ctx, q, roomID)
+	if err != nil {
+		return nil, err
+	}
+	return collectResidents(rows)
+}
+
 func (r *RoomRepo) AddResident(ctx context.Context, rr *domain.RoomResident) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	if err := lockRoomTx(ctx, tx, rr.RoomID); err != nil {
+		return err
+	}
+
+	var bed *domain.Bed
+	if rr.BedID == nil {
+		q := bedSelect + `
+			WHERE b.room_id = $1 AND b.retired_at IS NULL AND rr.id IS NULL
+			ORDER BY ` + bedOrderAsc + `
+			LIMIT 1`
+		bed, err = scanBed(tx.QueryRow(ctx, q, rr.RoomID))
+		if errors.Is(err, pgx.ErrNoRows) {
+			return repository.ErrNoFreeBed
+		}
+	} else {
+		bed, err = scanBed(tx.QueryRow(ctx, bedSelect+` WHERE b.id = $1 AND b.room_id = $2`, *rr.BedID, rr.RoomID))
+		if errors.Is(err, pgx.ErrNoRows) {
+			return repository.ErrNotFound
+		}
+	}
+	if err != nil {
+		return err
+	}
+	if bed.RetiredAt != nil {
+		return repository.ErrBedRetired
+	}
+	if bed.ResidentID != nil {
+		return repository.ErrBedOccupied
+	}
+
 	const q = `
-		INSERT INTO room_residents (room_id, student_id)
-		VALUES ($1, $2)
+		INSERT INTO room_residents (room_id, student_id, bed_id)
+		VALUES ($1, $2, $3)
 		RETURNING id, moved_in_at`
-	return r.db.QueryRow(ctx, q, rr.RoomID, rr.StudentID).Scan(&rr.ID, &rr.MovedInAt)
+	if err := tx.QueryRow(ctx, q, rr.RoomID, rr.StudentID, bed.ID).Scan(&rr.ID, &rr.MovedInAt); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return repository.ErrConflict
+		}
+		return err
+	}
+	rr.BedID = &bed.ID
+	rr.BedLabel = &bed.Label
+	rr.BedInventoryNo = &bed.InventoryNo
+	return tx.Commit(ctx)
 }
 
 func (r *RoomRepo) MoveOutResident(ctx context.Context, residentRowID uuid.UUID) error {
@@ -197,9 +343,7 @@ func (r *RoomRepo) MoveOutResident(ctx context.Context, residentRowID uuid.UUID)
 }
 
 func (r *RoomRepo) GetResidentByID(ctx context.Context, id uuid.UUID) (*domain.RoomResident, error) {
-	const q = `SELECT id, room_id, student_id, moved_in_at, moved_out_at FROM room_residents WHERE id = $1`
-	rr := &domain.RoomResident{}
-	err := r.db.QueryRow(ctx, q, id).Scan(&rr.ID, &rr.RoomID, &rr.StudentID, &rr.MovedInAt, &rr.MovedOutAt)
+	rr, err := scanResident(r.db.QueryRow(ctx, residentSelect+` WHERE rr.id = $1`, id))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, repository.ErrNotFound
@@ -233,11 +377,8 @@ func (r *RoomRepo) ListResidentStudentIDsByDormitory(ctx context.Context, dormit
 }
 
 func (r *RoomRepo) GetActiveResidentByStudent(ctx context.Context, studentID uuid.UUID) (*domain.RoomResident, error) {
-	const q = `
-		SELECT id, room_id, student_id, moved_in_at, moved_out_at
-		FROM room_residents WHERE student_id = $1 AND moved_out_at IS NULL`
-	rr := &domain.RoomResident{}
-	err := r.db.QueryRow(ctx, q, studentID).Scan(&rr.ID, &rr.RoomID, &rr.StudentID, &rr.MovedInAt, &rr.MovedOutAt)
+	q := residentSelect + ` WHERE rr.student_id = $1 AND rr.moved_out_at IS NULL`
+	rr, err := scanResident(r.db.QueryRow(ctx, q, studentID))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, repository.ErrNotFound
@@ -277,7 +418,7 @@ func (r *RoomRepo) ListAvailabilityByDormitory(ctx context.Context, dormitoryID 
 			(SELECT count(*) FROM applications a
 				WHERE COALESCE(a.assigned_room_id, a.preferred_room_id) = rooms.id
 				  AND a.status IN ('pending', 'manager_review', 'approved')) AS held_count
-		FROM rooms WHERE dormitory_id = $1 ORDER BY room_number`
+		FROM rooms WHERE dormitory_id = $1 ORDER BY ` + roomOrder
 	rows, err := r.db.Query(ctx, q, dormitoryID)
 	if err != nil {
 		return nil, err
@@ -289,7 +430,8 @@ func (r *RoomRepo) ListAvailabilityByDormitory(ctx context.Context, dormitoryID 
 		room := &domain.Room{}
 		avail := &domain.RoomAvailability{Room: room}
 		err := rows.Scan(
-			&room.ID, &room.DormitoryID, &room.RoomNumber, &room.Capacity, &room.Floor,
+			&room.ID, &room.DormitoryID, &room.FloorID, &room.FloorName,
+			&room.RoomNumber, &room.Capacity, &room.Floor,
 			&room.Category, &room.Restrictions,
 			&room.AreaSqM, &room.Equipment, &room.SanitaryConditions, &room.IsAccessible,
 			&room.AccessibilityNotes, &room.PhotoURLs,

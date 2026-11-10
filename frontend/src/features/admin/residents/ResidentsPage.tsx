@@ -12,6 +12,7 @@ import { getStudentProfile } from '../../../api/profileApi'
 import { formatDate } from '../../../utils/dateFormat'
 import { matchesPersonSearch } from '../../../utils/personSearch'
 import { adminCellClass, adminPageHeading, adminRowClass, adminTableWrapClass, adminTheadClass } from '../adminTable'
+import { roomLabel } from '../../../utils/roomLocation'
 
 interface ResidentRow {
   id: string
@@ -56,7 +57,7 @@ export function ResidentsPage() {
                   id: res.id,
                   studentId: res.student_id,
                   dormitoryName: d.name,
-                  roomNumber: r.room_number,
+                  roomNumber: roomLabel(r),
                   movedInAt: res.moved_in_at,
                 }))
               }),

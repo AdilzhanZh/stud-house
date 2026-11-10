@@ -17,6 +17,10 @@ export interface Dormitory {
   yearly_payment_doctorate: number | null
   built_year: string | null
   commissioned_year: string | null
+  // The object (the dormitory as an organisation) this building belongs
+  // to; ownership_form is the object's.
+  object_id: string
+  object_name: string
   ownership_form: string | null
   closed_for_applications: boolean
   latitude: number | null

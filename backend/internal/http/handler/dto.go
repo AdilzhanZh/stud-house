@@ -98,6 +98,8 @@ type dormitoryResponse struct {
 	YearlyPaymentDoctorate  *float64              `json:"yearly_payment_doctorate"`
 	BuiltYear               *time.Time            `json:"built_year"`
 	CommissionedYear        *time.Time            `json:"commissioned_year"`
+	ObjectID                uuid.UUID             `json:"object_id"`
+	ObjectName              string                `json:"object_name"`
 	OwnershipForm           *string               `json:"ownership_form"`
 	ClosedForApplications   bool                  `json:"closed_for_applications"`
 	Latitude                *float64              `json:"latitude"`
@@ -125,6 +127,8 @@ func dormitoryDTO(d *domain.Dormitory) dormitoryResponse {
 		YearlyPaymentDoctorate:  d.YearlyPaymentDoctorate,
 		BuiltYear:               d.BuiltYear,
 		CommissionedYear:        d.CommissionedYear,
+		ObjectID:                d.ObjectID,
+		ObjectName:              d.ObjectName,
 		OwnershipForm:           d.OwnershipForm,
 		ClosedForApplications:   d.ClosedForApplications,
 		Latitude:                d.Latitude,
@@ -226,6 +230,8 @@ func requiredDocumentsDTO(list []*domain.RequiredDocument) []requiredDocumentRes
 type roomResponse struct {
 	ID           uuid.UUID               `json:"id"`
 	DormitoryID  uuid.UUID               `json:"dormitory_id"`
+	FloorID      uuid.UUID               `json:"floor_id"`
+	FloorName    *string                 `json:"floor_name"`
 	RoomNumber   string                  `json:"room_number"`
 	Capacity     int                     `json:"capacity"`
 	Floor        *int                    `json:"floor"`
@@ -251,6 +257,8 @@ func roomDTO(r *domain.Room) roomResponse {
 	return roomResponse{
 		ID:           r.ID,
 		DormitoryID:  r.DormitoryID,
+		FloorID:      r.FloorID,
+		FloorName:    r.FloorName,
 		RoomNumber:   r.RoomNumber,
 		Capacity:     r.Capacity,
 		Floor:        r.Floor,
@@ -303,12 +311,61 @@ type roomResidentResponse struct {
 	ID         uuid.UUID  `json:"id"`
 	RoomID     uuid.UUID  `json:"room_id"`
 	StudentID  uuid.UUID  `json:"student_id"`
+	BedID      *uuid.UUID `json:"bed_id"`
+	BedLabel   *string    `json:"bed_label"`
+	BedCode    *string    `json:"bed_code"`
 	MovedInAt  time.Time  `json:"moved_in_at"`
 	MovedOutAt *time.Time `json:"moved_out_at"`
 }
 
 func roomResidentDTO(rr *domain.RoomResident) roomResidentResponse {
-	return roomResidentResponse{ID: rr.ID, RoomID: rr.RoomID, StudentID: rr.StudentID, MovedInAt: rr.MovedInAt, MovedOutAt: rr.MovedOutAt}
+	return roomResidentResponse{
+		ID: rr.ID, RoomID: rr.RoomID, StudentID: rr.StudentID,
+		BedID: rr.BedID, BedLabel: rr.BedLabel, BedCode: bedCodePtr(rr.BedInventoryNo),
+		MovedInAt: rr.MovedInAt, MovedOutAt: rr.MovedOutAt,
+	}
+}
+
+func bedCodePtr(inventoryNo *int64) *string {
+	if inventoryNo == nil {
+		return nil
+	}
+	code := domain.BedCode(*inventoryNo)
+	return &code
+}
+
+type bedResponse struct {
+	ID          uuid.UUID  `json:"id"`
+	InventoryNo int64      `json:"inventory_no"`
+	Code        string     `json:"code"`
+	RoomID      uuid.UUID  `json:"room_id"`
+	Label       string     `json:"label"`
+	CreatedAt   time.Time  `json:"created_at"`
+	RetiredAt   *time.Time `json:"retired_at"`
+	// The current stay on this bed; both nil when the bed is free.
+	ResidentID *uuid.UUID `json:"resident_id"`
+	StudentID  *uuid.UUID `json:"student_id"`
+}
+
+func bedDTO(b *domain.Bed) bedResponse {
+	return bedResponse{
+		ID: b.ID, InventoryNo: b.InventoryNo, Code: domain.BedCode(b.InventoryNo),
+		RoomID: b.RoomID, Label: b.Label, CreatedAt: b.CreatedAt, RetiredAt: b.RetiredAt,
+		ResidentID: b.ResidentID, StudentID: b.StudentID,
+	}
+}
+
+func bedsDTO(list []*domain.Bed) []bedResponse {
+	out := make([]bedResponse, 0, len(list))
+	for _, b := range list {
+		out = append(out, bedDTO(b))
+	}
+	return out
+}
+
+type bedHistoryResponse struct {
+	Bed   bedResponse            `json:"bed"`
+	Stays []roomResidentResponse `json:"stays"`
 }
 
 func roomResidentsDTO(list []*domain.RoomResident) []roomResidentResponse {

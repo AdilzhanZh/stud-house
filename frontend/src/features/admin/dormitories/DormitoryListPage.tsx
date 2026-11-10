@@ -99,7 +99,8 @@ export function DormitoryListPage() {
                 placeholder={t('admin.dormitories.photoPlaceholder')}
                 className="aspect-[16/10] rounded-2xl"
               />
-              <div className="mt-3 flex items-center gap-2">
+              <p className="mt-3 truncate text-xs font-semibold text-turquoise-400">{d.object_name}</p>
+              <div className="flex items-center gap-2">
                 <p className="text-base font-bold text-sand-100">{d.name}</p>
                 {d.closed_for_applications && (
                   <span className="inline-flex shrink-0 items-center rounded-full bg-clay-500/10 px-2 py-0.5 text-xs font-semibold text-clay-400">

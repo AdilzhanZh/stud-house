@@ -47,7 +47,8 @@ export interface DormitoryPayload {
   yearly_payment_doctorate: number | null
   built_year: string | null
   commissioned_year: string | null
-  ownership_form: string | null
+  // Empty on create: a new object named after the building is made.
+  object_id: string | null
   closed_for_applications: boolean
   latitude: number | null
   longitude: number | null

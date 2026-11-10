@@ -20,6 +20,8 @@ import { MyResidencePage } from './features/residence/MyResidencePage'
 import { DormitoryListPage } from './features/admin/dormitories/DormitoryListPage'
 import { DormitoryFormPage } from './features/admin/dormitories/DormitoryFormPage'
 import { DormitoryDetailPage } from './features/admin/dormitories/DormitoryDetailPage'
+import { RegistryPage } from './features/admin/registry/RegistryPage'
+import { ObjectsPage } from './features/admin/objects/ObjectsPage'
 import { RoomFormPage } from './features/admin/rooms/RoomFormPage'
 import { RoomResidentsView } from './features/admin/rooms/RoomResidentsView'
 import { DocumentListPage } from './features/admin/documents/DocumentListPage'
@@ -110,6 +112,8 @@ function App() {
           <Route path="/admin/dashboard" element={<DashboardPage />} />
           <Route path="/admin/dormitories" element={<DormitoryListPage />} />
           <Route path="/admin/dormitories/:id" element={<DormitoryDetailPage />} />
+          <Route path="/admin/registry" element={<RegistryPage />} />
+          <Route path="/admin/objects" element={<ObjectsPage />} />
           <Route path="/admin/rooms/:roomId/residents" element={<RoomResidentsView />} />
           <Route path="/admin/profile" element={<StaffProfilePage />} />
           <Route path="/admin/profile/edit" element={<EditProfilePage />} />

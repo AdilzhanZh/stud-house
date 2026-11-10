@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Maximize2 } from 'lucide-react'
 import { Card } from '../../../components/Card'
@@ -9,6 +9,8 @@ import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
 import { ImageLightbox } from '../../../components/ImageLightbox'
 import { extractErrorMessage } from '../../../api/client'
+import { listObjects } from '../../../api/hierarchyApi'
+import type { DormObject } from '../../../types/hierarchy'
 import {
   addDormitoryImage,
   addDormitoryRequiredDocument,
@@ -49,7 +51,10 @@ export function DormitoryFormPage() {
   const [yearlyPaymentDoctorate, setYearlyPaymentDoctorate] = useState('')
   const [builtYear, setBuiltYear] = useState('')
   const [commissionedYear, setCommissionedYear] = useState('')
-  const [ownershipForm, setOwnershipForm] = useState('')
+  // '' on create = a new object named after this building.
+  const [searchParams] = useSearchParams()
+  const [objectId, setObjectId] = useState(searchParams.get('object') ?? '')
+  const [objects, setObjects] = useState<DormObject[]>([])
   const [closedForApplications, setClosedForApplications] = useState(false)
   const [location, setLocation] = useState<LatLng | null>(null)
 
@@ -78,6 +83,7 @@ export function DormitoryFormPage() {
 
   useEffect(() => {
     listRequiredDocuments().then(setCatalog).catch(() => {})
+    listObjects().then(setObjects).catch(() => {})
     if (!id) return
     getDormitory(id)
       .then((d) => {
@@ -96,7 +102,7 @@ export function DormitoryFormPage() {
         setYearlyPaymentDoctorate(d.yearly_payment_doctorate != null ? String(d.yearly_payment_doctorate) : '')
         setBuiltYear(d.built_year?.slice(0, 10) ?? '')
         setCommissionedYear(d.commissioned_year?.slice(0, 10) ?? '')
-        setOwnershipForm(d.ownership_form ?? '')
+        setObjectId(d.object_id)
         setClosedForApplications(d.closed_for_applications)
         setLocation(dormitoryPosition(d))
       })
@@ -125,7 +131,7 @@ export function DormitoryFormPage() {
       yearly_payment_doctorate: yearlyPaymentDoctorate ? Number(yearlyPaymentDoctorate) : null,
       built_year: builtYear || null,
       commissioned_year: commissionedYear || null,
-      ownership_form: ownershipForm.trim() || null,
+      object_id: objectId || null,
       closed_for_applications: closedForApplications,
       latitude: location?.lat ?? null,
       longitude: location?.lng ?? null,
@@ -321,12 +327,21 @@ export function DormitoryFormPage() {
             />
           </div>
 
-          <Input
-            label={t('admin.dormitories.ownershipForm')}
-            value={ownershipForm}
-            onChange={(e) => setOwnershipForm(e.target.value)}
-            placeholder={t('admin.dormitories.ownershipFormPlaceholder')}
-          />
+          <div className="flex flex-col gap-1">
+            <Select
+              label={t('admin.objects.objectLabel')}
+              value={objectId}
+              onChange={(e) => setObjectId(e.target.value)}
+            >
+              {!isEdit && <option value="">{t('admin.objects.newObjectOption')}</option>}
+              {objects.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </Select>
+            <span className="text-xs text-sand-300">{t('admin.objects.objectFieldHint')}</span>
+          </div>
 
           <label className="flex cursor-pointer items-start gap-2.5 text-sm text-sand-100">
             <input

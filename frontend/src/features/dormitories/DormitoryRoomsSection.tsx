@@ -5,6 +5,7 @@ import { Card } from '../../components/Card'
 import { ImageLightbox } from '../../components/ImageLightbox'
 import { listRoomAvailability } from '../../api/roomApi'
 import type { RoomAvailability } from '../../types/rooms'
+import { groupRoomsByFloor, roomLabel } from '../../utils/roomLocation'
 
 // Public list of a dormitory's rooms with their (optional) details. It only
 // ever shows seat counts — never who lives in a room.
@@ -19,20 +20,14 @@ export function DormitoryRoomsSection({ dormitoryId }: { dormitoryId: string }) 
       .catch(() => setFailed(true))
   }, [dormitoryId])
 
-  const byFloor = useMemo(() => {
-    const groups = new Map<number | null, RoomAvailability[]>()
-    for (const room of rooms ?? []) {
-      const list = groups.get(room.floor) ?? []
-      list.push(room)
-      groups.set(room.floor, list)
-    }
-    return [...groups.entries()].sort(([a], [b]) => (a ?? Infinity) - (b ?? Infinity))
-  }, [rooms])
+  // Floor tabs in the server's order (building by building, floor by
+  // floor); with several buildings each tab is one building's floor.
+  const byFloor = useMemo(() => groupRoomsByFloor(rooms ?? [], t), [rooms, t])
 
-  // Which floor's rooms are shown; defaults to the lowest floor, and falls
+  // Which floor's rooms are shown; defaults to the first floor, and falls
   // back to it if the chosen floor disappears after a reload.
-  const [selectedFloor, setSelectedFloor] = useState<number | null | undefined>(undefined)
-  const activeGroup = byFloor.find(([floor]) => floor === selectedFloor) ?? byFloor[0]
+  const [selectedFloor, setSelectedFloor] = useState<string | undefined>(undefined)
+  const activeGroup = byFloor.find((g) => g.key === selectedFloor) ?? byFloor[0]
 
   if (failed) return null
 
@@ -44,12 +39,12 @@ export function DormitoryRoomsSection({ dormitoryId }: { dormitoryId: string }) 
 
       {byFloor.length > 0 && (
         <div role="tablist" aria-label={t('dorm.rooms.floorTabs')} className="-mx-1 mb-4 flex gap-2 overflow-x-auto px-1 pb-1">
-          {byFloor.map(([floor, list]) => {
-            const active = activeGroup?.[0] === floor
+          {byFloor.map(({ key: floor, label, rooms: list }) => {
+            const active = activeGroup?.key === floor
             const free = list.reduce((sum, r) => sum + Math.max(0, r.capacity - r.resident_count - r.held_count), 0)
             return (
               <button
-                key={floor ?? 'none'}
+                key={floor}
                 type="button"
                 role="tab"
                 aria-selected={active}
@@ -61,7 +56,7 @@ export function DormitoryRoomsSection({ dormitoryId }: { dormitoryId: string }) 
                 }`}
               >
                 <span className="text-sm font-semibold whitespace-nowrap">
-                  {floor != null ? t('wizard.floorLabel', { floor }) : t('wizard.floorNotSpecified')}
+                  {label}
                 </span>
                 <span className={`text-[11px] whitespace-nowrap ${active ? 'text-turquoise-400/80' : 'text-sand-300'}`}>
                   {t('dorm.rooms.floorSummary', { rooms: list.length, free })}
@@ -74,7 +69,7 @@ export function DormitoryRoomsSection({ dormitoryId }: { dormitoryId: string }) 
 
       {activeGroup && (
         <div role="tabpanel" className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          {activeGroup[1].map((room) => (
+          {activeGroup.rooms.map((room) => (
             <RoomCard key={room.id} room={room} />
           ))}
         </div>
@@ -132,7 +127,7 @@ function RoomCard({ room }: { room: RoomAvailability }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
           <p className="truncate text-base font-bold text-sand-100">
-            {t('dorm.rooms.roomNumber', { room: room.room_number })}
+            {t('dorm.rooms.roomNumber', { room: roomLabel(room) })}
           </p>
           <FreeChip free={freeSeats(room)} />
         </div>
@@ -171,7 +166,7 @@ function RoomCard({ room }: { room: RoomAvailability }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label={t('dorm.rooms.openDetails', { room: room.room_number })}
+        aria-label={t('dorm.rooms.openDetails', { room: roomLabel(room) })}
         className={`group ${base} transition-colors hover:border-turquoise-400/50 focus-visible:border-turquoise-400 focus-visible:outline-none`}
       >
         {body}
@@ -186,7 +181,7 @@ function RoomDetailsDialog({ room, onClose }: { room: RoomAvailability; onClose:
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const photos = room.photo_urls ?? []
   const gender = room.restrictions?.gender
-  const title = t('dorm.rooms.roomNumber', { room: room.room_number })
+  const title = t('dorm.rooms.roomNumber', { room: roomLabel(room) })
 
   // Escape closes (the lightbox handles its own Escape while it is open),
   // and the page behind doesn't scroll.

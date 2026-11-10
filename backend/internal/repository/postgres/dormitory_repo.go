@@ -26,9 +26,12 @@ const dormitoryColumns = `
 	total_capacity,
 	monthly_payment_bachelor, monthly_payment_master, monthly_payment_doctorate,
 	yearly_payment_bachelor, yearly_payment_master, yearly_payment_doctorate,
-	built_year, commissioned_year, ownership_form, closed_for_applications,
+	built_year, commissioned_year,
+	(SELECT ownership_form FROM dorm_objects WHERE dorm_objects.id = dormitories.object_id),
+	closed_for_applications,
 	latitude, longitude,
-	created_by, created_at, updated_at`
+	created_by, created_at, updated_at,
+	object_id, (SELECT name FROM dorm_objects WHERE dorm_objects.id = dormitories.object_id)`
 
 // dormTypeToText/textToDormType convert domain.DormitoryType (a named string
 // type) to/from a plain *string at the pgx boundary — mirrors the
@@ -61,6 +64,7 @@ func scanDormitory(row pgx.Row) (*domain.Dormitory, error) {
 		&d.BuiltYear, &d.CommissionedYear, &d.OwnershipForm, &d.ClosedForApplications,
 		&d.Latitude, &d.Longitude,
 		&d.CreatedBy, &d.CreatedAt, &d.UpdatedAt,
+		&d.ObjectID, &d.ObjectName,
 	)
 	if err != nil {
 		return nil, err
@@ -76,19 +80,36 @@ func (r *DormitoryRepo) Create(ctx context.Context, d *domain.Dormitory) error {
 			total_capacity,
 			monthly_payment_bachelor, monthly_payment_master, monthly_payment_doctorate,
 			yearly_payment_bachelor, yearly_payment_master, yearly_payment_doctorate,
-			built_year, commissioned_year, ownership_form, closed_for_applications,
+			built_year, commissioned_year, object_id, closed_for_applications,
 			latitude, longitude, created_by
 		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
-		RETURNING id, created_at, updated_at`
-	return r.db.QueryRow(ctx, q,
+		RETURNING id, created_at, updated_at, object_id`
+	err := r.db.QueryRow(ctx, q,
 		d.Name, d.Address, d.Phone, dormTypeToText(d.Type), d.FloorCount, d.TotalRoomsTarget,
 		d.TotalCapacity,
 		d.MonthlyPaymentBachelor, d.MonthlyPaymentMaster, d.MonthlyPaymentDoctorate,
 		d.YearlyPaymentBachelor, d.YearlyPaymentMaster, d.YearlyPaymentDoctorate,
-		d.BuiltYear, d.CommissionedYear, d.OwnershipForm, d.ClosedForApplications,
+		d.BuiltYear, d.CommissionedYear, nullableUUID(d.ObjectID), d.ClosedForApplications,
 		d.Latitude, d.Longitude, d.CreatedBy,
-	).Scan(&d.ID, &d.CreatedAt, &d.UpdatedAt)
+	).Scan(&d.ID, &d.CreatedAt, &d.UpdatedAt, &d.ObjectID)
+	if foreignKeyViolation(err) {
+		return repository.ErrObjectNotFound
+	}
+	return err
+}
+
+// nullableUUID passes uuid.Nil as SQL NULL.
+func nullableUUID(id uuid.UUID) *uuid.UUID {
+	if id == uuid.Nil {
+		return nil
+	}
+	return &id
+}
+
+func foreignKeyViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23503"
 }
 
 func (r *DormitoryRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Dormitory, error) {
@@ -112,7 +133,7 @@ func (r *DormitoryRepo) List(ctx context.Context, openOnly bool) ([]*domain.Dorm
 	if openOnly {
 		q += ` WHERE closed_for_applications = false`
 	}
-	q += ` ORDER BY name`
+	q += ` ORDER BY (SELECT o.name FROM dorm_objects o WHERE o.id = dormitories.object_id), dormitories.name`
 	rows, err := r.db.Query(ctx, q)
 	if err != nil {
 		return nil, err
@@ -139,7 +160,7 @@ func (r *DormitoryRepo) Update(ctx context.Context, d *domain.Dormitory) error {
 			monthly_payment_bachelor = $9, monthly_payment_master = $10, monthly_payment_doctorate = $11,
 			yearly_payment_bachelor = $12, yearly_payment_master = $13, yearly_payment_doctorate = $14,
 			built_year = $15, commissioned_year = $16,
-			ownership_form = $17, closed_for_applications = $18,
+			object_id = COALESCE($17, object_id), closed_for_applications = $18,
 			latitude = $19, longitude = $20,
 			updated_at = now()
 		WHERE id = $1
@@ -149,9 +170,12 @@ func (r *DormitoryRepo) Update(ctx context.Context, d *domain.Dormitory) error {
 		d.TotalRoomsTarget, d.TotalCapacity,
 		d.MonthlyPaymentBachelor, d.MonthlyPaymentMaster, d.MonthlyPaymentDoctorate,
 		d.YearlyPaymentBachelor, d.YearlyPaymentMaster, d.YearlyPaymentDoctorate,
-		d.BuiltYear, d.CommissionedYear, d.OwnershipForm, d.ClosedForApplications,
+		d.BuiltYear, d.CommissionedYear, nullableUUID(d.ObjectID), d.ClosedForApplications,
 		d.Latitude, d.Longitude,
 	).Scan(&d.UpdatedAt)
+	if foreignKeyViolation(err) {
+		return repository.ErrObjectNotFound
+	}
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return repository.ErrNotFound

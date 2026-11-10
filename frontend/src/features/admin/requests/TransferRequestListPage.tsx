@@ -12,6 +12,7 @@ import { getRoom, listRoomsByDormitory } from '../../../api/roomApi'
 import type { TransferRequest } from '../../../types/transferRequests'
 import type { Dormitory } from '../../../types/dormitories'
 import type { Room } from '../../../types/rooms'
+import { roomLabel } from '../../../utils/roomLocation'
 
 interface Row extends TransferRequest {
   studentName: string
@@ -53,12 +54,12 @@ export function TransferRequestListPage() {
               ...r,
               studentName: namesById[r.student_id] ?? r.student_id,
               currentRoomLabel: currentRoom
-                ? `${dormitoryNamesById[currentRoom.dormitory_id] ?? ''} — ${currentRoom.room_number}`
+                ? `${dormitoryNamesById[currentRoom.dormitory_id] ?? ''} — ${roomLabel(currentRoom)}`
                 : r.current_room_id,
               requestedDormitoryName: r.requested_dormitory_id
                 ? (dormitoryNamesById[r.requested_dormitory_id] ?? r.requested_dormitory_id)
                 : null,
-              requestedRoomLabel: requestedRoom?.room_number ?? null,
+              requestedRoomLabel: requestedRoom ? roomLabel(requestedRoom) : null,
             }
           }),
         )
@@ -174,7 +175,7 @@ export function TransferRequestListPage() {
                   <option value="">{t('admin.common.select')}</option>
                   {roomsForDormitory.map((room) => (
                     <option key={room.id} value={room.id}>
-                      {room.room_number} ({t('admin.requests.bedsCount', { count: room.capacity })})
+                      {roomLabel(room)} ({t('admin.requests.bedsCount', { count: room.capacity })})
                     </option>
                   ))}
                 </Select>

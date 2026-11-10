@@ -41,7 +41,7 @@ type dormitoryRequest struct {
 	YearlyPaymentDoctorate  *float64              `json:"yearly_payment_doctorate"`
 	BuiltYear               *string               `json:"built_year"`
 	CommissionedYear        *string               `json:"commissioned_year"`
-	OwnershipForm           *string               `json:"ownership_form"`
+	ObjectID                *uuid.UUID            `json:"object_id"`
 	ClosedForApplications   bool                  `json:"closed_for_applications"`
 	Latitude                *float64              `json:"latitude"`
 	Longitude               *float64              `json:"longitude"`
@@ -72,7 +72,7 @@ func (req dormitoryRequest) toInput() (service.DormitoryInput, error) {
 		YearlyPaymentDoctorate:  req.YearlyPaymentDoctorate,
 		BuiltYear:               builtYear,
 		CommissionedYear:        commissionedYear,
-		OwnershipForm:           req.OwnershipForm,
+		ObjectID:                req.ObjectID,
 		ClosedForApplications:   req.ClosedForApplications,
 		Latitude:                req.Latitude,
 		Longitude:               req.Longitude,

@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Room, RoomAvailability, RoomResident, RoomRestrictions } from '../types/rooms'
+import type { Bed, BedHistory, Room, RoomAvailability, RoomResident, RoomRestrictions } from '../types/rooms'
 
 export async function listRoomsByDormitory(dormitoryId: string): Promise<Room[]> {
   const { data } = await apiClient.get<{ data: Room[] }>(`/dormitories/${dormitoryId}/rooms`)
@@ -24,7 +24,7 @@ export async function getRoom(id: string): Promise<Room> {
 export interface RoomPayload {
   room_number: string
   capacity: number
-  floor: number | null
+  floor_id: string
   category: string
   area_sq_m: number | null
   equipment: string | null
@@ -69,9 +69,11 @@ export async function listRoomResidents(roomId: string): Promise<RoomResident[]>
   return data.data
 }
 
-export async function addResident(roomId: string, studentId: string): Promise<RoomResident> {
+// bedId omitted = the room's first free bed.
+export async function addResident(roomId: string, studentId: string, bedId?: string): Promise<RoomResident> {
   const { data } = await apiClient.post<{ data: RoomResident }>(`/rooms/${roomId}/residents`, {
     student_id: studentId,
+    bed_id: bedId || undefined,
   })
   return data.data
 }
@@ -80,10 +82,39 @@ export async function moveOutResident(residentId: string): Promise<void> {
   await apiClient.delete(`/room-residents/${residentId}`)
 }
 
-export async function transferResident(residentId: string, roomId: string): Promise<RoomResident> {
+// bedId omitted = the target room's first free bed; required to move to
+// another bed of the same room.
+export async function transferResident(residentId: string, roomId: string, bedId?: string): Promise<RoomResident> {
   const { data } = await apiClient.post<{ data: RoomResident }>(
     `/room-residents/${residentId}/transfer`,
-    { room_id: roomId },
+    { room_id: roomId, bed_id: bedId || undefined },
   )
+  return data.data
+}
+
+export async function listBeds(roomId: string, includeRetired = false): Promise<Bed[]> {
+  const { data } = await apiClient.get<{ data: Bed[] }>(`/rooms/${roomId}/beds`, {
+    params: includeRetired ? { include_retired: 'true' } : undefined,
+  })
+  return data.data
+}
+
+export async function addBeds(roomId: string, count = 1): Promise<Bed[]> {
+  const { data } = await apiClient.post<{ data: Bed[] }>(`/rooms/${roomId}/beds`, { count })
+  return data.data
+}
+
+export async function renameBed(bedId: string, label: string): Promise<Bed> {
+  const { data } = await apiClient.patch<{ data: Bed }>(`/beds/${bedId}`, { label })
+  return data.data
+}
+
+// Marks the bed as removed; its id and history are kept.
+export async function retireBed(bedId: string): Promise<void> {
+  await apiClient.delete(`/beds/${bedId}`)
+}
+
+export async function getBedHistory(bedId: string): Promise<BedHistory> {
+  const { data } = await apiClient.get<{ data: BedHistory }>(`/beds/${bedId}/history`)
   return data.data
 }

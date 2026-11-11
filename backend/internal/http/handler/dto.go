@@ -287,9 +287,13 @@ func roomsDTO(list []*domain.Room) []roomResponse {
 
 type roomAvailabilityResponse struct {
 	roomResponse
+	// Active beds by status, each counted once.
 	ResidentCount     int `json:"resident_count"`
 	HeldCount         int `json:"held_count"`
 	OutOfServiceCount int `json:"out_of_service_count"`
+	FreeCount         int `json:"free_count"`
+	// When any of the room's beds last changed status.
+	StatusChangedAt *time.Time `json:"status_changed_at"`
 }
 
 func roomAvailabilityDTO(a *domain.RoomAvailability) roomAvailabilityResponse {
@@ -298,6 +302,8 @@ func roomAvailabilityDTO(a *domain.RoomAvailability) roomAvailabilityResponse {
 		ResidentCount:     a.ResidentCount,
 		HeldCount:         a.HeldCount,
 		OutOfServiceCount: a.OutOfServiceCount,
+		FreeCount:         a.FreeCount,
+		StatusChangedAt:   a.StatusChangedAt,
 	}
 }
 
@@ -358,6 +364,8 @@ type bedResponse struct {
 	ServiceUntil     *string    `json:"service_until"`
 	ServiceChangedAt *time.Time `json:"service_changed_at"`
 	ServiceChangedBy *uuid.UUID `json:"service_changed_by"`
+	// When the bed's status last changed (its latest status log entry).
+	StatusChangedAt *time.Time `json:"status_changed_at"`
 }
 
 func bedDTO(b *domain.Bed) bedResponse {
@@ -369,6 +377,7 @@ func bedDTO(b *domain.Bed) bedResponse {
 		HeldApplicationID: b.HeldApplicationID, HeldStudentID: b.HeldStudentID,
 		ServiceReason: b.ServiceReason, ServiceUntil: datePtr(b.ServiceUntil),
 		ServiceChangedAt: b.ServiceChangedAt, ServiceChangedBy: b.ServiceChangedBy,
+		StatusChangedAt: b.StatusChangedAt,
 	}
 }
 

@@ -7,7 +7,11 @@ import { Card } from '../../../components/Card'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
 import { BedStatusBadge } from '../../../components/BedStatusBadge'
-import { bedStatusDotClass } from '../../../utils/bedStatus'
+import { bedStatusDotClass, latestTime } from '../../../utils/bedStatus'
+import { DataFreshness } from '../../../components/DataFreshness'
+import { getBedConsistency } from '../../../api/roomApi'
+import { formatDateTime } from '../../../utils/dateFormat'
+import type { BedConsistency } from '../../../types/rooms'
 import { extractErrorMessage } from '../../../api/client'
 import { getRegistry } from '../../../api/hierarchyApi'
 import { floorLabel } from '../../../utils/roomLocation'
@@ -155,22 +159,44 @@ export function RegistryPage() {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<BedStatus | null>(null)
+  const [loadedAt, setLoadedAt] = useState<Date | null>(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [consistency, setConsistency] = useState<BedConsistency | null>(null)
   // Expanded node ids; objects start open. While searching every
   // matching branch is shown open.
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
-  useEffect(() => {
-    getRegistry()
-      .then((data) => {
+  // Reloads the registry; the first load opens the objects, later ones keep
+  // whatever is expanded.
+  function load(first = false) {
+    setIsRefreshing(true)
+    Promise.all([getRegistry(), getBedConsistency().catch(() => null)])
+      .then(([data, check]) => {
         setTree(data)
-        setExpanded(new Set(data.map((d) => d.id)))
+        setConsistency(check)
+        setLoadedAt(new Date())
+        if (first) setExpanded(new Set(data.map((d) => d.id)))
       })
       .catch((err) => setError(extractErrorMessage(err, t('admin.common.loadError'))))
-  }, [])
+      .finally(() => setIsRefreshing(false))
+  }
+
+  useEffect(() => load(true), [])
 
   const searched = useMemo(() => (tree ? filterRegistry(tree, search, t) : []), [tree, search, t])
   const visible = useMemo(() => filterByStatus(searched, statusFilter), [searched, statusFilter])
   const statusTotals = useMemo(() => countStatuses(searched), [searched])
+  const lastChangeAt = useMemo(
+    () =>
+      latestTime(
+        (tree ?? []).flatMap((d) =>
+          d.dormitories.flatMap((b) =>
+            b.floors.flatMap((f) => f.rooms.flatMap((r) => r.beds.map((bd) => bd.status_changed_at))),
+          ),
+        ),
+      ),
+    [tree],
+  )
   const searching = search.trim() !== '' || statusFilter != null
   const isOpen = (id: string) => searching || expanded.has(id)
   const toggle = (id: string) =>
@@ -208,6 +234,23 @@ export function RegistryPage() {
       </div>
 
       <Card className="flex flex-col gap-3">
+        <DataFreshness
+          loadedAt={loadedAt}
+          lastChangeAt={lastChangeAt}
+          onRefresh={() => load()}
+          isRefreshing={isRefreshing}
+        />
+        {consistency && (
+          <p
+            className={`rounded-lg px-3 py-2 text-xs font-semibold ${
+              consistency.issues.length === 0 ? 'bg-mint-500/10 text-mint-400' : 'bg-clay-500/10 text-clay-400'
+            }`}
+          >
+            {consistency.issues.length === 0
+              ? t('admin.rooms.consistencyOk', { time: formatDateTime(consistency.checked_at) })
+              : t('admin.rooms.consistencyIssues', { count: consistency.issues.length })}
+          </p>
+        )}
         <div className="flex items-center gap-2 rounded-lg border border-sand-100/15 bg-navy-900 px-3">
           <Search className="h-4 w-4 shrink-0 text-sand-400" />
           <input
@@ -351,7 +394,21 @@ export function RegistryPage() {
                                                         {bd.service_reason}
                                                       </span>
                                                     )}
-                                                    <span className="ml-auto">
+                                                    <span
+                                                      className="ml-auto inline-flex items-center gap-2"
+                                                      title={
+                                                        bd.status_changed_at
+                                                          ? t('admin.rooms.bedUpdatedAt', {
+                                                              time: formatDateTime(bd.status_changed_at),
+                                                            })
+                                                          : undefined
+                                                      }
+                                                    >
+                                                      {bd.status_changed_at && (
+                                                        <span className="hidden text-[11px] text-sand-400 sm:inline">
+                                                          {formatDateTime(bd.status_changed_at)}
+                                                        </span>
+                                                      )}
                                                       <BedStatusBadge status={bd.status} />
                                                     </span>
                                                   </button>

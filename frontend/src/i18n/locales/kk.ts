@@ -1070,6 +1070,12 @@ export const kk = {
       moveReservationFailed: 'Броньды ауыстыру мүмкін болмады',
       noOtherFreeBeds: 'Бұл бөлмеде басқа бос төсек-орын жоқ',
       heldByThisStudent: '(осы студент брондаған)',
+      dataAsOf: 'Деректер {{time}} бойынша',
+      lastStatusChange: 'күйдің соңғы өзгерісі: {{time}}',
+      refresh: 'Жаңарту',
+      bedUpdatedAt: 'жаңартылды {{time}}',
+      consistencyOk: 'Есеп сәйкес: бір орын екі рет есептелмейді (тексерілді {{time}})',
+      consistencyIssues: 'Төсек-орын есебінде {{count}} сәйкессіздік табылды. Әкімшіге хабарлаңыз.',
       basis: {
         application: 'Тұруға өтініш',
         reservation: 'Бронь',

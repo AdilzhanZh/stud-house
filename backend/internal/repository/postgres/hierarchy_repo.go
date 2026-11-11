@@ -282,7 +282,8 @@ func (r *HierarchyRepo) Registry(ctx context.Context, objectID, dormitoryID *uui
 				WHERE rr.bed_id = bd.id AND rr.moved_out_at IS NULL)),
 			(bd.id IS NOT NULL AND EXISTS (SELECT 1 FROM applications a
 				WHERE a.held_bed_id = bd.id AND a.status IN ` + activeHoldStatuses + `)),
-			bd.service_status, bd.service_reason, bd.service_until
+			bd.service_status, bd.service_reason, bd.service_until,
+			(SELECT h.changed_at FROM bed_status_history h WHERE h.bed_id = bd.id ORDER BY h.seq DESC LIMIT 1)
 		FROM dorm_objects o
 		JOIN dormitories d ON d.object_id = o.id
 		LEFT JOIN floors f ON f.dormitory_id = d.id AND f.retired_at IS NULL
@@ -308,7 +309,7 @@ func (r *HierarchyRepo) Registry(ctx context.Context, objectID, dormitoryID *uui
 			&x.FloorID, &x.FloorNumber, &x.FloorName,
 			&x.RoomID, &x.RoomNumber, &x.RoomCapacity,
 			&x.BedID, &x.BedInventoryNo, &x.BedLabel, &x.BedOccupied,
-			&x.BedReserved, &x.BedService, &x.BedServiceReason, &x.BedServiceUntil,
+			&x.BedReserved, &x.BedService, &x.BedServiceReason, &x.BedServiceUntil, &x.BedStatusChanged,
 		); err != nil {
 			return nil, err
 		}

@@ -482,3 +482,31 @@ func (h *RoomHandler) BedHistory(c *gin.Context) {
 	}
 	response.OK(c, bedHistoryResponse{Bed: bedDTO(bed), Stays: roomResidentsDTO(stays)})
 }
+
+type bedConsistencyResponse struct {
+	// When the check ran.
+	CheckedAt time.Time                     `json:"checked_at"`
+	Issues    []bedConsistencyIssueResponse `json:"issues"`
+}
+
+type bedConsistencyIssueResponse struct {
+	// log_mismatch | held_by_resident | retired_in_use | hold_without_bed
+	Issue  string     `json:"issue"`
+	BedID  *uuid.UUID `json:"bed_id"`
+	RoomID *uuid.UUID `json:"room_id"`
+}
+
+// BedConsistency (GET /beds/consistency) checks that no bed is counted
+// twice and every bed's status log is current. issues is expected empty.
+func (h *RoomHandler) BedConsistency(c *gin.Context) {
+	issues, err := h.rooms.BedConsistencyIssues(c.Request.Context())
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	out := bedConsistencyResponse{CheckedAt: time.Now(), Issues: make([]bedConsistencyIssueResponse, 0, len(issues))}
+	for _, i := range issues {
+		out.Issues = append(out.Issues, bedConsistencyIssueResponse{Issue: i.Issue, BedID: i.BedID, RoomID: i.RoomID})
+	}
+	response.OK(c, out)
+}

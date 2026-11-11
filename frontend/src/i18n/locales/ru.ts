@@ -1073,6 +1073,12 @@ export const ru: typeof kk = {
       moveReservationFailed: 'Не удалось перенести бронь',
       noOtherFreeBeds: 'В этой комнате нет других свободных мест',
       heldByThisStudent: '(забронировано этим студентом)',
+      dataAsOf: 'Данные на {{time}}',
+      lastStatusChange: 'последнее изменение статуса: {{time}}',
+      refresh: 'Обновить',
+      bedUpdatedAt: 'обновлено {{time}}',
+      consistencyOk: 'Учёт согласован: двойного учёта мест нет (проверено {{time}})',
+      consistencyIssues: 'Найдены расхождения в учёте мест: {{count}}. Сообщите администратору.',
       basis: {
         application: 'Заявление на заселение',
         reservation: 'Бронь',

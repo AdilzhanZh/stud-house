@@ -127,6 +127,9 @@ type Bed struct {
 	ServiceUntil      *time.Time
 	ServiceChangedAt  *time.Time
 	ServiceChangedBy  *uuid.UUID
+	// StatusChangedAt is when the bed's status last changed (its latest
+	// status log entry); nil if it never has.
+	StatusChangedAt *time.Time
 }
 
 // BedServiceStatus is the part of a bed's status a manager sets by hand
@@ -208,15 +211,25 @@ func BedCode(inventoryNo int64) string {
 	return fmt.Sprintf("B-%06d", inventoryNo)
 }
 
-// RoomAvailability is a Room plus how many seats are already spoken for —
-// by actual residents (ResidentCount) and by pending applicants who have
-// this room as their current pick, i.e. a "hold" (HeldCount; see
-// RoomService.CheckHoldable). OutOfServiceCount is the beds under repair or
-// temporarily unavailable. Capacity - OutOfServiceCount - ResidentCount -
-// HeldCount is how many more applicants may still pick this room.
+// RoomAvailability is a Room with its active beds counted by status, each
+// bed exactly once: occupied (ResidentCount), reserved by an application
+// (HeldCount), under repair or unavailable (OutOfServiceCount) and free
+// (FreeCount — how many more applicants may still pick this room).
+// StatusChangedAt is when any of its beds last changed status.
 type RoomAvailability struct {
 	*Room
 	ResidentCount     int
 	HeldCount         int
 	OutOfServiceCount int
+	FreeCount         int
+	StatusChangedAt   *time.Time
+}
+
+// BedConsistencyIssue is something that would count a bed twice or leave
+// its status log stale (view bed_consistency_issues); none are expected.
+// BedID is nil for an application holding a room without a bed.
+type BedConsistencyIssue struct {
+	Issue  string
+	BedID  *uuid.UUID
+	RoomID *uuid.UUID
 }

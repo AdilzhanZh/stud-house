@@ -38,6 +38,7 @@ export interface RegistryBed {
   status: BedStatus
   service_reason: string | null
   service_until: string | null
+  status_changed_at: string | null
 }
 
 export interface RegistryRoom {

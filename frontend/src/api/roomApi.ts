@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Bed, BedHistory, BedServiceStatus, BedStatusHistory, Room, RoomAvailability, RoomResident, RoomRestrictions } from '../types/rooms'
+import type { Bed, BedConsistency, BedHistory, BedServiceStatus, BedStatusHistory, Room, RoomAvailability, RoomResident, RoomRestrictions } from '../types/rooms'
 
 export async function listRoomsByDormitory(dormitoryId: string): Promise<Room[]> {
   const { data } = await apiClient.get<{ data: Room[] }>(`/dormitories/${dormitoryId}/rooms`)
@@ -138,6 +138,11 @@ export async function setBedStatus(
     act_date: act.date,
     act_file_url: act.fileUrl || undefined,
   })
+  return data.data
+}
+
+export async function getBedConsistency(): Promise<BedConsistency> {
+  const { data } = await apiClient.get<{ data: BedConsistency }>('/beds/consistency')
   return data.data
 }
 

@@ -263,6 +263,8 @@ type registryBedResponse struct {
 	Status        domain.BedStatus `json:"status"`
 	ServiceReason *string          `json:"service_reason"`
 	ServiceUntil  *string          `json:"service_until"`
+	// When the bed's status last changed.
+	StatusChangedAt *time.Time `json:"status_changed_at"`
 }
 
 type registryRoomResponse struct {
@@ -339,7 +341,8 @@ func (h *HierarchyHandler) Registry(c *gin.Context) {
 					for _, b := range r.Beds {
 						rr.Beds = append(rr.Beds, registryBedResponse{ID: b.ID, Code: domain.BedCode(b.InventoryNo),
 							Label: b.Label, Occupied: b.Occupied, Status: b.Status,
-							ServiceReason: b.ServiceReason, ServiceUntil: datePtr(b.ServiceUntil)})
+							ServiceReason: b.ServiceReason, ServiceUntil: datePtr(b.ServiceUntil),
+							StatusChangedAt: b.StatusChangedAt})
 					}
 					rf.Rooms = append(rf.Rooms, rr)
 				}

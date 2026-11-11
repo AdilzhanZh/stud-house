@@ -122,8 +122,9 @@ func (r *RoomRepo) ListByDormitory(ctx context.Context, dormitoryID uuid.UUID) (
 
 // Update saves the room's fields and, in the same transaction, adds or
 // retires bed places so the room's active bed count equals room.Capacity.
-// Lowering the capacity retires free beds from the end of the room's bed
-// order (highest label first); if too few beds are free it returns
+// Lowering the capacity retires beds nobody lives on or holds — out-of-
+// service beds first, then from the end of the room's bed order (highest
+// label first); if too few such beds exist it returns
 // ErrBedOccupied and nothing is saved. Existing beds are never recreated,
 // so their ids survive any capacity change.
 func (r *RoomRepo) Update(ctx context.Context, room *domain.Room) error {
@@ -177,7 +178,9 @@ func (r *RoomRepo) Update(ctx context.Context, room *domain.Room) error {
 			WHERE b.room_id = $1 AND b.retired_at IS NULL
 			  AND NOT EXISTS (SELECT 1 FROM room_residents rr
 			                  WHERE rr.bed_id = b.id AND rr.moved_out_at IS NULL)
-			ORDER BY ` + bedOrderDesc + `
+			  AND NOT EXISTS (SELECT 1 FROM applications a
+			                  WHERE a.held_bed_id = b.id AND a.status IN ` + activeHoldStatuses + `)
+			ORDER BY (b.service_status = 'in_service'), ` + bedOrderDesc + `
 			LIMIT $2`
 		rows, err := tx.Query(ctx, q, room.ID, toRetire)
 		if err != nil {
@@ -289,11 +292,14 @@ func (r *RoomRepo) AddResident(ctx context.Context, rr *domain.RoomResident) err
 
 	var bed *domain.Bed
 	if rr.BedID == nil {
+		// The student's own held bed first, then the first free one.
 		q := bedSelect + `
 			WHERE b.room_id = $1 AND b.retired_at IS NULL AND rr.id IS NULL
-			ORDER BY ` + bedOrderAsc + `
+			  AND b.service_status = 'in_service'
+			  AND (ha.id IS NULL OR ha.student_id = $2)
+			ORDER BY (ha.id IS NULL), ` + bedOrderAsc + `
 			LIMIT 1`
-		bed, err = scanBed(tx.QueryRow(ctx, q, rr.RoomID))
+		bed, err = scanBed(tx.QueryRow(ctx, q, rr.RoomID, rr.StudentID))
 		if errors.Is(err, pgx.ErrNoRows) {
 			return repository.ErrNoFreeBed
 		}
@@ -311,6 +317,12 @@ func (r *RoomRepo) AddResident(ctx context.Context, rr *domain.RoomResident) err
 	}
 	if bed.ResidentID != nil {
 		return repository.ErrBedOccupied
+	}
+	if bed.HeldStudentID != nil && *bed.HeldStudentID != rr.StudentID {
+		return repository.ErrBedReserved
+	}
+	if bed.ServiceStatus != domain.BedInService {
+		return repository.ErrBedOutOfService
 	}
 
 	const q = `
@@ -417,7 +429,10 @@ func (r *RoomRepo) ListAvailabilityByDormitory(ctx context.Context, dormitoryID 
 			(SELECT count(*) FROM room_residents rr WHERE rr.room_id = rooms.id AND rr.moved_out_at IS NULL) AS resident_count,
 			(SELECT count(*) FROM applications a
 				WHERE COALESCE(a.assigned_room_id, a.preferred_room_id) = rooms.id
-				  AND a.status IN ('pending', 'manager_review', 'approved')) AS held_count
+				  AND a.status IN ('pending', 'manager_review', 'approved')) AS held_count,
+			(SELECT count(*) FROM beds b
+				WHERE b.room_id = rooms.id AND b.retired_at IS NULL
+				  AND b.service_status <> 'in_service') AS out_of_service_count
 		FROM rooms WHERE dormitory_id = $1 ORDER BY ` + roomOrder
 	rows, err := r.db.Query(ctx, q, dormitoryID)
 	if err != nil {
@@ -436,7 +451,7 @@ func (r *RoomRepo) ListAvailabilityByDormitory(ctx context.Context, dormitoryID 
 			&room.AreaSqM, &room.Equipment, &room.SanitaryConditions, &room.IsAccessible,
 			&room.AccessibilityNotes, &room.PhotoURLs,
 			&room.CreatedAt, &room.UpdatedAt,
-			&avail.ResidentCount, &avail.HeldCount,
+			&avail.ResidentCount, &avail.HeldCount, &avail.OutOfServiceCount,
 		)
 		if err != nil {
 			return nil, err

@@ -1070,6 +1070,12 @@ export const en: typeof kk = {
       moveReservationFailed: 'Could not move the reservation',
       noOtherFreeBeds: 'No other free beds in this room',
       heldByThisStudent: '(reserved by this student)',
+      dataAsOf: 'Data as of {{time}}',
+      lastStatusChange: 'last status change: {{time}}',
+      refresh: 'Refresh',
+      bedUpdatedAt: 'updated {{time}}',
+      consistencyOk: 'Records consistent: no bed is counted twice (checked {{time}})',
+      consistencyIssues: 'Bed records have {{count}} inconsistencies. Tell an administrator.',
       basis: {
         application: 'Housing application',
         reservation: 'Reservation',

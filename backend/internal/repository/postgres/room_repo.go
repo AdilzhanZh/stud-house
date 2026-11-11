@@ -400,18 +400,19 @@ func (r *RoomRepo) GetActiveResidentByStudent(ctx context.Context, studentID uui
 	return rr, nil
 }
 
-// CountHeldSeats counts non-terminal, non-correction applications
-// (pending/manager_review/approved) currently claiming roomID — via
-// assigned_room_id once a manager has earmarked one, falling back to the
-// student's own preferred_room_id otherwise. excludeApplicationID, when
-// set, omits that one application from the count (used when checking
-// whether an application may keep/take a room it may itself already hold).
-func (r *RoomRepo) CountHeldSeats(ctx context.Context, roomID uuid.UUID, excludeApplicationID *uuid.UUID) (int, error) {
-	const q = `
-		SELECT count(*) FROM applications
-		WHERE COALESCE(assigned_room_id, preferred_room_id) = $1
-		  AND status IN ('pending', 'manager_review', 'approved')
-		  AND ($2::uuid IS NULL OR id <> $2)`
+// CountFreeBeds counts the room's beds that are free: active, in service,
+// nobody living on them and no active application holding them.
+// excludeApplicationID's own hold doesn't count against it (used when an
+// application may keep or take a bed it may already hold).
+func (r *RoomRepo) CountFreeBeds(ctx context.Context, roomID uuid.UUID, excludeApplicationID *uuid.UUID) (int, error) {
+	q := `
+		SELECT count(*) FROM beds b
+		WHERE b.room_id = $1 AND b.retired_at IS NULL AND b.service_status = 'in_service'
+		  AND NOT EXISTS (SELECT 1 FROM room_residents rr
+		                  WHERE rr.bed_id = b.id AND rr.moved_out_at IS NULL)
+		  AND NOT EXISTS (SELECT 1 FROM applications a
+		                  WHERE a.held_bed_id = b.id AND a.status IN ` + activeHoldStatuses + `
+		                    AND ($2::uuid IS NULL OR a.id <> $2))`
 	var count int
 	if err := r.db.QueryRow(ctx, q, roomID, excludeApplicationID).Scan(&count); err != nil {
 		return 0, err
@@ -419,21 +420,28 @@ func (r *RoomRepo) CountHeldSeats(ctx context.Context, roomID uuid.UUID, exclude
 	return count, nil
 }
 
-// ListAvailabilityByDormitory returns every room of a dormitory together
-// with its current resident and hold counts, in one query — used by the
-// student-facing room picker so it doesn't have to fetch residents per room
-// (see CountHeldSeats for what counts as a hold).
+// ListAvailabilityByDormitory returns every room of a dormitory with its
+// active beds counted by status — each bed exactly once — and when the
+// status of any of its beds last changed, in one query (used by the room
+// pickers, so they don't fetch beds per room).
 func (r *RoomRepo) ListAvailabilityByDormitory(ctx context.Context, dormitoryID uuid.UUID) ([]*domain.RoomAvailability, error) {
 	q := `
 		SELECT ` + roomColumns + `,
-			(SELECT count(*) FROM room_residents rr WHERE rr.room_id = rooms.id AND rr.moved_out_at IS NULL) AS resident_count,
-			(SELECT count(*) FROM applications a
-				WHERE COALESCE(a.assigned_room_id, a.preferred_room_id) = rooms.id
-				  AND a.status IN ('pending', 'manager_review', 'approved')) AS held_count,
-			(SELECT count(*) FROM beds b
-				WHERE b.room_id = rooms.id AND b.retired_at IS NULL
-				  AND b.service_status <> 'in_service') AS out_of_service_count
-		FROM rooms WHERE dormitory_id = $1 ORDER BY ` + roomOrder
+			count(*) FILTER (WHERE bs.status = 'occupied') AS resident_count,
+			count(*) FILTER (WHERE bs.status = 'reserved') AS held_count,
+			count(*) FILTER (WHERE bs.status IN ('repair', 'unavailable')) AS out_of_service_count,
+			count(*) FILTER (WHERE bs.status = 'free') AS free_count,
+			max(bs.changed_at) AS status_changed_at
+		FROM rooms
+		LEFT JOIN LATERAL (
+			SELECT bed_current_status(b.id) AS status,
+				(SELECT h.changed_at FROM bed_status_history h
+				 WHERE h.bed_id = b.id ORDER BY h.seq DESC LIMIT 1) AS changed_at
+			FROM beds b WHERE b.room_id = rooms.id AND b.retired_at IS NULL
+		) bs ON true
+		WHERE dormitory_id = $1
+		GROUP BY rooms.id
+		ORDER BY ` + roomOrder
 	rows, err := r.db.Query(ctx, q, dormitoryID)
 	if err != nil {
 		return nil, err
@@ -452,6 +460,7 @@ func (r *RoomRepo) ListAvailabilityByDormitory(ctx context.Context, dormitoryID 
 			&room.AccessibilityNotes, &room.PhotoURLs,
 			&room.CreatedAt, &room.UpdatedAt,
 			&avail.ResidentCount, &avail.HeldCount, &avail.OutOfServiceCount,
+			&avail.FreeCount, &avail.StatusChangedAt,
 		)
 		if err != nil {
 			return nil, err

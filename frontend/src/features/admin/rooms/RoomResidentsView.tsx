@@ -25,8 +25,9 @@ import { Alert } from '../../../components/Alert'
 import { Avatar } from '../../../components/Avatar'
 import { ConfirmDialog } from '../../../components/ConfirmDialog'
 import { BedStatusBadge } from '../../../components/BedStatusBadge'
-import { bedStatusDotClass } from '../../../utils/bedStatus'
+import { bedStatusDotClass, latestTime } from '../../../utils/bedStatus'
 import { BedStatusDialog } from './BedStatusDialog'
+import { DataFreshness } from '../../../components/DataFreshness'
 import { BedStatusLog } from './BedStatusLog'
 import { extractErrorMessage } from '../../../api/client'
 import {
@@ -49,7 +50,7 @@ import { changeHeldBed, listApplications } from '../../../api/applicationAdminAp
 import { getStudentProfile } from '../../../api/profileApi'
 import { listBenefits, listStudentBenefits } from '../../../api/benefitApi'
 import { bilingualField } from '../../../utils/bilingualField'
-import { formatDate } from '../../../utils/dateFormat'
+import { formatDate, formatDateTime } from '../../../utils/dateFormat'
 import { canManage } from '../../../constants/roles'
 import { useAuth } from '../../auth/useAuth'
 import { BED_STATUSES, type Bed, type BedHistory, type BedStatusHistory, type Room, type RoomResident } from '../../../types/rooms'
@@ -81,6 +82,8 @@ export function RoomResidentsView() {
   const [settledApplications, setSettledApplications] = useState<Application[]>([])
   const [dormitories, setDormitories] = useState<Dormitory[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [loadedAt, setLoadedAt] = useState<Date | null>(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
   const [selectedStudentId, setSelectedStudentId] = useState('')
   const [assignBedId, setAssignBedId] = useState('')
@@ -125,6 +128,7 @@ export function RoomResidentsView() {
 
   function load() {
     if (!roomId) return
+    setIsRefreshing(true)
     Promise.all([
       getRoom(roomId),
       listRoomResidents(roomId),
@@ -140,8 +144,10 @@ export function RoomResidentsView() {
         setStudents(studentList)
         setSettledApplications(settled.filter((a) => a.dormitory_id === r.dormitory_id))
         setDormitories(dormitoryList)
+        setLoadedAt(new Date())
       })
       .catch((err) => setError(extractErrorMessage(err, t('admin.common.loadError'))))
+      .finally(() => setIsRefreshing(false))
   }
 
   useEffect(load, [roomId, isManager, showRetiredBeds])
@@ -566,7 +572,15 @@ export function RoomResidentsView() {
             </Button>
           )}
         </div>
-        <p className="mb-3 text-xs text-sand-300">{t('admin.rooms.bedsHint')}</p>
+        <p className="mb-2 text-xs text-sand-300">{t('admin.rooms.bedsHint')}</p>
+        <div className="mb-3">
+          <DataFreshness
+            loadedAt={loadedAt}
+            lastChangeAt={latestTime(activeBeds.map((b) => b.status_changed_at))}
+            onRefresh={load}
+            isRefreshing={isRefreshing}
+          />
+        </div>
         {statusCounts.length > 0 && (
           <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1.5" aria-label={t('admin.rooms.bedStatusSummary')}>
             {statusCounts.map(({ status, count }) => (
@@ -634,6 +648,11 @@ export function RoomResidentsView() {
                     >
                       {bedSubtitle(b)}
                     </p>
+                    {!b.retired_at && b.status_changed_at && (
+                      <p className="mt-0.5 text-[11px] text-sand-400">
+                        {t('admin.rooms.bedUpdatedAt', { time: formatDateTime(b.status_changed_at) })}
+                      </p>
+                    )}
                     {moveTarget?.id === b.id && (
                       <div className="mt-2 flex flex-col gap-2">
                         <p className="text-xs font-medium text-sand-100">

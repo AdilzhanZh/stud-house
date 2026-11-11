@@ -13,7 +13,8 @@ import { FloorCorridorMap } from '../../../components/FloorCorridorMap'
 import { extractErrorMessage } from '../../../api/client'
 import { getDormitory, getDormitoryCapacity } from '../../../api/dormitoryApi'
 import { deleteRoom, listBeds, listRoomsByDormitory } from '../../../api/roomApi'
-import { bedStatusDotClass } from '../../../utils/bedStatus'
+import { bedStatusDotClass, latestTime } from '../../../utils/bedStatus'
+import { DataFreshness } from '../../../components/DataFreshness'
 import { createFloor, listDormitoryFloors, retireFloor, updateFloor } from '../../../api/hierarchyApi'
 import { floorLabel, roomLabel } from '../../../utils/roomLocation'
 import type { Floor } from '../../../types/hierarchy'
@@ -31,6 +32,8 @@ interface RoomRow extends Room {
   residentCount: number
   // Active beds per status (free / reserved / occupied / repair / unavailable).
   bedStatusCounts: Record<BedStatus, number>
+  // When any of its beds last changed status.
+  statusChangedAt: string | null
 }
 
 function restrictionsSummary(room: Room, t: TFunction): string {
@@ -60,6 +63,8 @@ export function DormitoryDetailPage() {
   const [dormitory, setDormitory] = useState<Dormitory | null>(null)
   const [capacity, setCapacity] = useState<DormitoryCapacity | null>(null)
   const [rooms, setRooms] = useState<RoomRow[] | null>(null)
+  const [loadedAt, setLoadedAt] = useState<Date | null>(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [floors, setFloors] = useState<Floor[]>([])
   const [selectedFloor, setSelectedFloor] = useState<string | null>(null)
@@ -79,6 +84,7 @@ export function DormitoryDetailPage() {
 
   function load() {
     if (!id) return
+    setIsRefreshing(true)
     Promise.all([
       getDormitory(id),
       getDormitoryCapacity(id),
@@ -94,12 +100,19 @@ export function DormitoryDetailPage() {
             const beds = await listBeds(r.id).catch(() => [])
             const bedStatusCounts = Object.fromEntries(BED_STATUSES.map((s) => [s, 0])) as Record<BedStatus, number>
             for (const b of beds) bedStatusCounts[b.status] += 1
-            return { ...r, residentCount: bedStatusCounts.occupied, bedStatusCounts }
+            return {
+              ...r,
+              residentCount: bedStatusCounts.occupied,
+              bedStatusCounts,
+              statusChangedAt: latestTime(beds.map((b) => b.status_changed_at)),
+            }
           }),
         )
         setRooms(withResidents)
+        setLoadedAt(new Date())
       })
       .catch((err) => setError(extractErrorMessage(err, t('admin.common.loadError'))))
+      .finally(() => setIsRefreshing(false))
   }
 
   useEffect(load, [id])
@@ -316,6 +329,12 @@ export function DormitoryDetailPage() {
         </div>
       </div>
 
+      <DataFreshness
+        loadedAt={loadedAt}
+        lastChangeAt={latestTime(rooms.map((r) => r.statusChangedAt))}
+        onRefresh={load}
+        isRefreshing={isRefreshing}
+      />
       <Card className={adminTableWrapClass}>
         <table className="w-full text-left text-sm">
           <thead className={adminTheadClass}>

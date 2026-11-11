@@ -261,6 +261,8 @@ type RegistryBed struct {
 	// ServiceReason / ServiceUntil are set while the bed is out of service.
 	ServiceReason *string
 	ServiceUntil  *time.Time
+	// StatusChangedAt is when the bed's status last changed.
+	StatusChangedAt *time.Time
 }
 
 // Registry builds the tree from the repository's ordered flat rows.
@@ -308,7 +310,8 @@ func (s *HierarchyService) Registry(ctx context.Context, objectID, dormitoryID *
 		room.Beds = append(room.Beds, &RegistryBed{ID: *r.BedID, InventoryNo: *r.BedInventoryNo,
 			Label: *r.BedLabel, Occupied: r.BedOccupied,
 			Status:        domain.BedStatusOf(r.BedOccupied, r.BedReserved, *r.BedService),
-			ServiceReason: r.BedServiceReason, ServiceUntil: r.BedServiceUntil})
+			ServiceReason: r.BedServiceReason, ServiceUntil: r.BedServiceUntil,
+			StatusChangedAt: r.BedStatusChanged})
 	}
 	return out, nil
 }

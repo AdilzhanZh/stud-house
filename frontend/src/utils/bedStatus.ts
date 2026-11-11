@@ -8,3 +8,10 @@ export const bedStatusDotClass: Record<BedStatus, string> = {
   repair: 'bg-clay-400',
   unavailable: 'bg-sand-400',
 }
+
+// The latest of some ISO timestamps, or null.
+export function latestTime(values: (string | null | undefined)[]): string | null {
+  let best: string | null = null
+  for (const v of values) if (v && (!best || new Date(v) > new Date(best))) best = v
+  return best
+}

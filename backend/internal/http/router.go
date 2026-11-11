@@ -193,6 +193,8 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 				staffGroup.GET("/rooms/:roomId/beds", h.Room.ListBeds)
 				staffGroup.GET("/beds/:bedId/history", h.Room.BedHistory)
 				staffGroup.GET("/beds/:bedId/status-history", h.Room.BedStatusHistory)
+				// No double counting, no stale status log (expected: no issues).
+				staffGroup.GET("/beds/consistency", h.Room.BedConsistency)
 				// Registry: object → building (dormitory) → floor → room → bed.
 				staffGroup.GET("/registry", h.Hierarchy.Registry)
 				staffGroup.GET("/dorm-objects", h.Hierarchy.ListObjects)

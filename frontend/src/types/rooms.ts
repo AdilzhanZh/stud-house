@@ -38,17 +38,21 @@ export interface Room {
 // Room plus how many seats are already spoken for — by actual residents
 // (resident_count) and by other pending applicants who currently have this
 // room as their pick (held_count, a "hold" — see the backend's
-// RoomService.CheckHoldable). out_of_service_count is the beds under repair
-// or temporarily unavailable. roomFreeSeats() is how many more applicants
-// may still pick this room.
+// RoomService.CheckHoldable). All counts come from the room's active beds,
+// each counted once by its status: occupied (resident_count), reserved
+// (held_count), repair/unavailable (out_of_service_count), free
+// (free_count). status_changed_at: when any of its beds last changed.
 export interface RoomAvailability extends Room {
   resident_count: number
   held_count: number
   out_of_service_count: number
+  free_count: number
+  status_changed_at: string | null
 }
 
+// How many more applicants may still pick this room.
 export function roomFreeSeats(r: RoomAvailability): number {
-  return Math.max(0, r.capacity - r.out_of_service_count - r.resident_count - r.held_count)
+  return r.free_count
 }
 
 // moved_in_at is always set — RoomRepository.AddResident inserts room_id +
@@ -92,6 +96,8 @@ export interface Bed {
   service_until: string | null
   service_changed_at: string | null
   service_changed_by: string | null
+  // When the bed's status last changed (its latest log entry).
+  status_changed_at: string | null
 }
 
 // свободно / забронировано / занято / на ремонте / временно недоступно.
@@ -123,6 +129,15 @@ export interface BedStatusChange {
   act_file_url: string | null
   student_id: string | null
   backfilled: boolean
+}
+
+// GET /beds/consistency: anything that would count a bed twice or leave its
+// status log stale. issues is expected to be empty.
+export type BedConsistencyIssueKind = 'log_mismatch' | 'held_by_resident' | 'retired_in_use' | 'hold_without_bed'
+
+export interface BedConsistency {
+  checked_at: string
+  issues: { issue: BedConsistencyIssueKind; bed_id: string | null; room_id: string | null }[]
 }
 
 export interface BedStatusHistory {

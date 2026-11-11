@@ -32,7 +32,8 @@ const bedSelect = `
 	SELECT b.id, b.inventory_no, b.room_id, b.label, b.created_at, b.retired_at,
 		rr.id, rr.student_id, ha.id, ha.student_id,
 		b.service_status, b.service_reason, b.service_until,
-		b.service_changed_at, b.service_changed_by
+		b.service_changed_at, b.service_changed_by,
+		(SELECT h.changed_at FROM bed_status_history h WHERE h.bed_id = b.id ORDER BY h.seq DESC LIMIT 1)
 	FROM beds b
 	LEFT JOIN room_residents rr ON rr.bed_id = b.id AND rr.moved_out_at IS NULL
 	LEFT JOIN applications ha ON ha.held_bed_id = b.id AND ha.status IN ` + activeHoldStatuses
@@ -54,7 +55,7 @@ func scanBed(row pgx.Row) (*domain.Bed, error) {
 	err := row.Scan(&b.ID, &b.InventoryNo, &b.RoomID, &b.Label, &b.CreatedAt, &b.RetiredAt,
 		&b.ResidentID, &b.StudentID, &b.HeldApplicationID, &b.HeldStudentID,
 		&b.ServiceStatus, &b.ServiceReason, &b.ServiceUntil,
-		&b.ServiceChangedAt, &b.ServiceChangedBy)
+		&b.ServiceChangedAt, &b.ServiceChangedBy, &b.StatusChangedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -327,4 +328,21 @@ func (r *RoomRepo) CountOutOfServiceBeds(ctx context.Context, roomID uuid.UUID) 
 		SELECT count(*) FROM beds
 		WHERE room_id = $1 AND retired_at IS NULL AND service_status <> 'in_service'`, roomID).Scan(&n)
 	return n, err
+}
+
+func (r *RoomRepo) ListBedConsistencyIssues(ctx context.Context) ([]*domain.BedConsistencyIssue, error) {
+	rows, err := r.db.Query(ctx, `SELECT issue, bed_id, room_id FROM bed_consistency_issues ORDER BY issue, room_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []*domain.BedConsistencyIssue{}
+	for rows.Next() {
+		i := &domain.BedConsistencyIssue{}
+		if err := rows.Scan(&i.Issue, &i.BedID, &i.RoomID); err != nil {
+			return nil, err
+		}
+		out = append(out, i)
+	}
+	return out, rows.Err()
 }

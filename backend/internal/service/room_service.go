@@ -625,42 +625,36 @@ func (s *RoomService) ListActiveResidents(ctx context.Context, roomID uuid.UUID)
 	return s.rooms.ListActiveResidents(ctx, roomID)
 }
 
-// CheckHoldable reports whether roomID still has a free seat once both
-// actual residents and other pending applicants' holds are counted — a
-// hold being any non-terminal, non-correction application (pending/
-// manager_review/approved) currently claiming that room (see
-// RoomRepository.CountHeldSeats). excludeApplicationID lets a caller check
-// whether an application may keep/take this room without counting its own
-// existing hold on it against itself.
+// CheckHoldable reports whether roomID still has a free bed: one in
+// service, with nobody living on it and no other active application
+// holding it (see RoomRepository.CountFreeBeds). Every bed is counted by
+// its one status, so a seat is never counted twice. excludeApplicationID
+// lets a caller check whether an application may keep/take this room
+// without counting its own existing hold against itself.
 //
-// This is deliberately separate from ValidateAssignable, which continues to
-// check only actual residents: that method gates the final, authoritative
-// seat claim at contract-acceptance time (RoomService.AddResident), by
-// which point this application's own hold is meant to convert into that
-// exact seat, not be double-counted against it. CheckHoldable instead runs
-// at the two points a hold is created or kept — ApplicationService.Create
-// and the approve branch of ApplicationService.Decide.
+// This is deliberately separate from ValidateAssignable, which checks the
+// final seat claim at contract-acceptance time (RoomService.AddResident),
+// when the application's own hold turns into that seat. CheckHoldable runs
+// where a hold is created or kept — ApplicationService.Create, Resubmit
+// and the approve branch of Decide.
 func (s *RoomService) CheckHoldable(ctx context.Context, roomID uuid.UUID, excludeApplicationID *uuid.UUID) error {
-	room, err := s.GetByID(ctx, roomID)
+	if _, err := s.GetByID(ctx, roomID); err != nil {
+		return err
+	}
+	free, err := s.rooms.CountFreeBeds(ctx, roomID, excludeApplicationID)
 	if err != nil {
 		return err
 	}
-	residents, err := s.rooms.ListActiveResidents(ctx, roomID)
-	if err != nil {
-		return err
-	}
-	held, err := s.rooms.CountHeldSeats(ctx, roomID, excludeApplicationID)
-	if err != nil {
-		return err
-	}
-	usable, err := s.usableBeds(ctx, room)
-	if err != nil {
-		return err
-	}
-	if len(residents)+held >= usable {
+	if free == 0 {
 		return apperror.Conflict("бөлме толығымен толған")
 	}
 	return nil
+}
+
+// BedConsistencyIssues lists beds that would be counted twice or whose
+// status log is stale. Expected to be empty; the registry shows it.
+func (s *RoomService) BedConsistencyIssues(ctx context.Context) ([]*domain.BedConsistencyIssue, error) {
+	return s.rooms.ListBedConsistencyIssues(ctx)
 }
 
 // CheckBedHoldable reports whether the application of studentID may

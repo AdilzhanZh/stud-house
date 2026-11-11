@@ -146,13 +146,12 @@ type RoomRepository interface {
 	// audience — every student currently resident (moved_out_at IS NULL) in
 	// any room of the given dormitory.
 	ListResidentStudentIDsByDormitory(ctx context.Context, dormitoryID uuid.UUID) ([]uuid.UUID, error)
-	// CountHeldSeats counts non-terminal applications currently claiming
-	// roomID (see RoomService.CheckHoldable) — used to keep a pending
-	// applicant's room pick from exceeding capacity before any
-	// room_residents row exists.
-	CountHeldSeats(ctx context.Context, roomID uuid.UUID, excludeApplicationID *uuid.UUID) (int, error)
+	// CountFreeBeds counts the room's free beds (in service, nobody on them,
+	// not held), not counting excludeApplicationID's own hold as taken —
+	// see RoomService.CheckHoldable.
+	CountFreeBeds(ctx context.Context, roomID uuid.UUID, excludeApplicationID *uuid.UUID) (int, error)
 	// ListAvailabilityByDormitory returns every room of a dormitory with its
-	// resident, hold and out-of-service counts, for the room-picker UI.
+	// beds counted by status, for the room-picker UI.
 	ListAvailabilityByDormitory(ctx context.Context, dormitoryID uuid.UUID) ([]*domain.RoomAvailability, error)
 	// CountOutOfServiceBeds counts the room's active beds under repair or
 	// temporarily unavailable.
@@ -181,6 +180,9 @@ type RoomRepository interface {
 		reason *string, until *time.Time, changedBy uuid.UUID) (*domain.Bed, error)
 	// ListBedStatusHistory returns the bed's status log, newest first.
 	ListBedStatusHistory(ctx context.Context, bedID uuid.UUID) ([]*domain.BedStatusChange, error)
+	// ListBedConsistencyIssues lists beds that would be counted twice or
+	// whose status log is stale (expected: none).
+	ListBedConsistencyIssues(ctx context.Context) ([]*domain.BedConsistencyIssue, error)
 	// RenameBed returns ErrConflict if another active bed of the room has
 	// that label, ErrBedRetired if the bed is retired.
 	RenameBed(ctx context.Context, bedID uuid.UUID, label string) error

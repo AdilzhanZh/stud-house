@@ -67,4 +67,5 @@ type RegistryRow struct {
 	BedService       *BedServiceStatus
 	BedServiceReason *string
 	BedServiceUntil  *time.Time
+	BedStatusChanged *time.Time
 }

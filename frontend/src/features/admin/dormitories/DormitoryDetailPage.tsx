@@ -12,7 +12,8 @@ import { DeleteIconButton } from '../../../components/DeleteIconButton'
 import { FloorCorridorMap } from '../../../components/FloorCorridorMap'
 import { extractErrorMessage } from '../../../api/client'
 import { getDormitory, getDormitoryCapacity } from '../../../api/dormitoryApi'
-import { deleteRoom, listRoomResidents, listRoomsByDormitory } from '../../../api/roomApi'
+import { deleteRoom, listBeds, listRoomsByDormitory } from '../../../api/roomApi'
+import { bedStatusDotClass } from '../../../utils/bedStatus'
 import { createFloor, listDormitoryFloors, retireFloor, updateFloor } from '../../../api/hierarchyApi'
 import { floorLabel, roomLabel } from '../../../utils/roomLocation'
 import type { Floor } from '../../../types/hierarchy'
@@ -22,12 +23,14 @@ import { useAuth } from '../../auth/useAuth'
 import { dormitoryPosition } from '../../dormitories/DormitoryMap'
 import { DormitoryMiniMap } from '../../dormitories/DormitoryMapViewer'
 import type { Dormitory, DormitoryCapacity } from '../../../types/dormitories'
-import type { Room } from '../../../types/rooms'
+import { BED_STATUSES, type BedStatus, type Room } from '../../../types/rooms'
 
 const iconBtn = 'flex h-8 w-8 items-center justify-center rounded-lg transition-colors'
 
 interface RoomRow extends Room {
   residentCount: number
+  // Active beds per status (free / reserved / occupied / repair / unavailable).
+  bedStatusCounts: Record<BedStatus, number>
 }
 
 function restrictionsSummary(room: Room, t: TFunction): string {
@@ -88,8 +91,10 @@ export function DormitoryDetailPage() {
         setFloors(floorList)
         const withResidents = await Promise.all(
           roomList.map(async (r) => {
-            const residents = await listRoomResidents(r.id).catch(() => [])
-            return { ...r, residentCount: residents.length }
+            const beds = await listBeds(r.id).catch(() => [])
+            const bedStatusCounts = Object.fromEntries(BED_STATUSES.map((s) => [s, 0])) as Record<BedStatus, number>
+            for (const b of beds) bedStatusCounts[b.status] += 1
+            return { ...r, residentCount: bedStatusCounts.occupied, bedStatusCounts }
           }),
         )
         setRooms(withResidents)
@@ -319,6 +324,7 @@ export function DormitoryDetailPage() {
               <th className={adminCellClass}>{t('admin.dormitories.floor')}</th>
               <th className={adminCellClass}>{t('admin.dormitories.capacity')}</th>
               <th className={adminCellClass}>{t('admin.layout.residents')}</th>
+              <th className={adminCellClass}>{t('admin.rooms.bedStatusSummary')}</th>
               <th className={adminCellClass}>{t('admin.dormitories.restrictions')}</th>
               <th className={adminCellClass}>{t('admin.dormitories.actions')}</th>
             </tr>
@@ -332,6 +338,20 @@ export function DormitoryDetailPage() {
                 </td>
                 <td className={`${adminCellClass} text-sand-300`}>{room.capacity}</td>
                 <td className={`${adminCellClass} text-sand-300`}>{room.residentCount}</td>
+                <td className={adminCellClass}>
+                  <span className="flex flex-wrap gap-x-3 gap-y-1">
+                    {BED_STATUSES.filter((st) => room.bedStatusCounts[st] > 0).map((st) => (
+                      <span
+                        key={st}
+                        className="inline-flex items-center gap-1 text-xs whitespace-nowrap text-sand-300"
+                        title={t(`admin.rooms.bedStatus.${st}`)}
+                      >
+                        <span className={`h-2 w-2 rounded-full ${bedStatusDotClass[st]}`} />
+                        {t(`admin.rooms.bedStatus.${st}`)} {room.bedStatusCounts[st]}
+                      </span>
+                    ))}
+                  </span>
+                </td>
                 <td className={`${adminCellClass} text-sand-300`}>{restrictionsSummary(room, t)}</td>
                 <td className={adminCellClass}>
                   <div className="flex gap-3">

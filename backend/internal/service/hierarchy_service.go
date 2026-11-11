@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
@@ -256,6 +257,10 @@ type RegistryBed struct {
 	InventoryNo int64
 	Label       string
 	Occupied    bool
+	Status      domain.BedStatus
+	// ServiceReason / ServiceUntil are set while the bed is out of service.
+	ServiceReason *string
+	ServiceUntil  *time.Time
 }
 
 // Registry builds the tree from the repository's ordered flat rows.
@@ -301,7 +306,9 @@ func (s *HierarchyService) Registry(ctx context.Context, objectID, dormitoryID *
 			continue
 		}
 		room.Beds = append(room.Beds, &RegistryBed{ID: *r.BedID, InventoryNo: *r.BedInventoryNo,
-			Label: *r.BedLabel, Occupied: r.BedOccupied})
+			Label: *r.BedLabel, Occupied: r.BedOccupied,
+			Status:        domain.BedStatusOf(r.BedOccupied, r.BedReserved, *r.BedService),
+			ServiceReason: r.BedServiceReason, ServiceUntil: r.BedServiceUntil})
 	}
 	return out, nil
 }

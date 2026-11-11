@@ -18,7 +18,7 @@ interface RoomPickerProps {
 // needs_correction application re-picking after its previous hold was
 // released — see ApplicationDetailPage). Sourced from listRoomAvailability
 // instead of a per-room residents fetch, and treats a room as full once
-// resident_count + held_count reaches capacity, not just resident_count —
+// resident_count + held_count (+ beds out of service) reaches capacity —
 // a "held" room is one another pending applicant already has as their
 // current pick (see the backend's RoomService.CheckHoldable).
 export function RoomPicker({ dormitoryId, studentGender, roomId, onSelectRoom }: RoomPickerProps) {
@@ -87,7 +87,7 @@ export function RoomPicker({ dormitoryId, studentGender, roomId, onSelectRoom }:
           id: r.id,
           room_number: r.room_number,
           capacity: r.capacity,
-          residentCount: r.resident_count + r.held_count,
+          residentCount: r.resident_count + r.held_count + r.out_of_service_count,
           blocked: !isEligible(r),
         }))}
         selectedRoomId={roomId}
@@ -104,7 +104,7 @@ export function RoomPicker({ dormitoryId, studentGender, roomId, onSelectRoom }:
           {selectedRoom
             ? t('wizard.roomSelected', {
                 room: roomLabel(selectedRoom),
-                occupied: selectedRoom.resident_count + selectedRoom.held_count,
+                occupied: selectedRoom.resident_count + selectedRoom.held_count + selectedRoom.out_of_service_count,
                 capacity: selectedRoom.capacity,
               })
             : t('wizard.roomNotSelected')}

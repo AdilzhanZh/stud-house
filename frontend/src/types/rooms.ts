@@ -38,11 +38,17 @@ export interface Room {
 // Room plus how many seats are already spoken for — by actual residents
 // (resident_count) and by other pending applicants who currently have this
 // room as their pick (held_count, a "hold" — see the backend's
-// RoomService.CheckHoldable). capacity - resident_count - held_count is how
-// many more applicants may still pick this room.
+// RoomService.CheckHoldable). out_of_service_count is the beds under repair
+// or temporarily unavailable. roomFreeSeats() is how many more applicants
+// may still pick this room.
 export interface RoomAvailability extends Room {
   resident_count: number
   held_count: number
+  out_of_service_count: number
+}
+
+export function roomFreeSeats(r: RoomAvailability): number {
+  return Math.max(0, r.capacity - r.out_of_service_count - r.resident_count - r.held_count)
 }
 
 // moved_in_at is always set — RoomRepository.AddResident inserts room_id +
@@ -66,7 +72,9 @@ export interface RoomResident {
 // One bed place in a room. id and code (e.g. "B-000412") are permanent: a
 // bed is never renumbered or deleted, only retired when it is physically
 // removed. label is the editable position name. resident_id/student_id are
-// the current stay, both null when the bed is free.
+// the current stay, both null when the bed is free. held_* is the active
+// application reserving it. service_* is set while a manager has it under
+// repair or temporarily unavailable (service_until: YYYY-MM-DD).
 export interface Bed {
   id: string
   inventory_no: number
@@ -77,6 +85,49 @@ export interface Bed {
   retired_at: string | null
   resident_id: string | null
   student_id: string | null
+  status: BedStatus
+  held_application_id: string | null
+  held_student_id: string | null
+  service_reason: string | null
+  service_until: string | null
+  service_changed_at: string | null
+  service_changed_by: string | null
+}
+
+// свободно / забронировано / занято / на ремонте / временно недоступно.
+export type BedStatus = 'free' | 'reserved' | 'occupied' | 'repair' | 'unavailable'
+export const BED_STATUSES: BedStatus[] = ['free', 'reserved', 'occupied', 'repair', 'unavailable']
+
+// The part of a bed's status a manager sets by hand.
+export type BedServiceStatus = 'in_service' | 'repair' | 'unavailable'
+
+// The document behind a bed status change: заявление на заселение, бронь,
+// договор, заявление на выселение / на перевод, акт.
+export type BedBasisType = 'application' | 'reservation' | 'contract' | 'exit_request' | 'transfer_request' | 'act'
+
+// One entry of a bed's status log. changed_by null = the system, except on
+// backfilled entries (rebuilt from data older than the log), where author
+// and basis may simply be unknown.
+export interface BedStatusChange {
+  id: string
+  old_status: BedStatus
+  new_status: BedStatus
+  reason: string | null
+  until: string | null
+  changed_by: string | null
+  changed_at: string
+  basis_type: BedBasisType | null
+  basis_id: string | null
+  act_number: string | null
+  act_date: string | null
+  act_file_url: string | null
+  student_id: string | null
+  backfilled: boolean
+}
+
+export interface BedStatusHistory {
+  bed: Bed
+  changes: BedStatusChange[]
 }
 
 export interface BedHistory {

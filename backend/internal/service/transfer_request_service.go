@@ -102,6 +102,8 @@ func (s *TransferRequestService) List(ctx context.Context, status *domain.Transf
 func (s *TransferRequestService) Decide(ctx context.Context, actorID, transferRequestID uuid.UUID, action string, roomID *uuid.UUID, comment *string) (*domain.TransferRequest, error) {
 	var studentID uuid.UUID
 
+	// The transfer request is the basis of both beds' status changes.
+	ctx = domain.WithBedBasis(ctx, domain.BedBasisTransferRequest, transferRequestID)
 	err := s.transferRequests.WithLock(ctx, transferRequestID, func(ctx context.Context, tr *domain.TransferRequest, tx repository.TransferRequestTx) error {
 		if tr.Status != domain.TransferRequestPending {
 			return apperror.Conflict("ауыстыру өтініші бойынша шешім бұрын қабылданды")

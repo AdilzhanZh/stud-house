@@ -287,15 +287,17 @@ func roomsDTO(list []*domain.Room) []roomResponse {
 
 type roomAvailabilityResponse struct {
 	roomResponse
-	ResidentCount int `json:"resident_count"`
-	HeldCount     int `json:"held_count"`
+	ResidentCount     int `json:"resident_count"`
+	HeldCount         int `json:"held_count"`
+	OutOfServiceCount int `json:"out_of_service_count"`
 }
 
 func roomAvailabilityDTO(a *domain.RoomAvailability) roomAvailabilityResponse {
 	return roomAvailabilityResponse{
-		roomResponse:  roomDTO(a.Room),
-		ResidentCount: a.ResidentCount,
-		HeldCount:     a.HeldCount,
+		roomResponse:      roomDTO(a.Room),
+		ResidentCount:     a.ResidentCount,
+		HeldCount:         a.HeldCount,
+		OutOfServiceCount: a.OutOfServiceCount,
 	}
 }
 
@@ -345,6 +347,17 @@ type bedResponse struct {
 	// The current stay on this bed; both nil when the bed is free.
 	ResidentID *uuid.UUID `json:"resident_id"`
 	StudentID  *uuid.UUID `json:"student_id"`
+	// free | reserved | occupied | repair | unavailable.
+	Status domain.BedStatus `json:"status"`
+	// The active application holding this bed; both nil when none.
+	HeldApplicationID *uuid.UUID `json:"held_application_id"`
+	HeldStudentID     *uuid.UUID `json:"held_student_id"`
+	// Set while the bed is under repair or unavailable. ServiceUntil is the
+	// expected date it is back (YYYY-MM-DD).
+	ServiceReason    *string    `json:"service_reason"`
+	ServiceUntil     *string    `json:"service_until"`
+	ServiceChangedAt *time.Time `json:"service_changed_at"`
+	ServiceChangedBy *uuid.UUID `json:"service_changed_by"`
 }
 
 func bedDTO(b *domain.Bed) bedResponse {
@@ -352,7 +365,61 @@ func bedDTO(b *domain.Bed) bedResponse {
 		ID: b.ID, InventoryNo: b.InventoryNo, Code: domain.BedCode(b.InventoryNo),
 		RoomID: b.RoomID, Label: b.Label, CreatedAt: b.CreatedAt, RetiredAt: b.RetiredAt,
 		ResidentID: b.ResidentID, StudentID: b.StudentID,
+		Status:            b.Status(),
+		HeldApplicationID: b.HeldApplicationID, HeldStudentID: b.HeldStudentID,
+		ServiceReason: b.ServiceReason, ServiceUntil: datePtr(b.ServiceUntil),
+		ServiceChangedAt: b.ServiceChangedAt, ServiceChangedBy: b.ServiceChangedBy,
 	}
+}
+
+// datePtr formats a DATE column as YYYY-MM-DD.
+func datePtr(t *time.Time) *string {
+	if t == nil {
+		return nil
+	}
+	s := t.Format(time.DateOnly)
+	return &s
+}
+
+type bedStatusChangeResponse struct {
+	ID        uuid.UUID        `json:"id"`
+	OldStatus domain.BedStatus `json:"old_status"`
+	NewStatus domain.BedStatus `json:"new_status"`
+	Reason    *string          `json:"reason"`
+	Until     *string          `json:"until"`
+	// nil = the system (e.g. a scheduled job), or unknown when backfilled.
+	ChangedBy *uuid.UUID `json:"changed_by"`
+	ChangedAt time.Time  `json:"changed_at"`
+	// The document behind the change: application, reservation, contract,
+	// exit_request, transfer_request (basis_id = that record) or act
+	// (act_*). May be null on backfilled entries.
+	BasisType  *domain.BedBasisType `json:"basis_type"`
+	BasisID    *uuid.UUID           `json:"basis_id"`
+	ActNumber  *string              `json:"act_number"`
+	ActDate    *string              `json:"act_date"`
+	ActFileURL *string              `json:"act_file_url"`
+	StudentID  *uuid.UUID           `json:"student_id"`
+	// Rebuilt from data older than the log (author/basis may be unknown).
+	Backfilled bool `json:"backfilled"`
+}
+
+type bedStatusHistoryResponse struct {
+	Bed     bedResponse               `json:"bed"`
+	Changes []bedStatusChangeResponse `json:"changes"`
+}
+
+func bedStatusHistoryDTO(bed *domain.Bed, changes []*domain.BedStatusChange) bedStatusHistoryResponse {
+	out := bedStatusHistoryResponse{Bed: bedDTO(bed), Changes: make([]bedStatusChangeResponse, 0, len(changes))}
+	for _, c := range changes {
+		out.Changes = append(out.Changes, bedStatusChangeResponse{
+			ID: c.ID, OldStatus: c.OldStatus, NewStatus: c.NewStatus, Reason: c.Reason,
+			Until: datePtr(c.Until), ChangedBy: c.ChangedBy, ChangedAt: c.ChangedAt,
+			BasisType: c.BasisType, BasisID: c.BasisID, ActNumber: c.ActNumber,
+			ActDate: datePtr(c.ActDate), ActFileURL: c.ActFileURL, StudentID: c.StudentID,
+			Backfilled: c.Backfilled,
+		})
+	}
+	return out
 }
 
 func bedsDTO(list []*domain.Bed) []bedResponse {

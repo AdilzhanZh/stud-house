@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -19,14 +20,22 @@ import (
 // handled one after the other and rooms.capacity always equals the active
 // bed count.
 
-// bedSelect reads beds together with their current stay (if any); scan
-// with scanBed. The joined room_residents alias is rr, so callers can
-// filter on "rr.id IS NULL" for free beds.
+// activeHoldStatuses are the application statuses whose held_bed_id
+// reserves a bed (see migration 000100 and RoomRepo.CountHeldSeats).
+const activeHoldStatuses = `('pending', 'manager_review', 'approved')`
+
+// bedSelect reads beds together with their current stay and active hold
+// (if any); scan with scanBed. The joined room_residents alias is rr and
+// the holding application is ha, so callers can filter on "rr.id IS NULL"
+// for unoccupied beds and "ha.id IS NULL" for unreserved ones.
 const bedSelect = `
 	SELECT b.id, b.inventory_no, b.room_id, b.label, b.created_at, b.retired_at,
-		rr.id, rr.student_id
+		rr.id, rr.student_id, ha.id, ha.student_id,
+		b.service_status, b.service_reason, b.service_until,
+		b.service_changed_at, b.service_changed_by
 	FROM beds b
-	LEFT JOIN room_residents rr ON rr.bed_id = b.id AND rr.moved_out_at IS NULL`
+	LEFT JOIN room_residents rr ON rr.bed_id = b.id AND rr.moved_out_at IS NULL
+	LEFT JOIN applications ha ON ha.held_bed_id = b.id AND ha.status IN ` + activeHoldStatuses
 
 // Beds are ordered numerically when labels are numbers ("2" before "10"),
 // then by text, then by creation. Desc is the exact reverse, used to pick
@@ -43,7 +52,9 @@ const (
 func scanBed(row pgx.Row) (*domain.Bed, error) {
 	b := &domain.Bed{}
 	err := row.Scan(&b.ID, &b.InventoryNo, &b.RoomID, &b.Label, &b.CreatedAt, &b.RetiredAt,
-		&b.ResidentID, &b.StudentID)
+		&b.ResidentID, &b.StudentID, &b.HeldApplicationID, &b.HeldStudentID,
+		&b.ServiceStatus, &b.ServiceReason, &b.ServiceUntil,
+		&b.ServiceChangedAt, &b.ServiceChangedBy)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +92,7 @@ func addBedsTx(ctx context.Context, tx pgx.Tx, roomID uuid.UUID, count int) ([]*
 		RETURNING id, inventory_no, room_id, label, created_at, retired_at`
 	out := make([]*domain.Bed, 0, count)
 	for i := 0; i < count; i++ {
-		b := &domain.Bed{}
+		b := &domain.Bed{ServiceStatus: domain.BedInService}
 		if err := tx.QueryRow(ctx, q, roomID).Scan(
 			&b.ID, &b.InventoryNo, &b.RoomID, &b.Label, &b.CreatedAt, &b.RetiredAt,
 		); err != nil {
@@ -176,6 +187,9 @@ func (r *RoomRepo) RetireBed(ctx context.Context, bedID uuid.UUID) error {
 	if bed.ResidentID != nil {
 		return repository.ErrBedOccupied
 	}
+	if bed.HeldApplicationID != nil {
+		return repository.ErrBedReserved
+	}
 	var active int
 	if err := tx.QueryRow(ctx,
 		`SELECT count(*) FROM beds WHERE room_id = $1 AND retired_at IS NULL`, bed.RoomID,
@@ -226,4 +240,91 @@ func (r *RoomRepo) ListBedHistory(ctx context.Context, bedID uuid.UUID) ([]*doma
 		return nil, err
 	}
 	return collectResidents(rows)
+}
+
+func (r *RoomRepo) SetBedServiceStatus(ctx context.Context, bedID uuid.UUID, status domain.BedServiceStatus,
+	reason *string, until *time.Time, changedBy uuid.UUID) (*domain.Bed, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	bed, err := bedForChangeTx(ctx, tx, bedID)
+	if err != nil {
+		return nil, err
+	}
+	if bed.RetiredAt != nil {
+		return nil, repository.ErrBedRetired
+	}
+	if status != domain.BedInService {
+		if bed.ResidentID != nil {
+			return nil, repository.ErrBedOccupied
+		}
+		if bed.HeldApplicationID != nil {
+			return nil, repository.ErrBedReserved
+		}
+	}
+	if bed.ServiceStatus == status && equalPtr(bed.ServiceReason, reason) && equalDatePtr(bed.ServiceUntil, until) {
+		return bed, tx.Commit(ctx)
+	}
+
+	if _, err := tx.Exec(ctx, `
+		UPDATE beds
+		SET service_status = $2, service_reason = $3, service_until = $4,
+			service_changed_at = now(), service_changed_by = $5
+		WHERE id = $1`, bedID, status, reason, until, changedBy); err != nil {
+		return nil, err
+	}
+	updated, err := scanBed(tx.QueryRow(ctx, bedSelect+` WHERE b.id = $1`, bedID))
+	if err != nil {
+		return nil, err
+	}
+	return updated, tx.Commit(ctx)
+}
+
+func equalPtr[T comparable](a, b *T) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
+}
+
+func equalDatePtr(a, b *time.Time) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.Format(time.DateOnly) == b.Format(time.DateOnly)
+}
+
+func (r *RoomRepo) ListBedStatusHistory(ctx context.Context, bedID uuid.UUID) ([]*domain.BedStatusChange, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, bed_id, old_status, new_status, reason, until, changed_by, changed_at,
+			basis_type, basis_id, act_number, act_date, act_file_url, student_id, backfilled
+		FROM bed_status_history
+		WHERE bed_id = $1
+		ORDER BY seq DESC`, bedID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*domain.BedStatusChange
+	for rows.Next() {
+		c := &domain.BedStatusChange{}
+		if err := rows.Scan(&c.ID, &c.BedID, &c.OldStatus, &c.NewStatus, &c.Reason, &c.Until,
+			&c.ChangedBy, &c.ChangedAt, &c.BasisType, &c.BasisID, &c.ActNumber, &c.ActDate,
+			&c.ActFileURL, &c.StudentID, &c.Backfilled); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+func (r *RoomRepo) CountOutOfServiceBeds(ctx context.Context, roomID uuid.UUID) (int, error) {
+	var n int
+	err := r.db.QueryRow(ctx, `
+		SELECT count(*) FROM beds
+		WHERE room_id = $1 AND retired_at IS NULL AND service_status <> 'in_service'`, roomID).Scan(&n)
+	return n, err
 }

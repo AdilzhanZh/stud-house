@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -447,7 +448,11 @@ func (s *RoomService) ValidateAssignable(ctx context.Context, roomID, studentID 
 	if err != nil {
 		return nil, err
 	}
-	if len(residents) >= room.Capacity {
+	usable, err := s.usableBeds(ctx, room)
+	if err != nil {
+		return nil, err
+	}
+	if len(residents) >= usable {
 		return nil, apperror.Conflict("бөлме толығымен толған")
 	}
 
@@ -482,6 +487,10 @@ func bedPlacementError(err error) error {
 		return apperror.Conflict("бұл төсек-орын алынып тасталған")
 	case errors.Is(err, repository.ErrBedOccupied):
 		return apperror.Conflict("бұл төсек-орын бос емес")
+	case errors.Is(err, repository.ErrBedReserved):
+		return apperror.Conflict("бұл төсек-орын өтініш бойынша брондалған")
+	case errors.Is(err, repository.ErrBedOutOfService):
+		return apperror.Conflict("бұл төсек-орын жөндеуде немесе уақытша қолжетімсіз")
 	case errors.Is(err, repository.ErrNoFreeBed):
 		return apperror.Conflict("бөлмеде бос төсек-орын жоқ")
 	case errors.Is(err, repository.ErrConflict):
@@ -644,10 +653,51 @@ func (s *RoomService) CheckHoldable(ctx context.Context, roomID uuid.UUID, exclu
 	if err != nil {
 		return err
 	}
-	if len(residents)+held >= room.Capacity {
+	usable, err := s.usableBeds(ctx, room)
+	if err != nil {
+		return err
+	}
+	if len(residents)+held >= usable {
 		return apperror.Conflict("бөлме толығымен толған")
 	}
 	return nil
+}
+
+// CheckBedHoldable reports whether the application of studentID may
+// reserve bedID in roomID: the bed must be in that room, not retired, in
+// service, with nobody else living on it and no other application holding
+// it (applicationID's own hold on it is fine).
+func (s *RoomService) CheckBedHoldable(ctx context.Context, roomID, bedID, applicationID, studentID uuid.UUID) error {
+	bed, err := s.rooms.GetBedByID(ctx, bedID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return apperror.NotFound("төсек-орын табылмады")
+		}
+		return err
+	}
+	switch {
+	case bed.RoomID != roomID:
+		return apperror.NotFound("бұл бөлмеде мұндай төсек-орын табылмады")
+	case bed.RetiredAt != nil:
+		return apperror.Conflict("бұл төсек-орын алынып тасталған")
+	case bed.ServiceStatus != domain.BedInService:
+		return apperror.Conflict("бұл төсек-орын жөндеуде немесе уақытша қолжетімсіз")
+	case bed.StudentID != nil && *bed.StudentID != studentID:
+		return apperror.Conflict("бұл төсек-орын бос емес")
+	case bed.HeldApplicationID != nil && *bed.HeldApplicationID != applicationID:
+		return apperror.Conflict("бұл төсек-орын өтініш бойынша брондалған")
+	}
+	return nil
+}
+
+// usableBeds is the room's active beds minus those under repair or
+// temporarily unavailable — the seats that can be lived on or held.
+func (s *RoomService) usableBeds(ctx context.Context, room *domain.Room) (int, error) {
+	out, err := s.rooms.CountOutOfServiceBeds(ctx, room.ID)
+	if err != nil {
+		return 0, err
+	}
+	return room.Capacity - out, nil
 }
 
 // ListAvailabilityByDormitory returns every room of a dormitory with its
@@ -699,6 +749,8 @@ func (s *RoomService) RetireBed(ctx context.Context, bedID uuid.UUID) error {
 		return apperror.Conflict("бұл төсек-орын бұрын алынып тасталған")
 	case errors.Is(err, repository.ErrBedOccupied):
 		return apperror.Conflict("төсек-орында тұрғын бар — алдымен оны басқа орынға ауыстырыңыз")
+	case errors.Is(err, repository.ErrBedReserved):
+		return apperror.Conflict("бұл төсек-орын өтініш бойынша брондалған")
 	case errors.Is(err, repository.ErrLastBed):
 		return apperror.Conflict("бөлмеде кемінде бір төсек-орын қалуы керек")
 	}
@@ -747,4 +799,86 @@ func (s *RoomService) BedHistory(ctx context.Context, bedID uuid.UUID) (*domain.
 		return nil, nil, err
 	}
 	return bed, stays, nil
+}
+
+// maxBedServiceReasonLen caps the reason a bed is out of service.
+const maxBedServiceReasonLen = 500
+
+// maxBedActNumberLen matches bed_status_history.act_number VARCHAR(100).
+const maxBedActNumberLen = 100
+
+// SetBedStatus takes a bed out of service (repair — на ремонте,
+// unavailable — временно недоступно) or returns it to service. Every such
+// change cites an act (акт): its number and date are required, the scanned
+// file optional; the act is the basis recorded in the bed's status log.
+// Taking a bed out also needs a reason; until, the expected date it is
+// back, is optional and may not be in the past. Returning to service clears
+// both. A bed someone lives on or an application holds must be freed first.
+func (s *RoomService) SetBedStatus(ctx context.Context, bedID uuid.UUID, status domain.BedServiceStatus,
+	reason *string, until *time.Time, act domain.BedAct, actorID uuid.UUID) (*domain.Bed, error) {
+	if !status.Valid() {
+		return nil, apperror.BadRequest("төсек-орын күйі дұрыс емес")
+	}
+	act.Number = strings.TrimSpace(act.Number)
+	if act.Number == "" || act.Date.IsZero() {
+		return nil, apperror.BadRequest("актінің нөмірі мен күні міндетті")
+	}
+	if len([]rune(act.Number)) > maxBedActNumberLen {
+		return nil, apperror.BadRequest(fmt.Sprintf("акт нөмірі %d таңбадан аспауы керек", maxBedActNumberLen))
+	}
+	if act.Date.Format(time.DateOnly) > time.Now().Format(time.DateOnly) {
+		return nil, apperror.BadRequest("акт күні болашақта болмауы керек")
+	}
+	if act.FileURL != nil && strings.TrimSpace(*act.FileURL) == "" {
+		act.FileURL = nil
+	}
+	ctx = domain.WithBedAct(domain.WithBedActor(ctx, actorID), act)
+	if status == domain.BedInService {
+		reason, until = nil, nil
+	} else {
+		if reason != nil {
+			trimmed := strings.TrimSpace(*reason)
+			reason = &trimmed
+		}
+		if reason == nil || *reason == "" {
+			return nil, apperror.BadRequest("жөндеу немесе қолжетімсіздік себебі міндетті")
+		}
+		if len([]rune(*reason)) > maxBedServiceReasonLen {
+			return nil, apperror.BadRequest(fmt.Sprintf("себеп %d таңбадан аспауы керек", maxBedServiceReasonLen))
+		}
+		if until != nil && until.Format(time.DateOnly) < time.Now().Format(time.DateOnly) {
+			return nil, apperror.BadRequest("күтілетін аяқталу күні өткен күн болмауы керек")
+		}
+	}
+
+	bed, err := s.rooms.SetBedServiceStatus(ctx, bedID, status, reason, until, actorID)
+	switch {
+	case err == nil:
+		return bed, nil
+	case errors.Is(err, repository.ErrNotFound):
+		return nil, apperror.NotFound("төсек-орын табылмады")
+	case errors.Is(err, repository.ErrBedRetired):
+		return nil, apperror.Conflict("бұл төсек-орын алынып тасталған")
+	case errors.Is(err, repository.ErrBedOccupied):
+		return nil, apperror.Conflict("төсек-орында тұрғын бар — алдымен оны басқа орынға ауыстырыңыз")
+	case errors.Is(err, repository.ErrBedReserved):
+		return nil, apperror.Conflict("бұл төсек-орын өтініш бойынша брондалған")
+	}
+	return nil, err
+}
+
+// BedStatusHistory returns the bed and its status log, newest first.
+func (s *RoomService) BedStatusHistory(ctx context.Context, bedID uuid.UUID) (*domain.Bed, []*domain.BedStatusChange, error) {
+	bed, err := s.rooms.GetBedByID(ctx, bedID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, nil, apperror.NotFound("төсек-орын табылмады")
+		}
+		return nil, nil, err
+	}
+	changes, err := s.rooms.ListBedStatusHistory(ctx, bedID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return bed, changes, nil
 }

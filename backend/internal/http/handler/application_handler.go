@@ -206,9 +206,11 @@ func (h *ApplicationHandler) GetDetail(c *gin.Context) {
 }
 
 type decisionRequest struct {
-	Action  service.DecisionAction `json:"action" binding:"required"`
-	RoomID  *uuid.UUID             `json:"room_id"`
-	Comment *string                `json:"comment"`
+	Action service.DecisionAction `json:"action" binding:"required"`
+	RoomID *uuid.UUID             `json:"room_id"`
+	// BedID (approve only) picks which bed of the room is reserved.
+	BedID   *uuid.UUID `json:"bed_id"`
+	Comment *string    `json:"comment"`
 }
 
 // Decide is manager/admin-only: approve / reject / request_correction.
@@ -224,7 +226,32 @@ func (h *ApplicationHandler) Decide(c *gin.Context) {
 		return
 	}
 	actorID, _ := middleware.UserID(c)
-	app, err := h.applications.Decide(c.Request.Context(), actorID, id, req.Action, req.RoomID, req.Comment)
+	app, err := h.applications.Decide(c.Request.Context(), actorID, id, req.Action, req.RoomID, req.BedID, req.Comment)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, applicationDTO(app))
+}
+
+type changeHeldBedRequest struct {
+	BedID uuid.UUID `json:"bed_id" binding:"required"`
+}
+
+// ChangeHeldBed is manager/admin-only: PATCH /applications/:id/held-bed
+// moves the application's reservation to another free bed of its room.
+func (h *ApplicationHandler) ChangeHeldBed(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, apperror.BadRequest("өтініш идентификаторы дұрыс емес"))
+		return
+	}
+	var req changeHeldBedRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.BadRequest(err.Error()))
+		return
+	}
+	app, err := h.applications.ChangeHeldBed(c.Request.Context(), id, req.BedID)
 	if err != nil {
 		response.Error(c, err)
 		return

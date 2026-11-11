@@ -192,6 +192,7 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 				// Bed places of a room and one bed's stay history.
 				staffGroup.GET("/rooms/:roomId/beds", h.Room.ListBeds)
 				staffGroup.GET("/beds/:bedId/history", h.Room.BedHistory)
+				staffGroup.GET("/beds/:bedId/status-history", h.Room.BedStatusHistory)
 				// Registry: object → building (dormitory) → floor → room → bed.
 				staffGroup.GET("/registry", h.Hierarchy.Registry)
 				staffGroup.GET("/dorm-objects", h.Hierarchy.ListObjects)
@@ -257,6 +258,7 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 				mgmt.POST("/rooms/:roomId/beds", h.Room.AddBeds)
 				mgmt.PATCH("/beds/:bedId", h.Room.RenameBed)
 				mgmt.DELETE("/beds/:bedId", h.Room.RetireBed)
+				mgmt.PATCH("/beds/:bedId/status", h.Room.SetBedStatus)
 				mgmt.POST("/dorm-objects", h.Hierarchy.CreateObject)
 				mgmt.PATCH("/dorm-objects/:objectId", h.Hierarchy.UpdateObject)
 				mgmt.DELETE("/dorm-objects/:objectId", h.Hierarchy.DeleteObject)
@@ -287,6 +289,7 @@ func NewRouter(jwtSecret string, uploadDir string, h Handlers) *gin.Engine {
 				mgmt.GET("/applications", h.Application.List)
 				mgmt.PATCH("/applications/:id/decision", h.Application.Decide)
 				mgmt.PATCH("/applications/:id/cancel-approved", h.Application.CancelApproved)
+				mgmt.PATCH("/applications/:id/held-bed", h.Application.ChangeHeldBed)
 
 				// Green/yellow/red sorting of pending applications, and the
 				// bulk actions it exists for (see service.TriageService).

@@ -48,7 +48,13 @@ type Application struct {
 	Hometown       string
 	ParentContact  string
 	AssignedRoomID *uuid.UUID
-	HandledBy      *uuid.UUID
+	// HeldBedID is the bed place this application reserves in its room
+	// (COALESCE(AssignedRoomID, PreferredRoomID)) while it is pending,
+	// under review or approved; nil otherwise. The database keeps it in
+	// sync (trigger applications_sync_held_bed); a manager may move it to
+	// another free bed of the same room (ApplicationService.ChangeHeldBed).
+	HeldBedID *uuid.UUID
+	HandledBy *uuid.UUID
 	// ContractAgreedAt is when the student agreed to the contract in the
 	// wizard's final step. Nil only on applications that predate that step.
 	ContractAgreedAt *time.Time

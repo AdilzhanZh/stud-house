@@ -63,4 +63,8 @@ type RegistryRow struct {
 	BedInventoryNo   *int64
 	BedLabel         *string
 	BedOccupied      bool
+	BedReserved      bool
+	BedService       *BedServiceStatus
+	BedServiceReason *string
+	BedServiceUntil  *time.Time
 }

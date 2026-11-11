@@ -108,15 +108,98 @@ type RoomResident struct {
 // editable position inside the room.
 //
 // ResidentID/StudentID describe the current stay on this bed, nil when free.
+// HeldApplicationID/HeldStudentID describe the active application holding
+// it, nil when none. Service* is the out-of-service mark a manager sets by
+// hand (see BedServiceStatus); Status combines all of these.
 type Bed struct {
-	ID          uuid.UUID
-	InventoryNo int64
-	RoomID      uuid.UUID
-	Label       string
-	CreatedAt   time.Time
-	RetiredAt   *time.Time
-	ResidentID  *uuid.UUID
-	StudentID   *uuid.UUID
+	ID                uuid.UUID
+	InventoryNo       int64
+	RoomID            uuid.UUID
+	Label             string
+	CreatedAt         time.Time
+	RetiredAt         *time.Time
+	ResidentID        *uuid.UUID
+	StudentID         *uuid.UUID
+	HeldApplicationID *uuid.UUID
+	HeldStudentID     *uuid.UUID
+	ServiceStatus     BedServiceStatus
+	ServiceReason     *string
+	ServiceUntil      *time.Time
+	ServiceChangedAt  *time.Time
+	ServiceChangedBy  *uuid.UUID
+}
+
+// BedServiceStatus is the part of a bed's status a manager sets by hand
+// (beds.service_status). Everything else about a bed's status is worked
+// out from its stay and hold.
+type BedServiceStatus string
+
+const (
+	BedInService   BedServiceStatus = "in_service"
+	BedRepair      BedServiceStatus = "repair"      // на ремонте
+	BedUnavailable BedServiceStatus = "unavailable" // временно недоступно
+)
+
+func (s BedServiceStatus) Valid() bool {
+	return s == BedInService || s == BedRepair || s == BedUnavailable
+}
+
+// BedStatus is what a bed place is shown as.
+type BedStatus string
+
+const (
+	BedStatusFree        BedStatus = "free"        // свободно
+	BedStatusReserved    BedStatus = "reserved"    // забронировано
+	BedStatusOccupied    BedStatus = "occupied"    // занято
+	BedStatusRepair      BedStatus = "repair"      // на ремонте
+	BedStatusUnavailable BedStatus = "unavailable" // временно недоступно
+)
+
+// Status works out the bed's status. The database keeps occupied/reserved
+// beds in service, so at most one of these applies; the order only makes
+// the answer defined for any input.
+func (b *Bed) Status() BedStatus {
+	return BedStatusOf(b.ResidentID != nil, b.HeldApplicationID != nil, b.ServiceStatus)
+}
+
+// BedStatusOf is Bed.Status for callers that only have the three facts.
+func BedStatusOf(occupied, reserved bool, service BedServiceStatus) BedStatus {
+	switch {
+	case occupied:
+		return BedStatusOccupied
+	case reserved:
+		return BedStatusReserved
+	case service == BedRepair:
+		return BedStatusRepair
+	case service == BedUnavailable:
+		return BedStatusUnavailable
+	}
+	return BedStatusFree
+}
+
+// BedStatusChange is one entry of a bed's status log: every change of its
+// status, when and by whom (nil ChangedBy = the system), the previous
+// status, and the document behind it (BasisType/BasisID, or the Act*
+// fields for an act). Reason/Until are the out-of-service details when the
+// new status is repair or unavailable. StudentID is the student the change
+// concerns, if any. Backfilled marks entries rebuilt from data that
+// predates the log: their author and basis may be unknown (nil).
+type BedStatusChange struct {
+	ID         uuid.UUID
+	BedID      uuid.UUID
+	OldStatus  BedStatus
+	NewStatus  BedStatus
+	Reason     *string
+	Until      *time.Time
+	ChangedBy  *uuid.UUID
+	ChangedAt  time.Time
+	BasisType  *BedBasisType
+	BasisID    *uuid.UUID
+	ActNumber  *string
+	ActDate    *time.Time
+	ActFileURL *string
+	StudentID  *uuid.UUID
+	Backfilled bool
 }
 
 // BedCode formats a bed's permanent inventory number the way people see
@@ -128,10 +211,12 @@ func BedCode(inventoryNo int64) string {
 // RoomAvailability is a Room plus how many seats are already spoken for —
 // by actual residents (ResidentCount) and by pending applicants who have
 // this room as their current pick, i.e. a "hold" (HeldCount; see
-// RoomService.CheckHoldable). Capacity - ResidentCount - HeldCount is how
-// many more applicants may still pick this room.
+// RoomService.CheckHoldable). OutOfServiceCount is the beds under repair or
+// temporarily unavailable. Capacity - OutOfServiceCount - ResidentCount -
+// HeldCount is how many more applicants may still pick this room.
 type RoomAvailability struct {
 	*Room
-	ResidentCount int
-	HeldCount     int
+	ResidentCount     int
+	HeldCount         int
+	OutOfServiceCount int
 }

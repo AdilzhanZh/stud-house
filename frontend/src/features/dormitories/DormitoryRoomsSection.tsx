@@ -4,7 +4,7 @@ import { Accessibility, BedDouble, Camera, ChevronRight, Maximize2, Ruler, X } f
 import { Card } from '../../components/Card'
 import { ImageLightbox } from '../../components/ImageLightbox'
 import { listRoomAvailability } from '../../api/roomApi'
-import type { RoomAvailability } from '../../types/rooms'
+import { roomFreeSeats, type RoomAvailability } from '../../types/rooms'
 import { groupRoomsByFloor, roomLabel } from '../../utils/roomLocation'
 
 // Public list of a dormitory's rooms with their (optional) details. It only
@@ -41,7 +41,7 @@ export function DormitoryRoomsSection({ dormitoryId }: { dormitoryId: string }) 
         <div role="tablist" aria-label={t('dorm.rooms.floorTabs')} className="-mx-1 mb-4 flex gap-2 overflow-x-auto px-1 pb-1">
           {byFloor.map(({ key: floor, label, rooms: list }) => {
             const active = activeGroup?.key === floor
-            const free = list.reduce((sum, r) => sum + Math.max(0, r.capacity - r.resident_count - r.held_count), 0)
+            const free = list.reduce((sum, r) => sum + roomFreeSeats(r), 0)
             return (
               <button
                 key={floor}
@@ -79,7 +79,7 @@ export function DormitoryRoomsSection({ dormitoryId }: { dormitoryId: string }) 
 }
 
 function freeSeats(room: RoomAvailability) {
-  return Math.max(0, room.capacity - room.resident_count - room.held_count)
+  return roomFreeSeats(room)
 }
 
 function hasDetails(room: RoomAvailability) {

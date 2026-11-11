@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -18,6 +19,9 @@ var (
 	ErrNoFreeBed   = errors.New("room has no free bed")
 	ErrBedRetired  = errors.New("bed is retired")
 	ErrLastBed     = errors.New("room must keep at least one bed")
+	ErrBedReserved = errors.New("bed is reserved by an application")
+	// ErrBedOutOfService: the bed is under repair or temporarily unavailable.
+	ErrBedOutOfService = errors.New("bed is out of service")
 
 	// Object/floor errors (see HierarchyRepository).
 	ErrNotEmpty       = errors.New("still has rooms or buildings")
@@ -124,10 +128,13 @@ type RoomRepository interface {
 	UpdateRestrictions(ctx context.Context, id uuid.UUID, restrictions domain.RoomRestrictions) error
 	Delete(ctx context.Context, id uuid.UUID) error
 	ListActiveResidents(ctx context.Context, roomID uuid.UUID) ([]*domain.RoomResident, error)
-	// AddResident puts the stay on rr.BedID, or on the room's first free
-	// bed when rr.BedID is nil, and fills rr's bed fields. Errors:
+	// AddResident puts the stay on rr.BedID, or, when rr.BedID is nil, on
+	// the bed the student's own application holds in this room, else the
+	// room's first free bed. Beds out of service or held by another
+	// student's application are never taken. Fills rr's bed fields. Errors:
 	// ErrNotFound (bed not in this room), ErrBedRetired, ErrBedOccupied,
-	// ErrNoFreeBed, ErrConflict (student already has an active stay).
+	// ErrBedReserved, ErrBedOutOfService, ErrNoFreeBed, ErrConflict
+	// (student already has an active stay).
 	AddResident(ctx context.Context, rr *domain.RoomResident) error
 	MoveOutResident(ctx context.Context, residentRowID uuid.UUID) error
 	GetActiveResidentByStudent(ctx context.Context, studentID uuid.UUID) (*domain.RoomResident, error)
@@ -145,20 +152,35 @@ type RoomRepository interface {
 	// room_residents row exists.
 	CountHeldSeats(ctx context.Context, roomID uuid.UUID, excludeApplicationID *uuid.UUID) (int, error)
 	// ListAvailabilityByDormitory returns every room of a dormitory with its
-	// resident and hold counts, for the room-picker UI.
+	// resident, hold and out-of-service counts, for the room-picker UI.
 	ListAvailabilityByDormitory(ctx context.Context, dormitoryID uuid.UUID) ([]*domain.RoomAvailability, error)
+	// CountOutOfServiceBeds counts the room's active beds under repair or
+	// temporarily unavailable.
+	CountOutOfServiceBeds(ctx context.Context, roomID uuid.UUID) (int, error)
 
 	// Bed places. Create makes Capacity beds for a new room and Update
 	// adds/retires beds so the active count matches the new Capacity
-	// (ErrBedOccupied when too few beds are free to retire). AddBeds and
+	// (ErrBedOccupied when too few beds are free to retire; beds out of
+	// service go first, occupied or reserved beds never). AddBeds and
 	// RetireBed change one room's beds directly and keep rooms.capacity
 	// equal to the active bed count.
 	ListBeds(ctx context.Context, roomID uuid.UUID, includeRetired bool) ([]*domain.Bed, error)
 	GetBedByID(ctx context.Context, id uuid.UUID) (*domain.Bed, error)
 	AddBeds(ctx context.Context, roomID uuid.UUID, count int) ([]*domain.Bed, error)
-	// RetireBed returns ErrBedOccupied if a student is on it, ErrBedRetired
-	// if already retired, ErrLastBed if it is the room's only active bed.
+	// RetireBed returns ErrBedOccupied if a student is on it, ErrBedReserved
+	// if an application holds it, ErrBedRetired if already retired,
+	// ErrLastBed if it is the room's only active bed.
 	RetireBed(ctx context.Context, bedID uuid.UUID) error
+	// SetBedServiceStatus takes a bed out of service (repair/unavailable,
+	// with reason and optional expected end date) or returns it to service
+	// (reason/until must be nil) and returns the updated bed. The status log
+	// entry is written by the database, with the author and act taken from
+	// ctx (domain.BedLogContext).
+	// Errors: ErrNotFound, ErrBedRetired, ErrBedOccupied, ErrBedReserved.
+	SetBedServiceStatus(ctx context.Context, bedID uuid.UUID, status domain.BedServiceStatus,
+		reason *string, until *time.Time, changedBy uuid.UUID) (*domain.Bed, error)
+	// ListBedStatusHistory returns the bed's status log, newest first.
+	ListBedStatusHistory(ctx context.Context, bedID uuid.UUID) ([]*domain.BedStatusChange, error)
 	// RenameBed returns ErrConflict if another active bed of the room has
 	// that label, ErrBedRetired if the bed is retired.
 	RenameBed(ctx context.Context, bedID uuid.UUID, label string) error

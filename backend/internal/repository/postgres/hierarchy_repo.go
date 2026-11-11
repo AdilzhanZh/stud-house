@@ -272,14 +272,17 @@ func (r *HierarchyRepo) RetireFloor(ctx context.Context, id uuid.UUID) error {
 // empty buildings/floors/rooms kept as rows whose lower levels are nil.
 // Retired floors and beds are left out. objectID / dormitoryID narrow it.
 func (r *HierarchyRepo) Registry(ctx context.Context, objectID, dormitoryID *uuid.UUID) ([]*domain.RegistryRow, error) {
-	const q = `
+	q := `
 		SELECT o.id, o.name, o.owner_name, o.ownership_form,
 			d.id, d.name, COALESCE(d.address, ''),
 			f.id, f.number, f.name,
 			r.id, r.room_number, r.capacity,
 			bd.id, bd.inventory_no, bd.label,
 			(bd.id IS NOT NULL AND EXISTS (SELECT 1 FROM room_residents rr
-				WHERE rr.bed_id = bd.id AND rr.moved_out_at IS NULL))
+				WHERE rr.bed_id = bd.id AND rr.moved_out_at IS NULL)),
+			(bd.id IS NOT NULL AND EXISTS (SELECT 1 FROM applications a
+				WHERE a.held_bed_id = bd.id AND a.status IN ` + activeHoldStatuses + `)),
+			bd.service_status, bd.service_reason, bd.service_until
 		FROM dorm_objects o
 		JOIN dormitories d ON d.object_id = o.id
 		LEFT JOIN floors f ON f.dormitory_id = d.id AND f.retired_at IS NULL
@@ -305,6 +308,7 @@ func (r *HierarchyRepo) Registry(ctx context.Context, objectID, dormitoryID *uui
 			&x.FloorID, &x.FloorNumber, &x.FloorName,
 			&x.RoomID, &x.RoomNumber, &x.RoomCapacity,
 			&x.BedID, &x.BedInventoryNo, &x.BedLabel, &x.BedOccupied,
+			&x.BedReserved, &x.BedService, &x.BedServiceReason, &x.BedServiceUntil,
 		); err != nil {
 			return nil, err
 		}

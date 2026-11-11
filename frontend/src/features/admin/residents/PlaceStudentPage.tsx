@@ -319,7 +319,7 @@ export function PlaceStudentPage() {
                     id: r.id,
                     room_number: r.room_number,
                     capacity: r.capacity,
-                    residentCount: r.resident_count + r.held_count,
+                    residentCount: r.resident_count + r.held_count + r.out_of_service_count,
                     warning: restrictionMismatchReason(r, selectedProfile, selectedBenefitIds, t) != null,
                   }))}
                   selectedRoomId={roomId}

@@ -1,3 +1,5 @@
+import type { BedStatus } from './rooms'
+
 // Registry levels around a dormitory building (see backend
 // domain.DormObject / domain.Floor): the object above it, floors below it.
 
@@ -33,6 +35,9 @@ export interface RegistryBed {
   code: string
   label: string
   occupied: boolean
+  status: BedStatus
+  service_reason: string | null
+  service_until: string | null
 }
 
 export interface RegistryRoom {

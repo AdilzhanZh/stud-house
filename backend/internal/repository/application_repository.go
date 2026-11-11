@@ -24,6 +24,9 @@ type ApplicationTx interface {
 	// ClearPreferredRoom nulls preferred_room_id — used when an application
 	// enters needs_correction, releasing any room hold it held.
 	ClearPreferredRoom(ctx context.Context, id uuid.UUID) error
+	// SetHeldBed moves the application's reservation to another bed of the
+	// room it holds.
+	SetHeldBed(ctx context.Context, id, bedID uuid.UUID) error
 	AddHistory(ctx context.Context, h *domain.ApplicationStatusHistory) error
 }
 

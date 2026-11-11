@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Bed, BedHistory, Room, RoomAvailability, RoomResident, RoomRestrictions } from '../types/rooms'
+import type { Bed, BedHistory, BedServiceStatus, BedStatusHistory, Room, RoomAvailability, RoomResident, RoomRestrictions } from '../types/rooms'
 
 export async function listRoomsByDormitory(dormitoryId: string): Promise<Room[]> {
   const { data } = await apiClient.get<{ data: Room[] }>(`/dormitories/${dormitoryId}/rooms`)
@@ -112,6 +112,27 @@ export async function renameBed(bedId: string, label: string): Promise<Bed> {
 // Marks the bed as removed; its id and history are kept.
 export async function retireBed(bedId: string): Promise<void> {
   await apiClient.delete(`/beds/${bedId}`)
+}
+
+// Takes a bed out of service (repair / unavailable, reason required) or
+// returns it to service. until: expected end date, YYYY-MM-DD.
+export async function setBedStatus(
+  bedId: string,
+  status: BedServiceStatus,
+  reason?: string,
+  until?: string,
+): Promise<Bed> {
+  const { data } = await apiClient.patch<{ data: Bed }>(`/beds/${bedId}/status`, {
+    status,
+    reason: reason || undefined,
+    until: until || undefined,
+  })
+  return data.data
+}
+
+export async function getBedStatusHistory(bedId: string): Promise<BedStatusHistory> {
+  const { data } = await apiClient.get<{ data: BedStatusHistory }>(`/beds/${bedId}/status-history`)
+  return data.data
 }
 
 export async function getBedHistory(bedId: string): Promise<BedHistory> {

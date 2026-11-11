@@ -14,6 +14,7 @@ import {
   Trash2,
   UserPlus,
   Users,
+  Wrench,
   X,
 } from 'lucide-react'
 import { Card } from '../../../components/Card'
@@ -23,11 +24,15 @@ import { Input } from '../../../components/Input'
 import { Alert } from '../../../components/Alert'
 import { Avatar } from '../../../components/Avatar'
 import { ConfirmDialog } from '../../../components/ConfirmDialog'
+import { BedStatusBadge } from '../../../components/BedStatusBadge'
+import { bedStatusDotClass } from '../../../utils/bedStatus'
+import { BedStatusDialog } from './BedStatusDialog'
 import { extractErrorMessage } from '../../../api/client'
 import {
   addBeds,
   addResident,
   getBedHistory,
+  getBedStatusHistory,
   getRoom,
   listBeds,
   listRoomResidents,
@@ -39,14 +44,14 @@ import {
 } from '../../../api/roomApi'
 import { listDormitories } from '../../../api/dormitoryApi'
 import { listUsers } from '../../../api/adminUserApi'
-import { listApplications } from '../../../api/applicationAdminApi'
+import { changeHeldBed, listApplications } from '../../../api/applicationAdminApi'
 import { getStudentProfile } from '../../../api/profileApi'
 import { listBenefits, listStudentBenefits } from '../../../api/benefitApi'
 import { bilingualField } from '../../../utils/bilingualField'
 import { formatDate } from '../../../utils/dateFormat'
 import { canManage } from '../../../constants/roles'
 import { useAuth } from '../../auth/useAuth'
-import type { Bed, BedHistory, Room, RoomResident } from '../../../types/rooms'
+import { BED_STATUSES, type Bed, type BedHistory, type BedStatusHistory, type Room, type RoomResident } from '../../../types/rooms'
 import type { Application } from '../../../types/applications'
 import type { Dormitory } from '../../../types/dormitories'
 import type { StudentProfile, User } from '../../../types'
@@ -104,6 +109,13 @@ export function RoomResidentsView() {
   const [historyTarget, setHistoryTarget] = useState<Bed | null>(null)
   const [history, setHistory] = useState<BedHistory | null>(null)
   const [historyError, setHistoryError] = useState<string | null>(null)
+  const [statusHistory, setStatusHistory] = useState<BedStatusHistory | null>(null)
+  // Names of whoever changed a bed's status (staff), loaded with the history.
+  const [staffNames, setStaffNames] = useState<Record<string, string>>({})
+  const [statusTarget, setStatusTarget] = useState<Bed | null>(null)
+  const [moveTarget, setMoveTarget] = useState<Bed | null>(null)
+  const [moveBedId, setMoveBedId] = useState('')
+  const [isMoving, setIsMoving] = useState(false)
 
   const [detailsTarget, setDetailsTarget] = useState<RoomResident | null>(null)
   const [detailsProfile, setDetailsProfile] = useState<StudentProfile | null>(null)
@@ -259,10 +271,36 @@ export function RoomResidentsView() {
   function openHistory(b: Bed) {
     setHistoryTarget(b)
     setHistory(null)
+    setStatusHistory(null)
     setHistoryError(null)
-    getBedHistory(b.id)
-      .then(setHistory)
+    Promise.all([getBedHistory(b.id), getBedStatusHistory(b.id), listUsers().catch(() => [] as User[])])
+      .then(([stays, statuses, users]) => {
+        setHistory(stays)
+        setStatusHistory(statuses)
+        setStaffNames(Object.fromEntries(users.map((u) => [u.id, u.full_name])))
+      })
       .catch((err) => setHistoryError(extractErrorMessage(err, t('admin.common.loadError'))))
+  }
+
+  function openMove(b: Bed) {
+    setMoveTarget(b)
+    setMoveBedId('')
+    setBedError(null)
+  }
+
+  async function handleMoveReservation() {
+    if (!moveTarget?.held_application_id || !moveBedId) return
+    setBedError(null)
+    setIsMoving(true)
+    try {
+      await changeHeldBed(moveTarget.held_application_id, moveBedId)
+      setMoveTarget(null)
+      load()
+    } catch (err) {
+      setBedError(extractErrorMessage(err, t('admin.rooms.moveReservationFailed')))
+    } finally {
+      setIsMoving(false)
+    }
   }
 
   function openDetails(r: RoomResident) {
@@ -289,8 +327,41 @@ export function RoomResidentsView() {
   if (!room || !residents) return <p className="text-sm text-sand-300">{t('admin.common.loading')}</p>
 
   const residentStudentIds = new Set(residents.map((r) => r.student_id))
-  const freeBeds = beds.filter((b) => !b.retired_at && !b.resident_id)
-  const freeTransferBeds = bedsForTransfer.filter((b) => !b.retired_at && !b.resident_id)
+  // Beds a student can be put on: free ones, plus the bed their own
+  // application reserves.
+  const placeableBeds = (list: Bed[], studentId: string | undefined) =>
+    list.filter(
+      (b) => !b.retired_at && (b.status === 'free' || (b.status === 'reserved' && b.held_student_id === studentId)),
+    )
+  const freeBeds = placeableBeds(beds, selectedStudentId || undefined)
+  const freeTransferBeds = placeableBeds(bedsForTransfer, transferTarget?.student_id)
+  const activeBeds = beds.filter((b) => !b.retired_at)
+  const statusCounts = BED_STATUSES.map((status) => ({
+    status,
+    count: activeBeds.filter((b) => b.status === status).length,
+  })).filter((c) => c.count > 0)
+  const today = new Date().toISOString().slice(0, 10)
+  const nameOf = (studentId: string) => namesById[studentId] ?? studentId
+  const nameOfStaff = (userId: string) => staffNames[userId] ?? null
+  function bedSubtitle(b: Bed): string {
+    if (b.retired_at) return t('admin.rooms.bedRetired', { date: formatDate(b.retired_at) })
+    if (b.student_id) return nameOf(b.student_id)
+    if (b.held_student_id) return t('admin.rooms.bedReservedBy', { name: nameOf(b.held_student_id) })
+    if (b.status === 'repair' || b.status === 'unavailable') {
+      const parts = [b.service_reason ?? '']
+      if (b.service_until) {
+        parts.push(
+          b.service_until < today
+            ? t('admin.rooms.bedServiceOverdue', { date: formatDate(b.service_until) })
+            : t('admin.rooms.bedServiceUntil', { date: formatDate(b.service_until) }),
+        )
+      }
+      return parts.filter(Boolean).join(' · ')
+    }
+    return t('admin.rooms.bedFree')
+  }
+  const serviceLabel = (s: 'in_service' | 'repair' | 'unavailable') =>
+    s === 'in_service' ? t('admin.rooms.bedServiceInService') : t(`admin.rooms.bedStatus.${s}`)
   const transferIsSameRoom = transferRoomId === room.id
   const bedName = (b: { label: string }) => t('admin.rooms.bedLabel', { label: b.label })
   const eligibleApplications = settledApplications.filter(
@@ -498,6 +569,16 @@ export function RoomResidentsView() {
           )}
         </div>
         <p className="mb-3 text-xs text-sand-300">{t('admin.rooms.bedsHint')}</p>
+        {statusCounts.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1.5" aria-label={t('admin.rooms.bedStatusSummary')}>
+            {statusCounts.map(({ status, count }) => (
+              <span key={status} className="inline-flex items-center gap-1.5 text-xs text-sand-200">
+                <span className={`h-2 w-2 rounded-full ${bedStatusDotClass[status]}`} />
+                {t(`admin.rooms.bedStatus.${status}`)}: <span className="font-semibold text-sand-100">{count}</span>
+              </span>
+            ))}
+          </div>
+        )}
         {bedError && <Alert variant="error" message={bedError} />}
         <ul className="flex flex-col gap-2">
           {beds.map((b) => (
@@ -543,17 +624,55 @@ export function RoomResidentsView() {
               ) : (
                 <>
                   <div className="min-w-0 flex-1">
-                    <p className="flex flex-wrap items-baseline gap-x-2 text-sm font-semibold text-sand-100">
+                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-sand-100">
                       {bedName(b)}
                       <span className="font-mono text-xs font-normal text-sand-400">{b.code}</span>
+                      {!b.retired_at && <BedStatusBadge status={b.status} />}
                     </p>
-                    <p className="mt-0.5 truncate text-xs text-sand-300">
-                      {b.retired_at
-                        ? t('admin.rooms.bedRetired', { date: formatDate(b.retired_at) })
-                        : b.student_id
-                          ? namesById[b.student_id] ?? b.student_id
-                          : t('admin.rooms.bedFree')}
+                    <p
+                      className={`mt-0.5 text-xs break-words ${
+                        b.service_until && b.service_until < today && !b.retired_at ? 'text-clay-400' : 'text-sand-300'
+                      }`}
+                    >
+                      {bedSubtitle(b)}
                     </p>
+                    {moveTarget?.id === b.id && (
+                      <div className="mt-2 flex flex-col gap-2">
+                        <p className="text-xs font-medium text-sand-100">
+                          {t('admin.rooms.moveReservationTitle', {
+                            name: b.held_student_id ? nameOf(b.held_student_id) : '',
+                          })}
+                        </p>
+                        {activeBeds.some((x) => x.status === 'free') ? (
+                          <div className="flex items-end gap-2">
+                            <div className="min-w-0 flex-1">
+                              <Select
+                                label={t('admin.rooms.bedField')}
+                                value={moveBedId}
+                                onChange={(e) => setMoveBedId(e.target.value)}
+                              >
+                                <option value="">{t('admin.common.select')}</option>
+                                {activeBeds
+                                  .filter((x) => x.status === 'free')
+                                  .map((x) => (
+                                    <option key={x.id} value={x.id}>
+                                      {bedName(x)} · {x.code}
+                                    </option>
+                                  ))}
+                              </Select>
+                            </div>
+                            <Button onClick={handleMoveReservation} isLoading={isMoving} disabled={!moveBedId}>
+                              {t('common.confirm')}
+                            </Button>
+                            <Button variant="secondary" onClick={() => setMoveTarget(null)}>
+                              {t('common.cancel')}
+                            </Button>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-sand-300">{t('admin.rooms.noOtherFreeBeds')}</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
                     <button
@@ -567,6 +686,28 @@ export function RoomResidentsView() {
                     </button>
                     {isManager && !b.retired_at && (
                       <>
+                        {(b.status === 'free' || b.status === 'repair' || b.status === 'unavailable') && (
+                          <button
+                            type="button"
+                            aria-label={t('admin.rooms.changeBedStatus')}
+                            title={t('admin.rooms.changeBedStatus')}
+                            className="flex h-9 w-9 items-center justify-center rounded-xl text-amber-400 transition-colors hover:bg-amber-500/10"
+                            onClick={() => setStatusTarget(b)}
+                          >
+                            <Wrench className="h-4.5 w-4.5" />
+                          </button>
+                        )}
+                        {b.status === 'reserved' && b.held_application_id && (
+                          <button
+                            type="button"
+                            aria-label={t('admin.rooms.moveReservation')}
+                            title={t('admin.rooms.moveReservation')}
+                            className="flex h-9 w-9 items-center justify-center rounded-xl text-amber-400 transition-colors hover:bg-amber-500/10"
+                            onClick={() => openMove(b)}
+                          >
+                            <ArrowLeftRight className="h-4.5 w-4.5" />
+                          </button>
+                        )}
                         <button
                           type="button"
                           aria-label={t('admin.rooms.renameBed')}
@@ -576,7 +717,7 @@ export function RoomResidentsView() {
                         >
                           <Pencil className="h-4.5 w-4.5" />
                         </button>
-                        {!b.resident_id && (
+                        {!b.resident_id && !b.held_application_id && (
                           <button
                             type="button"
                             aria-label={t('admin.rooms.retireBed')}
@@ -699,27 +840,67 @@ export function RoomResidentsView() {
             <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
               {historyError ? (
                 <Alert variant="error" message={historyError} />
-              ) : !history ? (
+              ) : !history || !statusHistory ? (
                 <p className="text-sm text-sand-300">{t('admin.common.loading')}</p>
-              ) : history.stays.length === 0 ? (
-                <p className="text-sm text-sand-300">{t('admin.rooms.bedHistoryEmpty')}</p>
               ) : (
-                <ul className="flex flex-col gap-2">
-                  {history.stays.map((stay) => (
-                    <li key={stay.id} className="flex items-center gap-3 rounded-2xl bg-navy-950/40 p-3">
-                      <Avatar fullName={namesById[stay.student_id] ?? stay.student_id} sizeClass="h-9 w-9" />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-sand-100">
-                          {namesById[stay.student_id] ?? stay.student_id}
-                        </p>
-                        <p className="text-xs text-sand-300">
-                          {formatDate(stay.moved_in_at)} —{' '}
-                          {stay.moved_out_at ? formatDate(stay.moved_out_at) : t('admin.rooms.bedHistoryNow')}
-                        </p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                <div className="flex flex-col gap-4">
+                <section>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-sand-400">
+                    {t('admin.rooms.bedHistoryStays')}
+                  </p>
+                  {history.stays.length === 0 ? (
+                    <p className="text-sm text-sand-300">{t('admin.rooms.bedHistoryEmpty')}</p>
+                  ) : (
+                    <ul className="flex flex-col gap-2">
+                      {history.stays.map((stay) => (
+                        <li key={stay.id} className="flex items-center gap-3 rounded-2xl bg-navy-950/40 p-3">
+                          <Avatar fullName={namesById[stay.student_id] ?? stay.student_id} sizeClass="h-9 w-9" />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-sand-100">
+                              {namesById[stay.student_id] ?? stay.student_id}
+                            </p>
+                            <p className="text-xs text-sand-300">
+                              {formatDate(stay.moved_in_at)} —{' '}
+                              {stay.moved_out_at ? formatDate(stay.moved_out_at) : t('admin.rooms.bedHistoryNow')}
+                            </p>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+                <section>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-sand-400">
+                    {t('admin.rooms.bedHistoryStatuses')}
+                  </p>
+                  {statusHistory.changes.length === 0 ? (
+                    <p className="text-sm text-sand-300">{t('admin.rooms.bedHistoryNoStatusChanges')}</p>
+                  ) : (
+                    <ul className="flex flex-col gap-2">
+                      {statusHistory.changes.map((c) => (
+                        <li key={c.id} className="rounded-2xl bg-navy-950/40 p-3">
+                          <p className="text-sm font-semibold text-sand-100">
+                            {t('admin.rooms.bedHistoryStatusChange', {
+                              from: serviceLabel(c.old_status),
+                              to: serviceLabel(c.new_status),
+                            })}
+                          </p>
+                          <p className="mt-0.5 text-xs text-sand-300">
+                            {[
+                              formatDate(c.changed_at),
+                              c.changed_by ? nameOfStaff(c.changed_by) : null,
+                              c.reason,
+                              c.until ? t('admin.rooms.bedServiceUntil', { date: formatDate(c.until) }) : null,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+                </div>
               )}
             </div>
             <div className="mt-6 flex justify-end">
@@ -729,6 +910,17 @@ export function RoomResidentsView() {
             </div>
           </div>
         </div>
+      )}
+
+      {statusTarget && (
+        <BedStatusDialog
+          bed={statusTarget}
+          onClose={() => setStatusTarget(null)}
+          onSaved={() => {
+            setStatusTarget(null)
+            load()
+          }}
+        />
       )}
 
       {detailsTarget && (

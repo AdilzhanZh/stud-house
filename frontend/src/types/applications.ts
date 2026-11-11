@@ -25,6 +25,8 @@ export interface Application {
   hometown: string
   parent_contact: string
   assigned_room_id: string | null
+  // The bed the application reserves while pending/under review/approved.
+  held_bed_id: string | null
   handled_by: string | null
   created_at: string
   updated_at: string

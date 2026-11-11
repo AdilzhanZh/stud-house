@@ -227,7 +227,7 @@ type BulkResult struct {
 // approved on stale information.
 func (s *TriageService) ApproveGreen(ctx context.Context, actorID uuid.UUID, applicationIDs []uuid.UUID) ([]BulkResult, error) {
 	return s.bulk(ctx, applicationIDs, domain.TriageGreen, func(t *domain.ApplicationTriage) error {
-		_, err := s.decider.Decide(ctx, actorID, t.ApplicationID, ActionApprove, nil, nil)
+		_, err := s.decider.Decide(ctx, actorID, t.ApplicationID, ActionApprove, nil, nil, nil)
 		return err
 	})
 }
@@ -238,7 +238,7 @@ func (s *TriageService) ApproveGreen(ctx context.Context, actorID uuid.UUID, app
 func (s *TriageService) RequestCorrections(ctx context.Context, actorID uuid.UUID, applicationIDs []uuid.UUID) ([]BulkResult, error) {
 	return s.bulk(ctx, applicationIDs, domain.TriageYellow, func(t *domain.ApplicationTriage) error {
 		comment := correctionComment(t.Reasons)
-		_, err := s.decider.Decide(ctx, actorID, t.ApplicationID, ActionRequestCorrection, nil, &comment)
+		_, err := s.decider.Decide(ctx, actorID, t.ApplicationID, ActionRequestCorrection, nil, nil, &comment)
 		return err
 	})
 }

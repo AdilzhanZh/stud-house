@@ -159,14 +159,19 @@ const (
 // beds in service, so at most one of these applies; the order only makes
 // the answer defined for any input.
 func (b *Bed) Status() BedStatus {
+	return BedStatusOf(b.ResidentID != nil, b.HeldApplicationID != nil, b.ServiceStatus)
+}
+
+// BedStatusOf is Bed.Status for callers that only have the three facts.
+func BedStatusOf(occupied, reserved bool, service BedServiceStatus) BedStatus {
 	switch {
-	case b.ResidentID != nil:
+	case occupied:
 		return BedStatusOccupied
-	case b.HeldApplicationID != nil:
+	case reserved:
 		return BedStatusReserved
-	case b.ServiceStatus == BedRepair:
+	case service == BedRepair:
 		return BedStatusRepair
-	case b.ServiceStatus == BedUnavailable:
+	case service == BedUnavailable:
 		return BedStatusUnavailable
 	}
 	return BedStatusFree

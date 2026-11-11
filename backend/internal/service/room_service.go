@@ -488,7 +488,7 @@ func bedPlacementError(err error) error {
 	case errors.Is(err, repository.ErrBedOccupied):
 		return apperror.Conflict("бұл төсек-орын бос емес")
 	case errors.Is(err, repository.ErrBedReserved):
-		return apperror.Conflict("бұл төсек-орын өтінім бойынша брондалған")
+		return apperror.Conflict("бұл төсек-орын өтініш бойынша брондалған")
 	case errors.Is(err, repository.ErrBedOutOfService):
 		return apperror.Conflict("бұл төсек-орын жөндеуде немесе уақытша қолжетімсіз")
 	case errors.Is(err, repository.ErrNoFreeBed):
@@ -663,6 +663,33 @@ func (s *RoomService) CheckHoldable(ctx context.Context, roomID uuid.UUID, exclu
 	return nil
 }
 
+// CheckBedHoldable reports whether the application of studentID may
+// reserve bedID in roomID: the bed must be in that room, not retired, in
+// service, with nobody else living on it and no other application holding
+// it (applicationID's own hold on it is fine).
+func (s *RoomService) CheckBedHoldable(ctx context.Context, roomID, bedID, applicationID, studentID uuid.UUID) error {
+	bed, err := s.rooms.GetBedByID(ctx, bedID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return apperror.NotFound("төсек-орын табылмады")
+		}
+		return err
+	}
+	switch {
+	case bed.RoomID != roomID:
+		return apperror.NotFound("бұл бөлмеде мұндай төсек-орын табылмады")
+	case bed.RetiredAt != nil:
+		return apperror.Conflict("бұл төсек-орын алынып тасталған")
+	case bed.ServiceStatus != domain.BedInService:
+		return apperror.Conflict("бұл төсек-орын жөндеуде немесе уақытша қолжетімсіз")
+	case bed.StudentID != nil && *bed.StudentID != studentID:
+		return apperror.Conflict("бұл төсек-орын бос емес")
+	case bed.HeldApplicationID != nil && *bed.HeldApplicationID != applicationID:
+		return apperror.Conflict("бұл төсек-орын өтініш бойынша брондалған")
+	}
+	return nil
+}
+
 // usableBeds is the room's active beds minus those under repair or
 // temporarily unavailable — the seats that can be lived on or held.
 func (s *RoomService) usableBeds(ctx context.Context, room *domain.Room) (int, error) {
@@ -723,7 +750,7 @@ func (s *RoomService) RetireBed(ctx context.Context, bedID uuid.UUID) error {
 	case errors.Is(err, repository.ErrBedOccupied):
 		return apperror.Conflict("төсек-орында тұрғын бар — алдымен оны басқа орынға ауыстырыңыз")
 	case errors.Is(err, repository.ErrBedReserved):
-		return apperror.Conflict("бұл төсек-орын өтінім бойынша брондалған")
+		return apperror.Conflict("бұл төсек-орын өтініш бойынша брондалған")
 	case errors.Is(err, repository.ErrLastBed):
 		return apperror.Conflict("бөлмеде кемінде бір төсек-орын қалуы керек")
 	}
@@ -816,7 +843,7 @@ func (s *RoomService) SetBedStatus(ctx context.Context, bedID uuid.UUID, status 
 	case errors.Is(err, repository.ErrBedOccupied):
 		return nil, apperror.Conflict("төсек-орында тұрғын бар — алдымен оны басқа орынға ауыстырыңыз")
 	case errors.Is(err, repository.ErrBedReserved):
-		return nil, apperror.Conflict("бұл төсек-орын өтінім бойынша брондалған")
+		return nil, apperror.Conflict("бұл төсек-орын өтініш бойынша брондалған")
 	}
 	return nil, err
 }

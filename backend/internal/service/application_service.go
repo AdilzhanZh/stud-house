@@ -341,7 +341,11 @@ func (s *ApplicationService) Resubmit(ctx context.Context, actorStudentID, appli
 // Approval only earmarks AssignedRoomID; the seat itself (a room_residents
 // row) is claimed later, once the commission also approves — see
 // ContractService.OnProtocolApproved.
-func (s *ApplicationService) Decide(ctx context.Context, actorID, applicationID uuid.UUID, action DecisionAction, roomID *uuid.UUID, comment *string) (*domain.Application, error) {
+//
+// bedID, on approve only, picks which bed of the room the application
+// reserves; nil leaves the choice to the database (its current bed if it
+// stays usable, else the room's first free one).
+func (s *ApplicationService) Decide(ctx context.Context, actorID, applicationID uuid.UUID, action DecisionAction, roomID, bedID *uuid.UUID, comment *string) (*domain.Application, error) {
 	var finalStatus domain.ApplicationStatus
 	var studentID uuid.UUID
 
@@ -379,9 +383,22 @@ func (s *ApplicationService) Decide(ctx context.Context, actorID, applicationID 
 					return err
 				}
 			}
+			if bedID != nil {
+				if roomID == nil {
+					return apperror.BadRequest("төсек-орынды таңдау үшін бөлмені көрсетіңіз")
+				}
+				if err := s.rooms.CheckBedHoldable(ctx, *roomID, *bedID, applicationID, app.StudentID); err != nil {
+					return err
+				}
+			}
 			finalStatus = domain.ApplicationApproved
 			if err := tx.SetDecision(ctx, applicationID, finalStatus, roomID, actorID); err != nil {
 				return err
+			}
+			if bedID != nil {
+				if err := tx.SetHeldBed(ctx, applicationID, *bedID); err != nil {
+					return err
+				}
 			}
 		case ActionReject:
 			if comment == nil || *comment == "" {
@@ -424,6 +441,37 @@ func (s *ApplicationService) Decide(ctx context.Context, actorID, applicationID 
 
 	s.notifyDecision(ctx, studentID, applicationID, finalStatus, comment)
 
+	return s.GetByID(ctx, applicationID)
+}
+
+// ChangeHeldBed moves an active application's reservation to another free
+// bed of the room it holds (e.g. to keep a bed by the window for someone
+// else, or to free one a manager wants to repair).
+func (s *ApplicationService) ChangeHeldBed(ctx context.Context, applicationID, bedID uuid.UUID) (*domain.Application, error) {
+	err := s.applications.WithLock(ctx, applicationID, func(ctx context.Context, app *domain.Application, tx repository.ApplicationTx) error {
+		switch app.Status {
+		case domain.ApplicationPending, domain.ApplicationManagerReview, domain.ApplicationApproved:
+		default:
+			return apperror.Conflict("бұл өтініш төсек-орынды брондап тұрған жоқ")
+		}
+		roomID := app.AssignedRoomID
+		if roomID == nil {
+			roomID = app.PreferredRoomID
+		}
+		if roomID == nil {
+			return apperror.Conflict("бұл өтініш төсек-орынды брондап тұрған жоқ")
+		}
+		if err := s.rooms.CheckBedHoldable(ctx, *roomID, bedID, applicationID, app.StudentID); err != nil {
+			return err
+		}
+		return tx.SetHeldBed(ctx, applicationID, bedID)
+	})
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, apperror.NotFound("өтініш табылмады")
+		}
+		return nil, err
+	}
 	return s.GetByID(ctx, applicationID)
 }
 

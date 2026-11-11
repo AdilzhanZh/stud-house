@@ -256,10 +256,13 @@ func (h *HierarchyHandler) RetireFloor(c *gin.Context) {
 }
 
 type registryBedResponse struct {
-	ID       uuid.UUID `json:"id"`
-	Code     string    `json:"code"`
-	Label    string    `json:"label"`
-	Occupied bool      `json:"occupied"`
+	ID            uuid.UUID        `json:"id"`
+	Code          string           `json:"code"`
+	Label         string           `json:"label"`
+	Occupied      bool             `json:"occupied"`
+	Status        domain.BedStatus `json:"status"`
+	ServiceReason *string          `json:"service_reason"`
+	ServiceUntil  *string          `json:"service_until"`
 }
 
 type registryRoomResponse struct {
@@ -335,7 +338,8 @@ func (h *HierarchyHandler) Registry(c *gin.Context) {
 						Beds: make([]registryBedResponse, 0, len(r.Beds))}
 					for _, b := range r.Beds {
 						rr.Beds = append(rr.Beds, registryBedResponse{ID: b.ID, Code: domain.BedCode(b.InventoryNo),
-							Label: b.Label, Occupied: b.Occupied})
+							Label: b.Label, Occupied: b.Occupied, Status: b.Status,
+							ServiceReason: b.ServiceReason, ServiceUntil: datePtr(b.ServiceUntil)})
 					}
 					rf.Rooms = append(rf.Rooms, rr)
 				}

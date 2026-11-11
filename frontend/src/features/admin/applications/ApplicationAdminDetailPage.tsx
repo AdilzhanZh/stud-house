@@ -5,6 +5,7 @@ import { ChevronLeft, Check } from 'lucide-react'
 import { Card } from '../../../components/Card'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
+import { Select } from '../../../components/Select'
 import { StatusBadge } from '../../../components/StatusBadge'
 import { ApplicationJourneyStepper } from '../../../components/ApplicationJourneyStepper'
 import { FloorCorridorMap } from '../../../components/FloorCorridorMap'
@@ -12,7 +13,7 @@ import { extractErrorMessage } from '../../../api/client'
 import { getApplication } from '../../../api/applicationApi'
 import { cancelApprovedApplication, decideApplication } from '../../../api/applicationAdminApi'
 import { getDormitory } from '../../../api/dormitoryApi'
-import { listRoomResidents, listRoomsByDormitory } from '../../../api/roomApi'
+import { listBeds, listRoomResidents, listRoomsByDormitory } from '../../../api/roomApi'
 import { listUsers } from '../../../api/adminUserApi'
 import { listBenefits, listStudentBenefits } from '../../../api/benefitApi'
 import { getStudentProfile } from '../../../api/profileApi'
@@ -27,7 +28,7 @@ import { DocumentCheckSummary } from './DocumentCheckSummary'
 import type { ApplicationDetail } from '../../../types/applications'
 import type { Dormitory } from '../../../types/dormitories'
 import type { Benefit } from '../../../types/benefits'
-import type { Gender, Room } from '../../../types/rooms'
+import type { Bed, Gender, Room } from '../../../types/rooms'
 import type { User } from '../../../types'
 import type { JourneyStep } from '../../../components/ApplicationJourneyStepper'
 import { groupRoomsByFloor, roomLabel } from '../../../utils/roomLocation'
@@ -50,6 +51,10 @@ export function ApplicationAdminDetailPage() {
   const [studentBenefitNames, setStudentBenefitNames] = useState<string[]>([])
   const [rooms, setRooms] = useState<RoomWithOccupancy[]>([])
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
+  // Bed of the selected room to reserve; '' lets the backend choose (the
+  // bed already held if it stays usable, else the first free one).
+  const [selectedBedId, setSelectedBedId] = useState('')
+  const [roomBeds, setRoomBeds] = useState<Bed[]>([])
   const [selectedFloor, setSelectedFloor] = useState<string | null>(null)
   const [restrictionsRoom, setRestrictionsRoom] = useState<RoomWithOccupancy | null>(null)
   const [journeyStep, setJourneyStep] = useState<JourneyStep | null>(null)
@@ -103,6 +108,15 @@ export function ApplicationAdminDetailPage() {
 
   useEffect(load, [id])
 
+  useEffect(() => {
+    setSelectedBedId('')
+    if (!selectedRoomId) {
+      setRoomBeds([])
+      return
+    }
+    listBeds(selectedRoomId).then(setRoomBeds).catch(() => setRoomBeds([]))
+  }, [selectedRoomId])
+
   function resetPanel() {
     setPanel(null)
     setComment('')
@@ -119,7 +133,11 @@ export function ApplicationAdminDetailPage() {
     setActionError(null)
     setIsSubmitting(true)
     try {
-      await decideApplication(id, { action: 'approve', room_id: selectedRoomId ?? undefined })
+      await decideApplication(id, {
+        action: 'approve',
+        room_id: selectedRoomId ?? undefined,
+        bed_id: (selectedRoomId && selectedBedId) || undefined,
+      })
       navigate('/admin/applications')
     } catch (err) {
       setActionError(extractErrorMessage(err, t('admin.applications.approveFailed')))
@@ -376,6 +394,23 @@ export function ApplicationAdminDetailPage() {
                       })}
                       {application.preferred_room_id === selectedRoomId && ` ★ ${t('admin.applications.studentPreferred')}`}
                     </p>
+                  )}
+                  {selectedRoomId && (
+                    <Select
+                      label={t('admin.rooms.bedField')}
+                      value={selectedBedId}
+                      onChange={(e) => setSelectedBedId(e.target.value)}
+                    >
+                      <option value="">{t('admin.rooms.anyFreeBed')}</option>
+                      {roomBeds
+                        .filter((b) => b.status === 'free' || b.held_application_id === application.id)
+                        .map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {t('admin.rooms.bedLabel', { label: b.label })} · {b.code}
+                            {b.held_application_id === application.id ? ` ${t('admin.rooms.heldByThisStudent')}` : ''}
+                          </option>
+                        ))}
+                    </Select>
                   )}
                   {!application.preferred_room_id && (
                     <p className="text-xs text-sand-300">{t('admin.applications.noPreferredRoom')}</p>

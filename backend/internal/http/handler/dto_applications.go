@@ -20,6 +20,7 @@ type applicationResponse struct {
 	Hometown          string     `json:"hometown"`
 	ParentContact     string     `json:"parent_contact"`
 	AssignedRoomID    *uuid.UUID `json:"assigned_room_id"`
+	HeldBedID         *uuid.UUID `json:"held_bed_id"`
 	HandledBy         *uuid.UUID `json:"handled_by"`
 	CreatedAt         time.Time  `json:"created_at"`
 	UpdatedAt         time.Time  `json:"updated_at"`
@@ -38,6 +39,7 @@ func applicationDTO(a *domain.Application) applicationResponse {
 		Hometown:          a.Hometown,
 		ParentContact:     a.ParentContact,
 		AssignedRoomID:    a.AssignedRoomID,
+		HeldBedID:         a.HeldBedID,
 		HandledBy:         a.HandledBy,
 		CreatedAt:         a.CreatedAt,
 		UpdatedAt:         a.UpdatedAt,

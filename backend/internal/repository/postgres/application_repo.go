@@ -14,7 +14,7 @@ import (
 	"student-house/internal/repository"
 )
 
-const applicationColumns = `id, student_id, dormitory_id, status, preferred_room_type, preferred_room_id, notes, study_group, hometown, parent_contact, assigned_room_id, handled_by, contract_agreed_at, created_at, updated_at`
+const applicationColumns = `id, student_id, dormitory_id, status, preferred_room_type, preferred_room_id, notes, study_group, hometown, parent_contact, assigned_room_id, handled_by, contract_agreed_at, created_at, updated_at, held_bed_id`
 
 type ApplicationRepo struct {
 	db *pgxpool.Pool
@@ -211,6 +211,14 @@ func (t *applicationTx) UpdateEditableFieldsAndResubmit(ctx context.Context, id 
 	return err
 }
 
+// SetHeldBed points the application's hold at bedID. The trigger
+// applications_sync_held_bed keeps it only if the bed is usable; callers
+// check that first (RoomService.CheckBedHoldable).
+func (t *applicationTx) SetHeldBed(ctx context.Context, id, bedID uuid.UUID) error {
+	_, err := t.tx.Exec(ctx, `UPDATE applications SET held_bed_id = $2, updated_at = now() WHERE id = $1`, id, bedID)
+	return err
+}
+
 func (t *applicationTx) ClearPreferredRoom(ctx context.Context, id uuid.UUID) error {
 	const q = `UPDATE applications SET preferred_room_id = NULL WHERE id = $1`
 	_, err := t.tx.Exec(ctx, q, id)
@@ -243,7 +251,7 @@ func scanApplicationRow(row pgx.Row) (*domain.Application, error) {
 	a := &domain.Application{}
 	var status string
 	var studyGroup, hometown, parentContact *string
-	err := row.Scan(&a.ID, &a.StudentID, &a.DormitoryID, &status, &a.PreferredRoomType, &a.PreferredRoomID, &a.Notes, &studyGroup, &hometown, &parentContact, &a.AssignedRoomID, &a.HandledBy, &a.ContractAgreedAt, &a.CreatedAt, &a.UpdatedAt)
+	err := row.Scan(&a.ID, &a.StudentID, &a.DormitoryID, &status, &a.PreferredRoomType, &a.PreferredRoomID, &a.Notes, &studyGroup, &hometown, &parentContact, &a.AssignedRoomID, &a.HandledBy, &a.ContractAgreedAt, &a.CreatedAt, &a.UpdatedAt, &a.HeldBedID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, repository.ErrNotFound
@@ -268,7 +276,7 @@ func scanApplicationRows(rows pgx.Rows) ([]*domain.Application, error) {
 		a := &domain.Application{}
 		var status string
 		var studyGroup, hometown, parentContact *string
-		if err := rows.Scan(&a.ID, &a.StudentID, &a.DormitoryID, &status, &a.PreferredRoomType, &a.PreferredRoomID, &a.Notes, &studyGroup, &hometown, &parentContact, &a.AssignedRoomID, &a.HandledBy, &a.ContractAgreedAt, &a.CreatedAt, &a.UpdatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.StudentID, &a.DormitoryID, &status, &a.PreferredRoomType, &a.PreferredRoomID, &a.Notes, &studyGroup, &hometown, &parentContact, &a.AssignedRoomID, &a.HandledBy, &a.ContractAgreedAt, &a.CreatedAt, &a.UpdatedAt, &a.HeldBedID); err != nil {
 			return nil, err
 		}
 		a.Status = domain.ApplicationStatus(status)

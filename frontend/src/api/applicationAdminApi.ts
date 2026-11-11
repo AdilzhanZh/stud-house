@@ -13,6 +13,8 @@ export type DecisionAction = 'approve' | 'reject' | 'request_correction'
 export interface DecideApplicationPayload {
   action: DecisionAction
   room_id?: string
+  // approve only: which bed of the room to reserve; omitted = first free.
+  bed_id?: string
   comment?: string
 }
 
@@ -58,6 +60,15 @@ export async function approveGreenApplications(ids: string[]): Promise<BulkResul
 export async function requestApplicationCorrections(ids: string[]): Promise<BulkResult[]> {
   const { data } = await apiClient.post<{ data: BulkResult[] }>('/application-triage/request-corrections', {
     application_ids: ids,
+  })
+  return data.data
+}
+
+// Moves an active application's bed reservation to another free bed of
+// the room it holds.
+export async function changeHeldBed(id: string, bedId: string): Promise<Application> {
+  const { data } = await apiClient.patch<{ data: Application }>(`/applications/${id}/held-bed`, {
+    bed_id: bedId,
   })
   return data.data
 }

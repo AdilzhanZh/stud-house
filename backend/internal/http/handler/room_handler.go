@@ -404,6 +404,58 @@ func (h *RoomHandler) RetireBed(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+type bedStatusRequest struct {
+	Status domain.BedServiceStatus `json:"status" binding:"required"`
+	Reason *string                 `json:"reason"`
+	// Until is the expected date the bed is back in service, YYYY-MM-DD.
+	Until *string `json:"until"`
+}
+
+// SetBedStatus (PATCH /beds/:bedId/status) takes a bed out of service
+// (repair / unavailable) or returns it to service (in_service).
+func (h *RoomHandler) SetBedStatus(c *gin.Context) {
+	bedID, ok := parseBedID(c)
+	if !ok {
+		return
+	}
+	var req bedStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.BadRequest(err.Error()))
+		return
+	}
+	var until *time.Time
+	if req.Until != nil && *req.Until != "" {
+		t, err := time.Parse(time.DateOnly, *req.Until)
+		if err != nil {
+			response.Error(c, apperror.BadRequest("күн форматы дұрыс емес (ЖЖЖЖ-АА-КК)"))
+			return
+		}
+		until = &t
+	}
+	actorID, _ := middleware.UserID(c)
+	bed, err := h.rooms.SetBedStatus(c.Request.Context(), bedID, req.Status, req.Reason, until, actorID)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, bedDTO(bed))
+}
+
+// BedStatusHistory (GET /beds/:bedId/status-history) lists the bed's
+// service-status changes, newest first.
+func (h *RoomHandler) BedStatusHistory(c *gin.Context) {
+	bedID, ok := parseBedID(c)
+	if !ok {
+		return
+	}
+	bed, changes, err := h.rooms.BedStatusHistory(c.Request.Context(), bedID)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, bedStatusHistoryDTO(bed, changes))
+}
+
 func (h *RoomHandler) BedHistory(c *gin.Context) {
 	bedID, ok := parseBedID(c)
 	if !ok {

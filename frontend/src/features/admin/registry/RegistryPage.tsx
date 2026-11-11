@@ -6,11 +6,40 @@ import { BedSingle, ChevronDown, ChevronRight, Download, Search } from 'lucide-r
 import { Card } from '../../../components/Card'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
+import { BedStatusBadge } from '../../../components/BedStatusBadge'
+import { bedStatusDotClass } from '../../../utils/bedStatus'
 import { extractErrorMessage } from '../../../api/client'
 import { getRegistry } from '../../../api/hierarchyApi'
 import { floorLabel } from '../../../utils/roomLocation'
 import { adminPageHeading } from '../adminTable'
 import type { RegistryObject } from '../../../types/hierarchy'
+import { BED_STATUSES, type BedStatus } from '../../../types/rooms'
+
+// Keeps only beds with the given status, dropping branches left empty.
+function filterByStatus(tree: RegistryObject[], status: BedStatus | null): RegistryObject[] {
+  if (!status) return tree
+  return tree.flatMap((d) => {
+    const dormitories = d.dormitories.flatMap((b) => {
+      const floors = b.floors.flatMap((f) => {
+        const rooms = f.rooms.flatMap((r) => {
+          const beds = r.beds.filter((bd) => bd.status === status)
+          return beds.length > 0 ? [{ ...r, beds }] : []
+        })
+        return rooms.length > 0 ? [{ ...f, rooms }] : []
+      })
+      return floors.length > 0 ? [{ ...b, floors }] : []
+    })
+    return dormitories.length > 0 ? [{ ...d, dormitories }] : []
+  })
+}
+
+function countStatuses(tree: RegistryObject[]): Record<BedStatus, number> {
+  const out = Object.fromEntries(BED_STATUSES.map((s) => [s, 0])) as Record<BedStatus, number>
+  for (const d of tree)
+    for (const b of d.dormitories)
+      for (const f of b.floors) for (const r of f.rooms) for (const bd of r.beds) out[bd.status] += 1
+  return out
+}
 
 // Keeps a node when it matches the search itself (then with everything under
 // it) or when something under it matches (then only the matching branches).
@@ -66,6 +95,8 @@ function exportCsv(tree: RegistryObject[], t: TFunction) {
     t('admin.dormitories.roomNumber'), 'ID',
     t('admin.rooms.bedField'), t('admin.rooms.bedCodeColumn'), 'ID',
     t('admin.rooms.statusColumn'),
+    t('admin.rooms.serviceReasonColumn'),
+    t('admin.rooms.serviceUntilColumn'),
   ]
   const lines = [header]
   for (const d of tree) {
@@ -81,7 +112,12 @@ function exportCsv(tree: RegistryObject[], t: TFunction) {
           const room = [...floor, r.room_number, r.id]
           if (r.beds.length === 0) lines.push(room)
           for (const bd of r.beds) {
-            lines.push([...room, bd.label, bd.code, bd.id, bd.occupied ? t('admin.rooms.bedOccupied') : t('admin.rooms.bedFree')])
+            lines.push([
+              ...room, bd.label, bd.code, bd.id,
+              t(`admin.rooms.bedStatus.${bd.status}`),
+              bd.service_reason ?? '',
+              bd.service_until ?? '',
+            ])
           }
         }
       }
@@ -118,6 +154,7 @@ export function RegistryPage() {
   const [tree, setTree] = useState<RegistryObject[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<BedStatus | null>(null)
   // Expanded node ids; objects start open. While searching every
   // matching branch is shown open.
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -131,8 +168,10 @@ export function RegistryPage() {
       .catch((err) => setError(extractErrorMessage(err, t('admin.common.loadError'))))
   }, [])
 
-  const visible = useMemo(() => (tree ? filterRegistry(tree, search, t) : []), [tree, search, t])
-  const searching = search.trim() !== ''
+  const searched = useMemo(() => (tree ? filterRegistry(tree, search, t) : []), [tree, search, t])
+  const visible = useMemo(() => filterByStatus(searched, statusFilter), [searched, statusFilter])
+  const statusTotals = useMemo(() => countStatuses(searched), [searched])
+  const searching = search.trim() !== '' || statusFilter != null
   const isOpen = (id: string) => searching || expanded.has(id)
   const toggle = (id: string) =>
     setExpanded((prev) => {
@@ -179,6 +218,33 @@ export function RegistryPage() {
             aria-label={t('admin.rooms.registrySearch')}
             className="min-w-0 flex-1 bg-transparent py-2.5 text-sm text-sand-100 outline-none placeholder:text-sand-400/60"
           />
+        </div>
+        <div className="flex flex-wrap gap-2" role="group" aria-label={t('admin.rooms.registryStatusFilter')}>
+          <button
+            type="button"
+            aria-pressed={statusFilter == null}
+            onClick={() => setStatusFilter(null)}
+            className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+              statusFilter == null ? 'bg-turquoise-500 text-on-accent' : 'bg-navy-800 text-sand-300 hover:bg-navy-700'
+            }`}
+          >
+            {t('admin.rooms.registryAllStatuses')}
+          </button>
+          {BED_STATUSES.map((s) => (
+            <button
+              key={s}
+              type="button"
+              aria-pressed={statusFilter === s}
+              onClick={() => setStatusFilter(statusFilter === s ? null : s)}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                statusFilter === s ? 'bg-turquoise-500 text-on-accent' : 'bg-navy-800 text-sand-300 hover:bg-navy-700'
+              }`}
+            >
+              <span className={`h-2 w-2 rounded-full ${bedStatusDotClass[s]}`} />
+              {t(`admin.rooms.bedStatus.${s}`)}
+              <span className="tabular-nums opacity-80">{statusTotals[s]}</span>
+            </button>
+          ))}
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={expandAll} disabled={searching}>
@@ -280,10 +346,13 @@ export function RegistryPage() {
                                                       {t('admin.rooms.bedLabel', { label: bd.label })}
                                                     </span>
                                                     <span className="font-mono text-xs text-sand-400">{bd.code}</span>
-                                                    <span
-                                                      className={`ml-auto text-xs ${bd.occupied ? 'text-amber-400' : 'text-mint-400'}`}
-                                                    >
-                                                      {bd.occupied ? t('admin.rooms.bedOccupied') : t('admin.rooms.bedFree')}
+                                                    {bd.service_reason && (
+                                                      <span className="min-w-0 truncate text-xs text-sand-300">
+                                                        {bd.service_reason}
+                                                      </span>
+                                                    )}
+                                                    <span className="ml-auto">
+                                                      <BedStatusBadge status={bd.status} />
                                                     </span>
                                                   </button>
                                                 </li>

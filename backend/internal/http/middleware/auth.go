@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -50,6 +51,11 @@ func RequireAuth(jwtSecret string) gin.HandlerFunc {
 		c.Set(ctxIsManager, claims.IsManager)
 		c.Set(ctxIsCommitteeMember, claims.IsCommitteeMember)
 		c.Set(ctxIsChairperson, claims.IsChairperson)
+		// Requests that may change data carry the user as the author of any
+		// bed status change they cause (see domain.BedLogContext).
+		if c.Request.Method != http.MethodGet && c.Request.Method != http.MethodHead {
+			c.Request = c.Request.WithContext(domain.WithBedActor(c.Request.Context(), claims.UserID))
+		}
 		c.Next()
 	}
 }

@@ -101,14 +101,28 @@ export const BED_STATUSES: BedStatus[] = ['free', 'reserved', 'occupied', 'repai
 // The part of a bed's status a manager sets by hand.
 export type BedServiceStatus = 'in_service' | 'repair' | 'unavailable'
 
+// The document behind a bed status change: заявление на заселение, бронь,
+// договор, заявление на выселение / на перевод, акт.
+export type BedBasisType = 'application' | 'reservation' | 'contract' | 'exit_request' | 'transfer_request' | 'act'
+
+// One entry of a bed's status log. changed_by null = the system, except on
+// backfilled entries (rebuilt from data older than the log), where author
+// and basis may simply be unknown.
 export interface BedStatusChange {
   id: string
-  old_status: BedServiceStatus
-  new_status: BedServiceStatus
+  old_status: BedStatus
+  new_status: BedStatus
   reason: string | null
   until: string | null
   changed_by: string | null
   changed_at: string
+  basis_type: BedBasisType | null
+  basis_id: string | null
+  act_number: string | null
+  act_date: string | null
+  act_file_url: string | null
+  student_id: string | null
+  backfilled: boolean
 }
 
 export interface BedStatusHistory {

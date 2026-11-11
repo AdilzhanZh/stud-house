@@ -804,16 +804,35 @@ func (s *RoomService) BedHistory(ctx context.Context, bedID uuid.UUID) (*domain.
 // maxBedServiceReasonLen caps the reason a bed is out of service.
 const maxBedServiceReasonLen = 500
 
+// maxBedActNumberLen matches bed_status_history.act_number VARCHAR(100).
+const maxBedActNumberLen = 100
+
 // SetBedStatus takes a bed out of service (repair — на ремонте,
-// unavailable — временно недоступно) or returns it to service. Taking it
-// out needs a reason; until, the expected date it is back, is optional and
-// may not be in the past. Returning to service clears both. A bed someone
-// lives on or an application holds must be freed first.
+// unavailable — временно недоступно) or returns it to service. Every such
+// change cites an act (акт): its number and date are required, the scanned
+// file optional; the act is the basis recorded in the bed's status log.
+// Taking a bed out also needs a reason; until, the expected date it is
+// back, is optional and may not be in the past. Returning to service clears
+// both. A bed someone lives on or an application holds must be freed first.
 func (s *RoomService) SetBedStatus(ctx context.Context, bedID uuid.UUID, status domain.BedServiceStatus,
-	reason *string, until *time.Time, actorID uuid.UUID) (*domain.Bed, error) {
+	reason *string, until *time.Time, act domain.BedAct, actorID uuid.UUID) (*domain.Bed, error) {
 	if !status.Valid() {
 		return nil, apperror.BadRequest("төсек-орын күйі дұрыс емес")
 	}
+	act.Number = strings.TrimSpace(act.Number)
+	if act.Number == "" || act.Date.IsZero() {
+		return nil, apperror.BadRequest("актінің нөмірі мен күні міндетті")
+	}
+	if len([]rune(act.Number)) > maxBedActNumberLen {
+		return nil, apperror.BadRequest(fmt.Sprintf("акт нөмірі %d таңбадан аспауы керек", maxBedActNumberLen))
+	}
+	if act.Date.Format(time.DateOnly) > time.Now().Format(time.DateOnly) {
+		return nil, apperror.BadRequest("акт күні болашақта болмауы керек")
+	}
+	if act.FileURL != nil && strings.TrimSpace(*act.FileURL) == "" {
+		act.FileURL = nil
+	}
+	ctx = domain.WithBedAct(domain.WithBedActor(ctx, actorID), act)
 	if status == domain.BedInService {
 		reason, until = nil, nil
 	} else {
@@ -848,7 +867,7 @@ func (s *RoomService) SetBedStatus(ctx context.Context, bedID uuid.UUID, status 
 	return nil, err
 }
 
-// BedStatusHistory returns the bed and its service-status changes, newest first.
+// BedStatusHistory returns the bed and its status log, newest first.
 func (s *RoomService) BedStatusHistory(ctx context.Context, bedID uuid.UUID) (*domain.Bed, []*domain.BedStatusChange, error) {
 	bed, err := s.rooms.GetBedByID(ctx, bedID)
 	if err != nil {

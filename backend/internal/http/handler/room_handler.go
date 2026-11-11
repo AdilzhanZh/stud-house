@@ -409,6 +409,11 @@ type bedStatusRequest struct {
 	Reason *string                 `json:"reason"`
 	// Until is the expected date the bed is back in service, YYYY-MM-DD.
 	Until *string `json:"until"`
+	// The act (акт) behind the change: number and date (YYYY-MM-DD) are
+	// required, the uploaded scan optional.
+	ActNumber  string  `json:"act_number"`
+	ActDate    string  `json:"act_date"`
+	ActFileURL *string `json:"act_file_url"`
 }
 
 // SetBedStatus (PATCH /beds/:bedId/status) takes a bed out of service
@@ -432,8 +437,17 @@ func (h *RoomHandler) SetBedStatus(c *gin.Context) {
 		}
 		until = &t
 	}
+	act := domain.BedAct{Number: req.ActNumber, FileURL: req.ActFileURL}
+	if req.ActDate != "" {
+		t, err := time.Parse(time.DateOnly, req.ActDate)
+		if err != nil {
+			response.Error(c, apperror.BadRequest("күн форматы дұрыс емес (ЖЖЖЖ-АА-КК)"))
+			return
+		}
+		act.Date = t
+	}
 	actorID, _ := middleware.UserID(c)
-	bed, err := h.rooms.SetBedStatus(c.Request.Context(), bedID, req.Status, req.Reason, until, actorID)
+	bed, err := h.rooms.SetBedStatus(c.Request.Context(), bedID, req.Status, req.Reason, until, act, actorID)
 	if err != nil {
 		response.Error(c, err)
 		return

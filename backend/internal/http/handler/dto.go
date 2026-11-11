@@ -382,13 +382,25 @@ func datePtr(t *time.Time) *string {
 }
 
 type bedStatusChangeResponse struct {
-	ID        uuid.UUID               `json:"id"`
-	OldStatus domain.BedServiceStatus `json:"old_status"`
-	NewStatus domain.BedServiceStatus `json:"new_status"`
-	Reason    *string                 `json:"reason"`
-	Until     *string                 `json:"until"`
-	ChangedBy *uuid.UUID              `json:"changed_by"`
-	ChangedAt time.Time               `json:"changed_at"`
+	ID        uuid.UUID        `json:"id"`
+	OldStatus domain.BedStatus `json:"old_status"`
+	NewStatus domain.BedStatus `json:"new_status"`
+	Reason    *string          `json:"reason"`
+	Until     *string          `json:"until"`
+	// nil = the system (e.g. a scheduled job), or unknown when backfilled.
+	ChangedBy *uuid.UUID `json:"changed_by"`
+	ChangedAt time.Time  `json:"changed_at"`
+	// The document behind the change: application, reservation, contract,
+	// exit_request, transfer_request (basis_id = that record) or act
+	// (act_*). May be null on backfilled entries.
+	BasisType  *domain.BedBasisType `json:"basis_type"`
+	BasisID    *uuid.UUID           `json:"basis_id"`
+	ActNumber  *string              `json:"act_number"`
+	ActDate    *string              `json:"act_date"`
+	ActFileURL *string              `json:"act_file_url"`
+	StudentID  *uuid.UUID           `json:"student_id"`
+	// Rebuilt from data older than the log (author/basis may be unknown).
+	Backfilled bool `json:"backfilled"`
 }
 
 type bedStatusHistoryResponse struct {
@@ -402,6 +414,9 @@ func bedStatusHistoryDTO(bed *domain.Bed, changes []*domain.BedStatusChange) bed
 		out.Changes = append(out.Changes, bedStatusChangeResponse{
 			ID: c.ID, OldStatus: c.OldStatus, NewStatus: c.NewStatus, Reason: c.Reason,
 			Until: datePtr(c.Until), ChangedBy: c.ChangedBy, ChangedAt: c.ChangedAt,
+			BasisType: c.BasisType, BasisID: c.BasisID, ActNumber: c.ActNumber,
+			ActDate: datePtr(c.ActDate), ActFileURL: c.ActFileURL, StudentID: c.StudentID,
+			Backfilled: c.Backfilled,
 		})
 	}
 	return out

@@ -27,6 +27,7 @@ import { ConfirmDialog } from '../../../components/ConfirmDialog'
 import { BedStatusBadge } from '../../../components/BedStatusBadge'
 import { bedStatusDotClass } from '../../../utils/bedStatus'
 import { BedStatusDialog } from './BedStatusDialog'
+import { BedStatusLog } from './BedStatusLog'
 import { extractErrorMessage } from '../../../api/client'
 import {
   addBeds,
@@ -342,7 +343,6 @@ export function RoomResidentsView() {
   })).filter((c) => c.count > 0)
   const today = new Date().toISOString().slice(0, 10)
   const nameOf = (studentId: string) => namesById[studentId] ?? studentId
-  const nameOfStaff = (userId: string) => staffNames[userId] ?? null
   function bedSubtitle(b: Bed): string {
     if (b.retired_at) return t('admin.rooms.bedRetired', { date: formatDate(b.retired_at) })
     if (b.student_id) return nameOf(b.student_id)
@@ -360,8 +360,6 @@ export function RoomResidentsView() {
     }
     return t('admin.rooms.bedFree')
   }
-  const serviceLabel = (s: 'in_service' | 'repair' | 'unavailable') =>
-    s === 'in_service' ? t('admin.rooms.bedServiceInService') : t(`admin.rooms.bedStatus.${s}`)
   const transferIsSameRoom = transferRoomId === room.id
   const bedName = (b: { label: string }) => t('admin.rooms.bedLabel', { label: b.label })
   const eligibleApplications = settledApplications.filter(
@@ -873,32 +871,7 @@ export function RoomResidentsView() {
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-sand-400">
                     {t('admin.rooms.bedHistoryStatuses')}
                   </p>
-                  {statusHistory.changes.length === 0 ? (
-                    <p className="text-sm text-sand-300">{t('admin.rooms.bedHistoryNoStatusChanges')}</p>
-                  ) : (
-                    <ul className="flex flex-col gap-2">
-                      {statusHistory.changes.map((c) => (
-                        <li key={c.id} className="rounded-2xl bg-navy-950/40 p-3">
-                          <p className="text-sm font-semibold text-sand-100">
-                            {t('admin.rooms.bedHistoryStatusChange', {
-                              from: serviceLabel(c.old_status),
-                              to: serviceLabel(c.new_status),
-                            })}
-                          </p>
-                          <p className="mt-0.5 text-xs text-sand-300">
-                            {[
-                              formatDate(c.changed_at),
-                              c.changed_by ? nameOfStaff(c.changed_by) : null,
-                              c.reason,
-                              c.until ? t('admin.rooms.bedServiceUntil', { date: formatDate(c.until) }) : null,
-                            ]
-                              .filter(Boolean)
-                              .join(' · ')}
-                          </p>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                  <BedStatusLog changes={statusHistory.changes} names={{ ...namesById, ...staffNames }} />
                 </section>
                 </div>
               )}

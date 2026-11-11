@@ -276,11 +276,6 @@ func (r *RoomRepo) SetBedServiceStatus(ctx context.Context, bedID uuid.UUID, sta
 		WHERE id = $1`, bedID, status, reason, until, changedBy); err != nil {
 		return nil, err
 	}
-	if _, err := tx.Exec(ctx, `
-		INSERT INTO bed_status_history (bed_id, old_status, new_status, reason, until, changed_by)
-		VALUES ($1, $2, $3, $4, $5, $6)`, bedID, bed.ServiceStatus, status, reason, until, changedBy); err != nil {
-		return nil, err
-	}
 	updated, err := scanBed(tx.QueryRow(ctx, bedSelect+` WHERE b.id = $1`, bedID))
 	if err != nil {
 		return nil, err
@@ -304,10 +299,11 @@ func equalDatePtr(a, b *time.Time) bool {
 
 func (r *RoomRepo) ListBedStatusHistory(ctx context.Context, bedID uuid.UUID) ([]*domain.BedStatusChange, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, bed_id, old_status, new_status, reason, until, changed_by, changed_at
+		SELECT id, bed_id, old_status, new_status, reason, until, changed_by, changed_at,
+			basis_type, basis_id, act_number, act_date, act_file_url, student_id, backfilled
 		FROM bed_status_history
 		WHERE bed_id = $1
-		ORDER BY changed_at DESC, id`, bedID)
+		ORDER BY seq DESC`, bedID)
 	if err != nil {
 		return nil, err
 	}
@@ -316,7 +312,8 @@ func (r *RoomRepo) ListBedStatusHistory(ctx context.Context, bedID uuid.UUID) ([
 	for rows.Next() {
 		c := &domain.BedStatusChange{}
 		if err := rows.Scan(&c.ID, &c.BedID, &c.OldStatus, &c.NewStatus, &c.Reason, &c.Until,
-			&c.ChangedBy, &c.ChangedAt); err != nil {
+			&c.ChangedBy, &c.ChangedAt, &c.BasisType, &c.BasisID, &c.ActNumber, &c.ActDate,
+			&c.ActFileURL, &c.StudentID, &c.Backfilled); err != nil {
 			return nil, err
 		}
 		out = append(out, c)

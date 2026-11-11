@@ -6,6 +6,7 @@ import { Input } from '../../../components/Input'
 import { Alert } from '../../../components/Alert'
 import { extractErrorMessage } from '../../../api/client'
 import { setBedStatus } from '../../../api/roomApi'
+import { uploadFile } from '../../../api/uploadApi'
 import type { Bed, BedServiceStatus } from '../../../types/rooms'
 
 interface BedStatusDialogProps {
@@ -22,6 +23,8 @@ function todayISO(): string {
 
 // Takes a bed out of service (на ремонте / временно недоступно, with a
 // reason and an optional expected end date) or returns it to service.
+// Every such change cites an act (акт): number and date required, a scan
+// optional; the act is the basis recorded in the bed's status log.
 // Only offered for beds nobody lives on or holds: an occupied or reserved
 // bed's status follows its stay/reservation automatically.
 export function BedStatusDialog({ bed, onClose, onSaved }: BedStatusDialogProps) {
@@ -31,6 +34,9 @@ export function BedStatusDialog({ bed, onClose, onSaved }: BedStatusDialogProps)
   const [status, setStatus] = useState<BedServiceStatus>(initial)
   const [reason, setReason] = useState(bed.service_reason ?? '')
   const [until, setUntil] = useState(bed.service_until ?? '')
+  const [actNumber, setActNumber] = useState('')
+  const [actDate, setActDate] = useState(todayISO())
+  const [actFile, setActFile] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -40,9 +46,11 @@ export function BedStatusDialog({ bed, onClose, onSaved }: BedStatusDialogProps)
     setError(null)
     setIsSaving(true)
     try {
+      const fileUrl = actFile ? await uploadFile(actFile) : undefined
+      const act = { number: actNumber.trim(), date: actDate, fileUrl }
       const updated = outOfService
-        ? await setBedStatus(bed.id, status, reason.trim(), until)
-        : await setBedStatus(bed.id, 'in_service')
+        ? await setBedStatus(bed.id, status, act, reason.trim(), until)
+        : await setBedStatus(bed.id, 'in_service', act)
       onSaved(updated)
     } catch (err) {
       setError(extractErrorMessage(err, t('admin.rooms.bedStatusFailed')))
@@ -59,7 +67,7 @@ export function BedStatusDialog({ bed, onClose, onSaved }: BedStatusDialogProps)
       onClick={onClose}
     >
       <div
-        className="flex w-full max-w-sm flex-col gap-4 rounded-[20px] bg-navy-900 p-6 shadow-[var(--shadow-card)]"
+        className="flex max-h-[90vh] w-full max-w-sm flex-col gap-4 overflow-y-auto rounded-[20px] bg-navy-900 p-6 shadow-[var(--shadow-card)]"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="font-heading text-lg text-sand-100">
@@ -95,11 +103,39 @@ export function BedStatusDialog({ bed, onClose, onSaved }: BedStatusDialogProps)
             />
           </>
         )}
+        <div className="flex flex-col gap-3 rounded-2xl bg-navy-950/40 p-3">
+          <p className="text-xs text-sand-300">{t('admin.rooms.bedActHint')}</p>
+          <Input
+            label={t('admin.rooms.bedActNumber')}
+            required
+            value={actNumber}
+            maxLength={100}
+            onChange={(e) => setActNumber(e.target.value)}
+          />
+          <Input
+            label={t('admin.rooms.bedActDate')}
+            type="date"
+            required
+            value={actDate}
+            max={todayISO()}
+            onChange={(e) => setActDate(e.target.value)}
+          />
+          <Input
+            label={t('admin.rooms.bedActFile')}
+            type="file"
+            accept=".pdf,image/*"
+            onChange={(e) => setActFile(e.target.files?.[0] ?? null)}
+          />
+        </div>
         <div className="mt-2 flex justify-end gap-3">
           <Button variant="secondary" onClick={onClose}>
             {t('common.cancel')}
           </Button>
-          <Button onClick={handleSave} isLoading={isSaving} disabled={outOfService && !reason.trim()}>
+          <Button
+            onClick={handleSave}
+            isLoading={isSaving}
+            disabled={(outOfService && !reason.trim()) || !actNumber.trim() || !actDate}
+          >
             {t('common.confirm')}
           </Button>
         </div>

@@ -173,12 +173,13 @@ type RoomRepository interface {
 	RetireBed(ctx context.Context, bedID uuid.UUID) error
 	// SetBedServiceStatus takes a bed out of service (repair/unavailable,
 	// with reason and optional expected end date) or returns it to service
-	// (reason/until must be nil), records the change in the bed's status
-	// history and returns the updated bed. A no-op change records nothing.
+	// (reason/until must be nil) and returns the updated bed. The status log
+	// entry is written by the database, with the author and act taken from
+	// ctx (domain.BedLogContext).
 	// Errors: ErrNotFound, ErrBedRetired, ErrBedOccupied, ErrBedReserved.
 	SetBedServiceStatus(ctx context.Context, bedID uuid.UUID, status domain.BedServiceStatus,
 		reason *string, until *time.Time, changedBy uuid.UUID) (*domain.Bed, error)
-	// ListBedStatusHistory returns the bed's service-status changes, newest first.
+	// ListBedStatusHistory returns the bed's status log, newest first.
 	ListBedStatusHistory(ctx context.Context, bedID uuid.UUID) ([]*domain.BedStatusChange, error)
 	// RenameBed returns ErrConflict if another active bed of the room has
 	// that label, ErrBedRetired if the bed is retired.

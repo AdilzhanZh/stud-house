@@ -114,11 +114,19 @@ export async function retireBed(bedId: string): Promise<void> {
   await apiClient.delete(`/beds/${bedId}`)
 }
 
+// The act (акт) behind a manual status change. date: YYYY-MM-DD.
+export interface BedActInput {
+  number: string
+  date: string
+  fileUrl?: string
+}
+
 // Takes a bed out of service (repair / unavailable, reason required) or
-// returns it to service. until: expected end date, YYYY-MM-DD.
+// returns it to service, citing an act. until: expected end date, YYYY-MM-DD.
 export async function setBedStatus(
   bedId: string,
   status: BedServiceStatus,
+  act: BedActInput,
   reason?: string,
   until?: string,
 ): Promise<Bed> {
@@ -126,6 +134,9 @@ export async function setBedStatus(
     status,
     reason: reason || undefined,
     until: until || undefined,
+    act_number: act.number,
+    act_date: act.date,
+    act_file_url: act.fileUrl || undefined,
   })
   return data.data
 }

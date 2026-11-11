@@ -177,16 +177,29 @@ func BedStatusOf(occupied, reserved bool, service BedServiceStatus) BedStatus {
 	return BedStatusFree
 }
 
-// BedStatusChange is one entry of a bed's service-status history.
+// BedStatusChange is one entry of a bed's status log: every change of its
+// status, when and by whom (nil ChangedBy = the system), the previous
+// status, and the document behind it (BasisType/BasisID, or the Act*
+// fields for an act). Reason/Until are the out-of-service details when the
+// new status is repair or unavailable. StudentID is the student the change
+// concerns, if any. Backfilled marks entries rebuilt from data that
+// predates the log: their author and basis may be unknown (nil).
 type BedStatusChange struct {
-	ID        uuid.UUID
-	BedID     uuid.UUID
-	OldStatus BedServiceStatus
-	NewStatus BedServiceStatus
-	Reason    *string
-	Until     *time.Time
-	ChangedBy *uuid.UUID
-	ChangedAt time.Time
+	ID         uuid.UUID
+	BedID      uuid.UUID
+	OldStatus  BedStatus
+	NewStatus  BedStatus
+	Reason     *string
+	Until      *time.Time
+	ChangedBy  *uuid.UUID
+	ChangedAt  time.Time
+	BasisType  *BedBasisType
+	BasisID    *uuid.UUID
+	ActNumber  *string
+	ActDate    *time.Time
+	ActFileURL *string
+	StudentID  *uuid.UUID
+	Backfilled bool
 }
 
 // BedCode formats a bed's permanent inventory number the way people see

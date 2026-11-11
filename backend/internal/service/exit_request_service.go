@@ -107,7 +107,9 @@ func (s *ExitRequestService) Decide(ctx context.Context, actorID, exitRequestID 
 	}
 
 	if approved {
-		if err := s.rooms.MoveOutResident(ctx, approvedResidentID); err != nil && !errors.Is(err, repository.ErrNotFound) {
+		// The exit request is the basis of the bed becoming free.
+		moveOutCtx := domain.WithBedBasis(ctx, domain.BedBasisExitRequest, exitRequestID)
+		if err := s.rooms.MoveOutResident(moveOutCtx, approvedResidentID); err != nil && !errors.Is(err, repository.ErrNotFound) {
 			return nil, err
 		}
 	}
